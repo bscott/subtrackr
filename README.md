@@ -2,6 +2,8 @@
 
 A self-hosted subscription management application built with Go and HTMX. Track your subscriptions, visualize spending, and get renewal reminders.
 
+![SubTrackr Dashboard](dashboard-screenshot.png)
+
 ![SubTrackr Dashboard](https://img.shields.io/badge/version-1.0.0-blue)
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.21-00ADD8)
 ![License](https://img.shields.io/badge/license-MIT-green)

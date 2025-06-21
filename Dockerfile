@@ -1,8 +1,12 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.21 AS builder
 
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev sqlite-dev
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libc6-dev \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -14,13 +18,17 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o subtrackr ./cmd/server
+RUN CGO_ENABLED=1 go build -o subtrackr ./cmd/server
 
 # Final stage
-FROM alpine:latest
+FROM debian:bookworm-slim
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates sqlite tzdata
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    sqlite3 \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
 RUN mkdir /app
 
 WORKDIR /app
@@ -28,8 +36,7 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /app/subtrackr .
 
-# Copy static files and templates
-COPY --from=builder /app/web ./web
+# Copy templates
 COPY --from=builder /app/templates ./templates
 
 # Create data directory for SQLite
