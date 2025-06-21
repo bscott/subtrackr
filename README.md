@@ -37,7 +37,7 @@ version: '3.8'
 
 services:
   subtrackr:
-    image: ghcr.io/yourusername/subtrackr:latest
+    image: bscott/subtrackr:latest
     container_name: subtrackr
     ports:
       - "8080:8080"
