@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - SubTrackr</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#3b82f6',
+                        'success': '#10b981',
+                        'warning': '#f59e0b',
+                        'danger': '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-4 py-3">
+            <div class="flex items-center justify-between max-w-7xl mx-auto">
+                <div class="flex items-center space-x-8">
+                    <h1 class="text-xl font-bold text-primary">SubTrackr</h1>
+                    <nav class="flex space-x-1">
+                        <a href="/" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"></path>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <a href="/subscriptions" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Subscriptions
+                        </a>
+                        <a href="/analytics" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Analytics
+                        </a>
+                    </nav>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button 
+                        hx-get="/form/subscription"
+                        hx-target="#modal-content"
+                        hx-trigger="click"
+                        onclick="document.getElementById('modal').classList.remove('hidden')"
+                        class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Add
+                    </button>
+                    <a href="/settings" class="text-primary">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4">
+            <div class="max-w-7xl mx-auto">
+
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Settings</h2>
+            <p class="text-sm text-gray-600 mt-1">Manage your SubTrackr preferences and data</p>
+        </div>
+        
+        <div class="p-6 space-y-8">
+            <!-- Export Data -->
+            <div>
+                <h3 class="text-base font-medium text-gray-900 mb-4">Export Data</h3>
+                <p class="text-sm text-gray-600 mb-4">Download your subscription data in various formats</p>
+                <div class="flex space-x-3">
+                    <a href="/api/export/csv" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 inline-block">
+                        Export as CSV
+                    </a>
+                    <a href="/api/export/json" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 inline-block">
+                        Export as JSON
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Data Management -->
+            <div class="border-t border-gray-200 pt-8">
+                <h3 class="text-base font-medium text-gray-900 mb-4">Data Management</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div>
+                            <h4 class="text-sm font-medium text-yellow-800">Backup Data</h4>
+                            <p class="text-sm text-yellow-700">Create a backup of all your subscription data</p>
+                        </div>
+                        <a href="/api/backup" class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-yellow-700 inline-block">
+                            Create Backup
+                        </a>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div>
+                            <h4 class="text-sm font-medium text-red-800">Clear All Data</h4>
+                            <p class="text-sm text-red-700">Permanently delete all subscription data</p>
+                        </div>
+                        <button 
+                            hx-delete="/api/clear-all"
+                            hx-confirm="Are you sure you want to delete all subscription data? This action cannot be undone."
+                            hx-target="body"
+                            hx-swap="none"
+                            class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700">
+                            Clear Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Email Notifications -->
+            <div class="border-t border-gray-200 pt-8">
+                <h3 class="text-base font-medium text-gray-900 mb-4">Email Notifications</h3>
+                
+                <!-- SMTP Settings -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-4">SMTP Configuration</h4>
+                    <form id="smtp-form" hx-post="/api/settings/smtp" hx-trigger="submit" hx-target="#smtp-message">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="smtp_host" class="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
+                                <input type="text" id="smtp_host" name="smtp_host" placeholder="smtp.gmail.com"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="smtp_port" class="block text-sm font-medium text-gray-700 mb-1">SMTP Port</label>
+                                <input type="number" id="smtp_port" name="smtp_port" placeholder="587"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="smtp_username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                <input type="email" id="smtp_username" name="smtp_username" placeholder="your-email@example.com"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="smtp_password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <input type="password" id="smtp_password" name="smtp_password" placeholder="••••••••"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="smtp_from" class="block text-sm font-medium text-gray-700 mb-1">From Email</label>
+                                <input type="email" id="smtp_from" name="smtp_from" placeholder="noreply@example.com"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="smtp_from_name" class="block text-sm font-medium text-gray-700 mb-1">From Name</label>
+                                <input type="text" id="smtp_from_name" name="smtp_from_name" placeholder="SubTrackr"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div id="smtp-message"></div>
+                            <div class="flex space-x-2">
+                                <button type="button" 
+                                        hx-post="/api/settings/smtp/test" 
+                                        hx-include="#smtp-form"
+                                        hx-target="#smtp-message"
+                                        class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">
+                                    Test Connection
+                                </button>
+                                <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
+                                    Save SMTP Settings
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Notification Preferences -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900">Renewal Reminders</h4>
+                            <p class="text-sm text-gray-600">Get notified before subscriptions renew</p>
+                        </div>
+                        <button hx-post="/api/settings/notifications/renewal" 
+                                hx-trigger="click"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-1"></span>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900">High Cost Alerts</h4>
+                            <p class="text-sm text-gray-600">Alert when adding expensive subscriptions</p>
+                        </div>
+                        <button hx-post="/api/settings/notifications/highcost"
+                                hx-trigger="click" 
+                                class="relative inline-flex h-6 w-11 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-6"></span>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900">Days Before Renewal</h4>
+                            <p class="text-sm text-gray-600">How many days before renewal to send reminder</p>
+                        </div>
+                        <input type="number" 
+                               name="reminder_days"
+                               value="7"
+                               min="1"
+                               max="30"
+                               hx-post="/api/settings/notifications/days"
+                               hx-trigger="change"
+                               class="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API Keys -->
+            <div class="border-t border-gray-200 pt-8">
+                <h3 class="text-base font-medium text-gray-900 mb-4">API Keys</h3>
+                <p class="text-sm text-gray-600 mb-4">Create API keys to access SubTrackr from external applications</p>
+                
+                <!-- API Key List -->
+                <div id="api-keys-list" class="space-y-2 mb-4">
+                    <div hx-get="/api/settings/apikeys" hx-trigger="load" hx-swap="innerHTML">
+                        <div class="text-center py-4 text-gray-500">
+                            Loading API keys...
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Create New API Key -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Create New API Key</h4>
+                    <form hx-post="/api/settings/apikeys" hx-target="#api-keys-list" hx-swap="innerHTML">
+                        <div class="flex items-end space-x-3">
+                            <div class="flex-1">
+                                <label for="api_key_name" class="block text-sm font-medium text-gray-700 mb-1">Key Name</label>
+                                <input type="text" 
+                                       id="api_key_name" 
+                                       name="name" 
+                                       required
+                                       placeholder="e.g., Home Assistant Integration"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
+                                Generate API Key
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- API Documentation Link -->
+                <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <p class="text-sm text-blue-800">
+                        <strong>API Documentation:</strong> Include the API key in the <code class="bg-blue-100 px-1 py-0.5 rounded">X-API-Key</code> header for all requests.
+                        <a href="#api-docs" class="text-blue-600 hover:text-blue-800 underline ml-1">View full API documentation</a>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- About -->
+            <div class="border-t border-gray-200 pt-8">
+                <h3 class="text-base font-medium text-gray-900 mb-4">About SubTrackr</h3>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Version</span>
+                        <span class="text-sm text-gray-600">1.0.0</span>
+                    </div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Build</span>
+                        <span class="text-sm text-gray-600">Go + HTMX</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">Database</span>
+                        <span class="text-sm text-gray-600">SQLite</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Documentation -->
+<div id="api-docs" class="mt-6">
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">API Documentation</h2>
+            
+            <div class="space-y-6">
+                <!-- Authentication -->
+                <div>
+                    <h3 class="text-md font-medium text-gray-900 mb-2">Authentication</h3>
+                    <p class="text-sm text-gray-600 mb-3">All API requests require authentication using an API key. Include your API key in the request headers:</p>
+                    <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm">
+                        <div class="mb-2">
+                            <span class="text-gray-500"># Authorization header (recommended)</span><br>
+                            Authorization: Bearer sk_your_api_key_here
+                        </div>
+                        <div>
+                            <span class="text-gray-500"># X-API-Key header (alternative)</span><br>
+                            X-API-Key: sk_your_api_key_here
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Endpoints -->
+                <div>
+                    <h3 class="text-md font-medium text-gray-900 mb-3">API Endpoints</h3>
+                    
+                    <!-- Subscriptions -->
+                    <div class="mb-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Subscriptions</h4>
+                        <div class="bg-gray-50 rounded-lg overflow-hidden">
+                            <table class="min-w-full">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Method</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Endpoint</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">List all subscriptions</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">POST</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Create a new subscription</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions/:id</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Get subscription details</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-medium">PUT</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions/:id</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Update subscription</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">DELETE</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions/:id</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Delete subscription</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Statistics & Export -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Statistics & Export</h4>
+                        <div class="bg-gray-50 rounded-lg overflow-hidden">
+                            <table class="min-w-full">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Method</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Endpoint</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/stats</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Get subscription statistics</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/export/csv</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Export subscriptions as CSV</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/export/json</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600">Export subscriptions as JSON</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Example Requests -->
+                <div>
+                    <h3 class="text-md font-medium text-gray-900 mb-3">Example Requests</h3>
+                    
+                    <div class="space-y-4">
+                        <!-- List Subscriptions -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">List Subscriptions</h4>
+                            <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                                <div class="text-green-400">curl -H "Authorization: Bearer sk_your_api_key_here" \</div>
+                                <div class="ml-4">http://localhost:8080/api/v1/subscriptions</div>
+                            </div>
+                        </div>
+
+                        <!-- Create Subscription -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Create Subscription</h4>
+                            <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                                <div class="text-green-400">curl -X POST \</div>
+                                <div class="ml-4">-H "Authorization: Bearer sk_your_api_key_here" \</div>
+                                <div class="ml-4">-H "Content-Type: application/json" \</div>
+                                <div class="ml-4">-d '{</div>
+                                <div class="ml-8">"name": "Netflix",</div>
+                                <div class="ml-8">"cost": 15.99,</div>
+                                <div class="ml-8">"schedule": "Monthly",</div>
+                                <div class="ml-8">"status": "Active",</div>
+                                <div class="ml-8">"category": "Entertainment"</div>
+                                <div class="ml-4">}' \</div>
+                                <div class="ml-4">http://localhost:8080/api/v1/subscriptions</div>
+                            </div>
+                        </div>
+
+                        <!-- Get Statistics -->
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">Get Statistics</h4>
+                            <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                                <div class="text-green-400">curl -H "Authorization: Bearer sk_your_api_key_here" \</div>
+                                <div class="ml-4">http://localhost:8080/api/v1/stats</div>
+                            </div>
+                            <div class="mt-2">
+                                <h5 class="text-xs font-medium text-gray-600 mb-1">Response:</h5>
+                                <div class="bg-gray-50 rounded-lg p-3 font-mono text-xs">
+<pre>{
+  "total_count": 15,
+  "active_count": 12,
+  "total_cost": 245.67,
+  "categories": {
+    "Entertainment": 45.99,
+    "Productivity": 89.00,
+    "Storage": 29.99
+  }
+}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Resources -->
+                <div>
+                    <h3 class="text-md font-medium text-gray-900 mb-2">Additional Resources</h3>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div class="text-sm text-blue-800">
+                                <p>For more detailed API documentation and examples, check the README file in the project repository.</p>
+                                <p class="mt-1">The test script <code class="bg-blue-100 px-1 py-0.5 rounded">test-api.sh</code> provides interactive examples of API usage.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+            <div id="modal-content">
+                <!-- Dynamic content loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Close modal when clicking outside
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+            }
+        });
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.getElementById('modal').classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

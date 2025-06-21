@@ -1,0 +1,38 @@
+# Ignore unnecessary files for Docker build
+node_modules/
+.git/
+.gitignore
+README.md
+SUBTRACKR-README.md
+QUICK-START.md
+product-spec.md
+rebuild.sh
+remove-configs.sh
+
+# React build artifacts (we're not using React anymore)
+src/
+public/
+package.json
+package-lock.json
+tsconfig.json
+tailwind.config*
+postcss.config*
+
+# Development files
+*.log
+.env
+.DS_Store
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/

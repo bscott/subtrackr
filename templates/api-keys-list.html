@@ -1,0 +1,49 @@
+{{if .Keys}}
+    {{range .Keys}}
+    <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+        <div class="flex-1">
+            <div class="flex items-center space-x-3">
+                <h5 class="text-sm font-medium text-gray-900">{{.Name}}</h5>
+                {{if .IsNew}}
+                <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">New</span>
+                {{end}}
+            </div>
+            {{if .IsNew}}
+            <div class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                <p class="text-xs text-yellow-800 mb-1">
+                    <strong>Important:</strong> Copy this API key now. You won't be able to see it again!
+                </p>
+                <div class="flex items-center space-x-2">
+                    <code class="flex-1 text-xs bg-yellow-100 px-2 py-1 rounded font-mono">{{.Key}}</code>
+                    <button onclick="navigator.clipboard.writeText('{{.Key}}')" 
+                            class="text-yellow-700 hover:text-yellow-900">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {{else}}
+            <div class="text-xs text-gray-500 mt-1">
+                Created: {{.CreatedAt.Format "Jan 2, 2006"}} • 
+                {{if .LastUsed}}Last used: {{.LastUsed.Format "Jan 2, 2006"}}{{else}}Never used{{end}} • 
+                Usage: {{.UsageCount}} requests
+            </div>
+            {{end}}
+        </div>
+        <button hx-delete="/api/settings/apikeys/{{.ID}}"
+                hx-confirm="Are you sure you want to delete this API key?"
+                hx-target="#api-keys-list"
+                hx-swap="innerHTML"
+                class="ml-4 text-gray-400 hover:text-danger">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+        </button>
+    </div>
+    {{end}}
+{{else}}
+    <div class="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+        No API keys created yet
+    </div>
+{{end}}

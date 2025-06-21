@@ -1,0 +1,166 @@
+<div class="p-6">
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-gray-900">
+            {{if .IsEdit}}Edit{{else}}Add{{end}} Subscription
+        </h3>
+        <button onclick="document.getElementById('modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+
+    <div id="form-errors" class="mb-4"></div>
+
+    <form {{if .IsEdit}}hx-put="/api/subscriptions/{{.Subscription.ID}}"{{else}}hx-post="/api/subscriptions"{{end}} 
+          hx-target="#form-errors">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Name -->
+            <div class="md:col-span-2">
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                <input type="text" id="name" name="name" required
+                       value="{{if .Subscription}}{{.Subscription.Name}}{{end}}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- Category -->
+            <div>
+                <label for="category" class="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                <select id="category" name="category" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                    <option value="">Select category</option>
+                    <option value="Entertainment" {{if .Subscription}}{{if eq .Subscription.Category "Entertainment"}}selected{{end}}{{end}}>Entertainment</option>
+                    <option value="Productivity" {{if .Subscription}}{{if eq .Subscription.Category "Productivity"}}selected{{end}}{{end}}>Productivity</option>
+                    <option value="Storage" {{if .Subscription}}{{if eq .Subscription.Category "Storage"}}selected{{end}}{{end}}>Storage</option>
+                    <option value="Software" {{if .Subscription}}{{if eq .Subscription.Category "Software"}}selected{{end}}{{end}}>Software</option>
+                    <option value="Fitness" {{if .Subscription}}{{if eq .Subscription.Category "Fitness"}}selected{{end}}{{end}}>Fitness</option>
+                    <option value="Education" {{if .Subscription}}{{if eq .Subscription.Category "Education"}}selected{{end}}{{end}}>Education</option>
+                    <option value="Food" {{if .Subscription}}{{if eq .Subscription.Category "Food"}}selected{{end}}{{end}}>Food</option>
+                    <option value="Travel" {{if .Subscription}}{{if eq .Subscription.Category "Travel"}}selected{{end}}{{end}}>Travel</option>
+                    <option value="Business" {{if .Subscription}}{{if eq .Subscription.Category "Business"}}selected{{end}}{{end}}>Business</option>
+                    <option value="Other" {{if .Subscription}}{{if eq .Subscription.Category "Other"}}selected{{end}}{{end}}>Other</option>
+                </select>
+            </div>
+
+            <!-- Cost -->
+            <div>
+                <label for="cost" class="block text-sm font-medium text-gray-700 mb-2">Cost *</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-2 text-gray-500">$</span>
+                    <input type="number" id="cost" name="cost" step="0.01" min="0" required
+                           value="{{if .Subscription}}{{.Subscription.Cost}}{{end}}"
+                           class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                </div>
+            </div>
+
+            <!-- Schedule -->
+            <div>
+                <label for="schedule" class="block text-sm font-medium text-gray-700 mb-2">Schedule *</label>
+                <select id="schedule" name="schedule" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                    <option value="">Select schedule</option>
+                    <option value="Monthly" {{if .Subscription}}{{if eq .Subscription.Schedule "Monthly"}}selected{{end}}{{end}}>Monthly</option>
+                    <option value="Annual" {{if .Subscription}}{{if eq .Subscription.Schedule "Annual"}}selected{{end}}{{end}}>Annual</option>
+                    <option value="Weekly" {{if .Subscription}}{{if eq .Subscription.Schedule "Weekly"}}selected{{end}}{{end}}>Weekly</option>
+                    <option value="Daily" {{if .Subscription}}{{if eq .Subscription.Schedule "Daily"}}selected{{end}}{{end}}>Daily</option>
+                </select>
+            </div>
+
+            <!-- Status -->
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
+                <select id="status" name="status" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                    <option value="">Select status</option>
+                    <option value="Active" {{if .Subscription}}{{if eq .Subscription.Status "Active"}}selected{{end}}{{end}}>Active</option>
+                    <option value="Cancelled" {{if .Subscription}}{{if eq .Subscription.Status "Cancelled"}}selected{{end}}{{end}}>Cancelled</option>
+                    <option value="Paused" {{if .Subscription}}{{if eq .Subscription.Status "Paused"}}selected{{end}}{{end}}>Paused</option>
+                    <option value="Trial" {{if .Subscription}}{{if eq .Subscription.Status "Trial"}}selected{{end}}{{end}}>Trial</option>
+                </select>
+            </div>
+
+            <!-- Payment Method -->
+            <div>
+                <label for="payment_method" class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <input type="text" id="payment_method" name="payment_method"
+                       value="{{if .Subscription}}{{.Subscription.PaymentMethod}}{{end}}"
+                       placeholder="e.g., Visa ****1234"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- Account -->
+            <div>
+                <label for="account" class="block text-sm font-medium text-gray-700 mb-2">Account</label>
+                <input type="text" id="account" name="account"
+                       value="{{if .Subscription}}{{.Subscription.Account}}{{end}}"
+                       placeholder="Account email or username"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- URL -->
+            <div class="md:col-span-2">
+                <label for="url" class="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
+                <input type="url" id="url" name="url"
+                       value="{{if .Subscription}}{{.Subscription.URL}}{{end}}"
+                       placeholder="https://example.com"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- Start Date -->
+            <div>
+                <label for="start_date" class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <input type="date" id="start_date" name="start_date"
+                       value="{{if .Subscription}}{{if .Subscription.StartDate}}{{.Subscription.StartDate.Format "2006-01-02"}}{{end}}{{end}}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- Renewal Date -->
+            <div>
+                <label for="renewal_date" class="block text-sm font-medium text-gray-700 mb-2">Next Renewal</label>
+                <input type="date" id="renewal_date" name="renewal_date"
+                       value="{{if .Subscription}}{{if .Subscription.RenewalDate}}{{.Subscription.RenewalDate.Format "2006-01-02"}}{{end}}{{end}}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- Cancellation Date -->
+            <div>
+                <label for="cancellation_date" class="block text-sm font-medium text-gray-700 mb-2">Cancellation Date</label>
+                <input type="date" id="cancellation_date" name="cancellation_date"
+                       value="{{if .Subscription}}{{if .Subscription.CancellationDate}}{{.Subscription.CancellationDate.Format "2006-01-02"}}{{end}}{{end}}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            </div>
+
+            <!-- Usage -->
+            <div>
+                <label for="usage" class="block text-sm font-medium text-gray-700 mb-2">Usage Level</label>
+                <select id="usage" name="usage"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                    <option value="">Select usage</option>
+                    <option value="High" {{if .Subscription}}{{if eq .Subscription.Usage "High"}}selected{{end}}{{end}}>High</option>
+                    <option value="Medium" {{if .Subscription}}{{if eq .Subscription.Usage "Medium"}}selected{{end}}{{end}}>Medium</option>
+                    <option value="Low" {{if .Subscription}}{{if eq .Subscription.Usage "Low"}}selected{{end}}{{end}}>Low</option>
+                    <option value="None" {{if .Subscription}}{{if eq .Subscription.Usage "None"}}selected{{end}}{{end}}>None</option>
+                </select>
+            </div>
+
+            <!-- Notes -->
+            <div class="md:col-span-2">
+                <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea id="notes" name="notes" rows="3"
+                          placeholder="Additional notes about this subscription"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">{{if .Subscription}}{{.Subscription.Notes}}{{end}}</textarea>
+            </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+            <button type="button" onclick="document.getElementById('modal').classList.add('hidden')"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </button>
+            <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90">
+                {{if .IsEdit}}Update{{else}}Add{{end}} Subscription
+            </button>
+        </div>
+    </form>
+</div>

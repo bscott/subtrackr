@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - SubTrackr</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#3b82f6',
+                        'success': '#10b981',
+                        'warning': '#f59e0b',
+                        'danger': '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-4 py-3">
+            <div class="flex items-center justify-between max-w-7xl mx-auto">
+                <div class="flex items-center space-x-8">
+                    <h1 class="text-xl font-bold text-primary">SubTrackr</h1>
+                    <nav class="flex space-x-1">
+                        <a href="/" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"></path>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <a href="/subscriptions" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Subscriptions
+                        </a>
+                        <a href="/analytics" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Analytics
+                        </a>
+                    </nav>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button 
+                        hx-get="/form/subscription"
+                        hx-target="#modal-content"
+                        hx-trigger="click"
+                        onclick="document.getElementById('modal').classList.remove('hidden')"
+                        class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Add
+                    </button>
+                    <a href="/settings" class="text-gray-600 hover:text-gray-900">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4">
+            <div class="max-w-7xl mx-auto">
+
+<!-- Stats Overview -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <h3 class="text-sm font-medium text-gray-600 mb-2">Total Monthly Spend</h3>
+        <p class="text-2xl font-bold text-primary">${{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
+        <p class="text-xs text-gray-500 mt-1">Across {{.Stats.ActiveSubscriptions}} active subscriptions</p>
+    </div>
+    
+    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <h3 class="text-sm font-medium text-gray-600 mb-2">Total Annual Spend</h3>
+        <p class="text-2xl font-bold text-success">${{printf "%.2f" .Stats.TotalAnnualSpend}}</p>
+        <p class="text-xs text-gray-500 mt-1">Projected yearly cost</p>
+    </div>
+    
+    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <h3 class="text-sm font-medium text-gray-600 mb-2">Annual Savings</h3>
+        <p class="text-2xl font-bold text-danger">${{printf "%.2f" .Stats.TotalSaved}}</p>
+        <p class="text-xs text-gray-500 mt-1">From {{.Stats.CancelledSubscriptions}} cancelled subscriptions</p>
+    </div>
+</div>
+
+<!-- Category Breakdown -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Category Spending Chart -->
+    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 mb-6">Spending by Category</h3>
+        <div class="space-y-4">
+            {{range $category, $amount := .Stats.CategorySpending}}
+            <div class="flex items-center justify-between">
+                <div class="flex items-center flex-1">
+                    <div class="w-3 h-3 bg-primary rounded-full mr-3"></div>
+                    <span class="text-sm font-medium text-gray-700 min-w-0 flex-1">{{$category}}</span>
+                </div>
+                <div class="flex items-center space-x-4 ml-4">
+                    <div class="w-24 bg-gray-200 rounded-full h-2">
+                        <div class="bg-primary h-2 rounded-full" style="width: {{printf "%.0f" (div $amount 1.5)}}%"></div>
+                    </div>
+                    <span class="text-sm font-medium text-gray-900 w-16 text-right">${{printf "%.2f" $amount}}</span>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    
+    <!-- Subscription Status -->
+    <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 mb-6">Subscription Status</h3>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                <div class="flex items-center">
+                    <div class="w-3 h-3 bg-success rounded-full mr-3"></div>
+                    <span class="text-sm font-medium text-gray-700">Active</span>
+                </div>
+                <span class="text-lg font-bold text-success">{{.Stats.ActiveSubscriptions}}</span>
+            </div>
+            
+            <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+                <div class="flex items-center">
+                    <div class="w-3 h-3 bg-danger rounded-full mr-3"></div>
+                    <span class="text-sm font-medium text-gray-700">Cancelled</span>
+                </div>
+                <span class="text-lg font-bold text-danger">{{.Stats.CancelledSubscriptions}}</span>
+            </div>
+            
+            <div class="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
+                <div class="flex items-center">
+                    <div class="w-3 h-3 bg-warning rounded-full mr-3"></div>
+                    <span class="text-sm font-medium text-gray-700">Upcoming Renewals</span>
+                </div>
+                <span class="text-lg font-bold text-warning">{{.Stats.UpcomingRenewals}}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cost Analysis -->
+<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+    <h3 class="text-lg font-semibold text-gray-900 mb-6">Cost Analysis</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="text-center p-4 bg-blue-50 rounded-lg">
+            <p class="text-2xl font-bold text-primary">${{printf "%.2f" (div .Stats.TotalMonthlySpend 30)}}</p>
+            <p class="text-sm text-gray-600">Average Daily Cost</p>
+        </div>
+        
+        <div class="text-center p-4 bg-green-50 rounded-lg">
+            <p class="text-2xl font-bold text-success">${{printf "%.2f" (div .Stats.TotalAnnualSpend 12)}}</p>
+            <p class="text-sm text-gray-600">Average Monthly Cost</p>
+        </div>
+        
+        <div class="text-center p-4 bg-purple-50 rounded-lg">
+            <p class="text-2xl font-bold text-purple-600">{{if gt .Stats.ActiveSubscriptions 0}}${{printf "%.2f" (div .Stats.TotalMonthlySpend .Stats.ActiveSubscriptions)}}{{else}}$0.00{{end}}</p>
+            <p class="text-sm text-gray-600">Average Cost per Subscription</p>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+            <div id="modal-content">
+                <!-- Dynamic content loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Close modal when clicking outside
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+            }
+        });
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.getElementById('modal').classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
