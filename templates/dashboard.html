@@ -153,7 +153,8 @@
             </div>
             <div class="flex items-center space-x-4">
                 <div class="w-32 bg-gray-200 rounded-full h-2">
-                    <div class="bg-primary h-2 rounded-full" style="width: {{printf "%.0f" (div $amount 1.5)}}%"></div>
+                    <div class="bg-primary h-2 rounded-full transition-all duration-300" 
+                         style="width: {{if gt $.Stats.TotalMonthlySpend 0}}{{printf "%.1f" (div (mul $amount 100) $.Stats.TotalMonthlySpend)}}{{else}}0{{end}}%"></div>
                 </div>
                 <span class="text-sm font-medium text-gray-900 w-16 text-right">${{printf "%.2f" $amount}}</span>
             </div>
