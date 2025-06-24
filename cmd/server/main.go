@@ -41,7 +41,7 @@ func main() {
 	settingsService := service.NewSettingsService(settingsRepo)
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 
 	// Setup Gin router
@@ -135,6 +135,9 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		api.GET("/settings/apikeys", settingsHandler.ListAPIKeys)
 		api.POST("/settings/apikeys", settingsHandler.CreateAPIKey)
 		api.DELETE("/settings/apikeys/:id", settingsHandler.DeleteAPIKey)
+		
+		// Currency setting
+		api.POST("/settings/currency", settingsHandler.UpdateCurrency)
 	}
 
 	// Public API routes (require API key authentication)

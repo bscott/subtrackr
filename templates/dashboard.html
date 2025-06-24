@@ -82,7 +82,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-600">Monthly Spend</p>
-                <p class="text-3xl font-bold text-primary">${{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
+                <p class="text-3xl font-bold text-primary">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
             </div>
             <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
@@ -98,7 +98,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-600">Annual Spend</p>
-                <p class="text-3xl font-bold text-success">${{printf "%.2f" .Stats.TotalAnnualSpend}}</p>
+                <p class="text-3xl font-bold text-success">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalAnnualSpend}}</p>
             </div>
             <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                 <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,7 +128,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-600">Monthly Savings</p>
-                <p class="text-3xl font-bold text-danger">${{printf "%.2f" .Stats.MonthlySaved}}</p>
+                <p class="text-3xl font-bold text-danger">{{.CurrencySymbol}}{{printf "%.2f" .Stats.MonthlySaved}}</p>
                 <p class="text-xs text-gray-500">From cancellations</p>
             </div>
             <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -156,7 +156,7 @@
                     <div class="bg-primary h-2 rounded-full transition-all duration-300" 
                          style="width: {{if gt $.Stats.TotalMonthlySpend 0}}{{printf "%.1f" (div (mul $amount 100) $.Stats.TotalMonthlySpend)}}{{else}}0{{end}}%"></div>
                 </div>
-                <span class="text-sm font-medium text-gray-900 w-16 text-right">${{printf "%.2f" $amount}}</span>
+                <span class="text-sm font-medium text-gray-900 w-16 text-right">{{$.CurrencySymbol}}{{printf "%.2f" $amount}}</span>
             </div>
         </div>
         {{end}}
@@ -181,7 +181,7 @@
                 </div>
             </div>
             <div class="text-right">
-                <p class="text-sm font-medium text-gray-900">${{printf "%.2f" .Cost}}</p>
+                <p class="text-sm font-medium text-gray-900">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</p>
                 <p class="text-sm text-gray-500">{{.Schedule}}</p>
             </div>
         </div>
