@@ -167,7 +167,7 @@
         </div>
         
         <div class="text-center p-4 bg-purple-50 rounded-lg">
-            <p class="text-2xl font-bold text-purple-600">{{if gt .Stats.ActiveSubscriptions 0}}{{.CurrencySymbol}}{{printf "%.2f" (div .Stats.TotalMonthlySpend .Stats.ActiveSubscriptions)}}{{else}}$0.00{{end}}</p>
+            <p class="text-2xl font-bold text-purple-600">{{if gt .Stats.ActiveSubscriptions 0}}{{.CurrencySymbol}}{{printf "%.2f" (div .Stats.TotalMonthlySpend .Stats.ActiveSubscriptions)}}{{else}}{{.CurrencySymbol}}0.00{{end}}</p>
             <p class="text-sm text-gray-600">Average Cost per Subscription</p>
         </div>
     </div>
