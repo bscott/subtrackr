@@ -196,8 +196,10 @@
                         </div>
                         <button hx-post="/api/settings/notifications/renewal" 
                                 hx-trigger="click"
-                                class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-1"></span>
+                                hx-swap="none"
+                                id="renewal-toggle"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full {{if .RenewalReminders}}bg-primary{{else}}bg-gray-200{{end}} transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform {{if .RenewalReminders}}translate-x-6{{else}}translate-x-1{{end}}"></span>
                         </button>
                     </div>
                     
@@ -207,9 +209,11 @@
                             <p class="text-sm text-gray-600">Alert when adding expensive subscriptions</p>
                         </div>
                         <button hx-post="/api/settings/notifications/highcost"
-                                hx-trigger="click" 
-                                class="relative inline-flex h-6 w-11 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
-                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-6"></span>
+                                hx-trigger="click"
+                                hx-swap="none"
+                                id="highcost-toggle" 
+                                class="relative inline-flex h-6 w-11 items-center rounded-full {{if .HighCostAlerts}}bg-primary{{else}}bg-gray-200{{end}} transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-transform {{if .HighCostAlerts}}translate-x-6{{else}}translate-x-1{{end}}"></span>
                         </button>
                     </div>
                     
@@ -220,14 +224,49 @@
                         </div>
                         <input type="number" 
                                name="reminder_days"
-                               value="7"
+                               value="{{.ReminderDays}}"
                                min="1"
                                max="30"
                                hx-post="/api/settings/notifications/days"
                                hx-trigger="change"
+                               hx-swap="none"
                                class="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary">
                     </div>
                 </div>
+            </div>
+            
+            <!-- Currency Settings -->
+            <div class="border-t border-gray-200 pt-8">
+                <h3 class="text-base font-medium text-gray-900 mb-4">Currency</h3>
+                <p class="text-sm text-gray-600 mb-4">Choose your preferred currency for displaying subscription costs</p>
+                
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center">
+                        <input type="radio" 
+                               name="currency" 
+                               value="USD" 
+                               {{if or (eq .Currency "USD") (eq .Currency "")}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "USD"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700">$ USD (US Dollar)</span>
+                    </label>
+                    
+                    <label class="flex items-center">
+                        <input type="radio" 
+                               name="currency" 
+                               value="EUR"
+                               {{if eq .Currency "EUR"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "EUR"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700">€ EUR (Euro)</span>
+                    </label>
+                </div>
+                
+                <div id="currency-message" class="mt-2"></div>
             </div>
             
             <!-- API Keys -->
@@ -503,6 +542,45 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 document.getElementById('modal').classList.add('hidden');
+            }
+        });
+
+        // Handle toggle button responses
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/settings/notifications/renewal') {
+                const response = JSON.parse(evt.detail.xhr.responseText);
+                const toggle = document.getElementById('renewal-toggle');
+                const span = toggle.querySelector('span');
+                
+                if (response.enabled) {
+                    toggle.classList.remove('bg-gray-200');
+                    toggle.classList.add('bg-primary');
+                    span.classList.remove('translate-x-1');
+                    span.classList.add('translate-x-6');
+                } else {
+                    toggle.classList.remove('bg-primary');
+                    toggle.classList.add('bg-gray-200');
+                    span.classList.remove('translate-x-6');
+                    span.classList.add('translate-x-1');
+                }
+            }
+            
+            if (evt.detail.pathInfo.requestPath === '/api/settings/notifications/highcost') {
+                const response = JSON.parse(evt.detail.xhr.responseText);
+                const toggle = document.getElementById('highcost-toggle');
+                const span = toggle.querySelector('span');
+                
+                if (response.enabled) {
+                    toggle.classList.remove('bg-gray-200');
+                    toggle.classList.add('bg-primary');
+                    span.classList.remove('translate-x-1');
+                    span.classList.add('translate-x-6');
+                } else {
+                    toggle.classList.remove('bg-primary');
+                    toggle.classList.add('bg-gray-200');
+                    span.classList.remove('translate-x-6');
+                    span.classList.add('translate-x-1');
+                }
             }
         });
     </script>

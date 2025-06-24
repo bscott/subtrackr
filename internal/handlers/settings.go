@@ -287,3 +287,19 @@ func (h *SettingsHandler) DeleteAPIKey(c *gin.Context) {
 	// Return updated list
 	h.ListAPIKeys(c)
 }
+
+// UpdateCurrency updates the currency preference
+func (h *SettingsHandler) UpdateCurrency(c *gin.Context) {
+	currency := c.PostForm("currency")
+	
+	err := h.service.SetCurrency(currency)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"currency": currency,
+		"symbol": h.service.GetCurrencySymbol(),
+	})
+}

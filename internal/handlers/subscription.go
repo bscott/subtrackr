@@ -13,11 +13,15 @@ import (
 )
 
 type SubscriptionHandler struct {
-	service *service.SubscriptionService
+	service         *service.SubscriptionService
+	settingsService *service.SettingsService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService) *SubscriptionHandler {
-	return &SubscriptionHandler{service: service}
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService) *SubscriptionHandler {
+	return &SubscriptionHandler{
+		service:         service,
+		settingsService: settingsService,
+	}
 }
 
 // Dashboard renders the main dashboard page
@@ -41,10 +45,11 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
-		"Title":         "Dashboard",
-		"CurrentPage":   "dashboard",
-		"Stats":         stats,
-		"Subscriptions": recentSubs,
+		"Title":          "Dashboard",
+		"CurrentPage":    "dashboard",
+		"Stats":          stats,
+		"Subscriptions":  recentSubs,
+		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 	})
 }
 
@@ -57,9 +62,10 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "subscriptions.html", gin.H{
-		"Title":         "Subscriptions",
-		"CurrentPage":   "subscriptions",
-		"Subscriptions": subscriptions,
+		"Title":          "Subscriptions",
+		"CurrentPage":    "subscriptions",
+		"Subscriptions":  subscriptions,
+		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 	})
 }
 
@@ -72,17 +78,23 @@ func (h *SubscriptionHandler) Analytics(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "analytics.html", gin.H{
-		"Title":       "Analytics",
-		"CurrentPage": "analytics",
-		"Stats":       stats,
+		"Title":          "Analytics",
+		"CurrentPage":    "analytics",
+		"Stats":          stats,
+		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 	})
 }
 
 // Settings renders the settings page
 func (h *SubscriptionHandler) Settings(c *gin.Context) {
 	c.HTML(http.StatusOK, "settings.html", gin.H{
-		"Title":       "Settings",
-		"CurrentPage": "settings",
+		"Title":            "Settings",
+		"CurrentPage":      "settings",
+		"Currency":         h.settingsService.GetCurrency(),
+		"CurrencySymbol":   h.settingsService.GetCurrencySymbol(),
+		"RenewalReminders": h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
+		"HighCostAlerts":   h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
+		"ReminderDays":     h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
 	})
 }
 
@@ -97,7 +109,8 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
-		"Subscriptions": subscriptions,
+		"Subscriptions":  subscriptions,
+		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 	})
 }
 
@@ -265,8 +278,9 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "subscription-form.html", gin.H{
-		"Subscription": subscription,
-		"IsEdit":       isEdit,
+		"Subscription":   subscription,
+		"IsEdit":         isEdit,
+		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 	})
 }
 
