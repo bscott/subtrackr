@@ -546,41 +546,33 @@
         });
 
         // Handle toggle button responses
-        document.body.addEventListener('htmx:afterRequest', function(evt) {
-            if (evt.detail.pathInfo.requestPath === '/api/settings/notifications/renewal') {
-                const response = JSON.parse(evt.detail.xhr.responseText);
-                const toggle = document.getElementById('renewal-toggle');
-                const span = toggle.querySelector('span');
-                
-                if (response.enabled) {
-                    toggle.classList.remove('bg-gray-200');
-                    toggle.classList.add('bg-primary');
-                    span.classList.remove('translate-x-1');
-                    span.classList.add('translate-x-6');
-                } else {
-                    toggle.classList.remove('bg-primary');
-                    toggle.classList.add('bg-gray-200');
-                    span.classList.remove('translate-x-6');
-                    span.classList.add('translate-x-1');
-                }
-            }
+        function updateToggle(response, toggleId) {
+            const toggle = document.getElementById(toggleId);
+            const span = toggle.querySelector('span');
             
-            if (evt.detail.pathInfo.requestPath === '/api/settings/notifications/highcost') {
-                const response = JSON.parse(evt.detail.xhr.responseText);
-                const toggle = document.getElementById('highcost-toggle');
-                const span = toggle.querySelector('span');
-                
-                if (response.enabled) {
-                    toggle.classList.remove('bg-gray-200');
-                    toggle.classList.add('bg-primary');
-                    span.classList.remove('translate-x-1');
-                    span.classList.add('translate-x-6');
-                } else {
-                    toggle.classList.remove('bg-primary');
-                    toggle.classList.add('bg-gray-200');
-                    span.classList.remove('translate-x-6');
-                    span.classList.add('translate-x-1');
-                }
+            if (response.enabled) {
+                toggle.classList.remove('bg-gray-200');
+                toggle.classList.add('bg-primary');
+                span.classList.remove('translate-x-1');
+                span.classList.add('translate-x-6');
+            } else {
+                toggle.classList.remove('bg-primary');
+                toggle.classList.add('bg-gray-200');
+                span.classList.remove('translate-x-6');
+                span.classList.add('translate-x-1');
+            }
+        }
+
+        document.body.addEventListener('htmx:afterRequest', function(evt) {
+            const path = evt.detail.pathInfo.requestPath;
+            const response = JSON.parse(evt.detail.xhr.responseText);
+
+            if (path === '/api/settings/notifications/renewal') {
+                updateToggle(response, 'renewal-toggle');
+            }
+
+            if (path === '/api/settings/notifications/highcost') {
+                updateToggle(response, 'highcost-toggle');
             }
         });
     </script>
