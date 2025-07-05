@@ -1,33 +1,23 @@
-# Ignore unnecessary files for Docker build
-node_modules/
+# Git files
 .git/
 .gitignore
-README.md
-SUBTRACKR-README.md
-QUICK-START.md
-product-spec.md
-rebuild.sh
-remove-configs.sh
+.github/
 
-# React build artifacts (we're not using React anymore)
-src/
-public/
-package.json
-package-lock.json
-tsconfig.json
-tailwind.config*
-postcss.config*
+# Documentation
+*.md
+docs/
+LICENSE
 
 # Development files
+docker-compose.yml
+.dockerignore
+Dockerfile
 *.log
-.env
+.env*
 .DS_Store
-*.png
-*.jpg
-*.jpeg
-*.gif
 
-# Go specific
+# Build artifacts
+subtrackr
 *.exe
 *.exe~
 *.dll
@@ -36,3 +26,53 @@ postcss.config*
 *.test
 *.out
 vendor/
+dist/
+
+# Test files
+*_test.go
+testdata/
+coverage.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Data directory
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+
+# CI/CD
+.github/
+
+# Legacy files (no longer used)
+node_modules/
+src/
+public/
+package*.json
+tsconfig.json
+tailwind.config*
+postcss.config*
+rebuild.sh
+remove-configs.sh
+
+# Media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
