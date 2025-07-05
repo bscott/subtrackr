@@ -28,6 +28,8 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 
 ## 🚀 Quick Start
 
+SubTrackr is available as a multi-platform Docker image supporting both AMD64 and ARM64 architectures (including Apple Silicon).
+
 ### Option 1: Docker Compose (Recommended)
 
 1. **Create docker-compose.yml**:
@@ -37,7 +39,7 @@ version: '3.8'
 
 services:
   subtrackr:
-    image: bscott/subtrackr:latest
+    image: ghcr.io/bscott/subtrackr:latest
     container_name: subtrackr
     ports:
       - "8080:8080"
@@ -65,7 +67,7 @@ docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
   -e GIN_MODE=release \
-  bscott/subtrackr:latest
+  ghcr.io/bscott/subtrackr:latest
 ```
 
 ### Option 3: Build from Source
@@ -146,7 +148,7 @@ docker-compose up -d --build
    - Apply
 
 2. **Manual Docker Template**:
-   - Repository: `bscott/subtrackr:latest`
+   - Repository: `ghcr.io/bscott/subtrackr:latest`
    - Port: `8080:8080`
    - Path: `/app/data` → `/mnt/user/appdata/subtrackr`
 
