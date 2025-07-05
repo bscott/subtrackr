@@ -14,7 +14,6 @@ docker-compose.yml
 Dockerfile
 *.log
 .env*
-.DS_Store
 
 # Build artifacts
 subtrackr
