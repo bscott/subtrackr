@@ -27,7 +27,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
 FROM debian:bookworm-slim
 
 # Install runtime dependencies in a single layer
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     sqlite3 \
     tzdata \
