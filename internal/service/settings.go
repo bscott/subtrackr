@@ -134,7 +134,7 @@ func (s *SettingsService) ValidateAPIKey(key string) (*models.APIKey, error) {
 // SetCurrency saves the currency preference
 func (s *SettingsService) SetCurrency(currency string) error {
 	// Validate currency
-	if currency != "USD" && currency != "EUR" {
+	if currency != "USD" && currency != "EUR" && currency != "PLN" {
 		return fmt.Errorf("invalid currency: %s", currency)
 	}
 	return s.repo.Set("currency", currency)
@@ -155,6 +155,8 @@ func (s *SettingsService) GetCurrencySymbol() string {
 	switch currency {
 	case "EUR":
 		return "€"
+	case "PLN":
+		return "zł"
 	default:
 		return "$"
 	}
