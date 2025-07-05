@@ -10,26 +10,29 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first for better caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
-# Copy source code
-COPY . .
+# Copy only necessary source directories
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 
-# Build the application
-RUN CGO_ENABLED=1 go build -o subtrackr ./cmd/server
+# Build the application with optimizations
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s" \
+    -o subtrackr ./cmd/server
 
 # Final stage
 FROM debian:bookworm-slim
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+# Install runtime dependencies in a single layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     sqlite3 \
     tzdata \
-    && rm -rf /var/lib/apt/lists/*
-RUN mkdir /app
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/data
 
 WORKDIR /app
 
@@ -37,10 +40,7 @@ WORKDIR /app
 COPY --from=builder /app/subtrackr .
 
 # Copy templates
-COPY --from=builder /app/templates ./templates
-
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+COPY templates/ ./templates/
 
 # Expose port
 EXPOSE 8080
