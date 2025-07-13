@@ -1,23 +1,27 @@
 name: Build and Publish Docker Image
 
-# Define path filters to avoid duplication
-x-path-filters: &path-filters
-  - '**.go'
-  - 'go.mod'
-  - 'go.sum'
-  - 'Dockerfile'
-  - 'templates/**'
-  - 'web/**'
-  - '.github/workflows/docker-publish.yml'
-
 on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
-    paths: *path-filters
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'templates/**'
+      - 'web/**'
+      - '.github/workflows/docker-publish.yml'
   pull_request:
     branches: [ main ]
-    paths: *path-filters
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'templates/**'
+      - 'web/**'
+      - '.github/workflows/docker-publish.yml'
   workflow_dispatch:
 
 env:
