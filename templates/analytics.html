@@ -27,7 +27,7 @@
         <header class="bg-white border-b border-gray-200 px-4 py-3">
             <div class="flex items-center justify-between max-w-7xl mx-auto">
                 <div class="flex items-center space-x-8">
-                    <h1 class="text-xl font-bold text-primary">SubTrackr</h1>
+                    <img src="/static/images/logo.svg" alt="SubTrackr" class="h-8 w-auto">
                     <nav class="flex space-x-1">
                         <a href="/" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,9 +110,9 @@
                     <span class="text-sm font-medium text-gray-700 min-w-0 flex-1">{{$category}}</span>
                 </div>
                 <div class="flex items-center space-x-4 ml-4">
-                    <div class="w-24 bg-gray-200 rounded-full h-2">
-                        <div class="bg-primary h-2 rounded-full transition-all duration-300" 
-                             style="width: {{if gt $.Stats.TotalMonthlySpend 0}}{{printf "%.1f" (div (mul $amount 100) $.Stats.TotalMonthlySpend)}}{{else}}0{{end}}%"></div>
+                    <div class="w-24 rounded-full h-2 overflow-hidden" style="background-color: #e5e7eb;">
+                        <div class="h-2 rounded-full transition-all duration-300" 
+                             style="width: {{printf "%.0f" (div (mul $amount 100.0) $.Stats.TotalMonthlySpend)}}%; background-color: #3b82f6;"></div>
                     </div>
                     <span class="text-sm font-medium text-gray-900 w-16 text-right">{{$.CurrencySymbol}}{{printf "%.2f" $amount}}</span>
                 </div>
@@ -155,7 +155,7 @@
 <!-- Cost Analysis -->
 <div class="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
     <h3 class="text-lg font-semibold text-gray-900 mb-6">Cost Analysis</h3>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="text-center p-4 bg-blue-50 rounded-lg">
             <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{printf "%.2f" (div .Stats.TotalMonthlySpend 30)}}</p>
             <p class="text-sm text-gray-600">Average Daily Cost</p>
@@ -164,11 +164,6 @@
         <div class="text-center p-4 bg-green-50 rounded-lg">
             <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
             <p class="text-sm text-gray-600">Total Monthly Cost</p>
-        </div>
-        
-        <div class="text-center p-4 bg-purple-50 rounded-lg">
-            <p class="text-2xl font-bold text-purple-600">{{if gt .Stats.ActiveSubscriptions 0}}{{.CurrencySymbol}}{{printf "%.2f" (div .Stats.TotalMonthlySpend .Stats.ActiveSubscriptions)}}{{else}}{{.CurrencySymbol}}0.00{{end}}</p>
-            <p class="text-sm text-gray-600">Average Cost per Subscription</p>
         </div>
     </div>
 </div>
