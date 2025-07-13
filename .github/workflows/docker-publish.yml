@@ -1,23 +1,24 @@
 name: Build and Publish Docker Image
 
+# Define path filters to avoid duplication
+x-path-filters: &path-filters
+  - '**.go'
+  - 'go.mod'
+  - 'go.sum'
+  - 'Dockerfile'
+  - 'templates/**'
+  - 'web/**'
+  - '.github/workflows/docker-publish.yml'
+
 on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Dockerfile'
-      - '.github/workflows/docker-publish.yml'
+    paths: *path-filters
   pull_request:
     branches: [ main ]
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Dockerfile'
-      - '.github/workflows/docker-publish.yml'
+    paths: *path-filters
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -61,8 +62,6 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image

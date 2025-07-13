@@ -39,8 +39,9 @@ WORKDIR /app
 # Copy the binary from builder
 COPY --from=builder /app/subtrackr .
 
-# Copy templates
+# Copy templates and static assets
 COPY templates/ ./templates/
+COPY web/ ./web/
 
 # Expose port
 EXPOSE 8080
