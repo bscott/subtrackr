@@ -40,7 +40,8 @@ WORKDIR /app
 COPY --from=builder /app/subtrackr .
 
 # Copy templates and static assets
-COPY templates/ web/ ./
+COPY templates/ ./templates/
+COPY web/ ./web/
 
 # Expose port
 EXPOSE 8080
