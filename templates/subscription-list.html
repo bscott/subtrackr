@@ -8,7 +8,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <h3 class="text-sm font-medium text-gray-900">{{.Name}}</h3>
-                            <p class="text-sm text-gray-500">{{.Category}} • {{.Status}}</p>
+                            <p class="text-sm text-gray-500">{{.Category.Name}} • {{.Status}}</p>
                             {{if .URL}}
                             <a href="{{.URL}}" target="_blank" class="text-xs text-primary hover:text-primary/80">{{.URL}}</a>
                             {{end}}

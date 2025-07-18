@@ -6,11 +6,12 @@ import (
 )
 
 type SubscriptionService struct {
-	repo *repository.SubscriptionRepository
+	repo            *repository.SubscriptionRepository
+	categoryService *CategoryService
 }
 
-func NewSubscriptionService(repo *repository.SubscriptionRepository) *SubscriptionService {
-	return &SubscriptionService{repo: repo}
+func NewSubscriptionService(repo *repository.SubscriptionRepository, categoryService *CategoryService) *SubscriptionService {
+	return &SubscriptionService{repo: repo, categoryService: categoryService}
 }
 
 func (s *SubscriptionService) Create(subscription *models.Subscription) (*models.Subscription, error) {
@@ -59,10 +60,10 @@ func (s *SubscriptionService) GetStats() (*models.Stats, error) {
 	}
 
 	stats := &models.Stats{
-		ActiveSubscriptions:   len(activeSubscriptions),
+		ActiveSubscriptions:    len(activeSubscriptions),
 		CancelledSubscriptions: len(cancelledSubscriptions),
-		UpcomingRenewals:      len(upcomingRenewals),
-		CategorySpending:      make(map[string]float64),
+		UpcomingRenewals:       len(upcomingRenewals),
+		CategorySpending:       make(map[string]float64),
 	}
 
 	// Calculate totals
@@ -83,4 +84,8 @@ func (s *SubscriptionService) GetStats() (*models.Stats, error) {
 	}
 
 	return stats, nil
+}
+
+func (s *SubscriptionService) GetAllCategories() ([]models.Category, error) {
+	return s.categoryService.GetAll()
 }
