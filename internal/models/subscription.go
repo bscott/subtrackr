@@ -7,22 +7,24 @@ import (
 )
 
 type Subscription struct {
-	ID               uint      `json:"id" gorm:"primaryKey"`
-	Name             string    `json:"name" gorm:"not null" validate:"required"`
-	Cost             float64   `json:"cost" gorm:"not null" validate:"required,gt=0"`
-	Schedule         string    `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual"`
-	Status           string    `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused"`
-	Category         string    `json:"category" gorm:"not null" validate:"required,oneof=Entertainment Productivity Storage Health Utilities Other"`
-	PaymentMethod    string    `json:"payment_method" gorm:""`
-	Account          string    `json:"account" gorm:""`
+	ID       uint    `json:"id" gorm:"primaryKey"`
+	Name     string  `json:"name" gorm:"not null" validate:"required"`
+	Cost     float64 `json:"cost" gorm:"not null" validate:"required,gt=0"`
+	Schedule string  `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual"`
+	Status   string  `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused"`
+	// Category         string    `json:"category" gorm:"not null" validate:"required,oneof=Entertainment Productivity Storage Health Utilities Other"`
+	CategoryID       uint       `json:"category_id" gorm:"not null"`
+	Category         Category   `json:"category" gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	PaymentMethod    string     `json:"payment_method" gorm:""`
+	Account          string     `json:"account" gorm:""`
 	StartDate        *time.Time `json:"start_date" gorm:""`
 	RenewalDate      *time.Time `json:"renewal_date" gorm:""`
 	CancellationDate *time.Time `json:"cancellation_date" gorm:""`
-	URL              string    `json:"url" gorm:""`
-	Notes            string    `json:"notes" gorm:""`
-	Usage            string    `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low"`
-	CreatedAt        time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt        time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	URL              string     `json:"url" gorm:""`
+	Notes            string     `json:"notes" gorm:""`
+	Usage            string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low"`
+	CreatedAt        time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt        time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // AnnualCost calculates the annual cost based on schedule
@@ -68,14 +70,14 @@ func (s *Subscription) BeforeCreate(tx *gorm.DB) error {
 
 // Stats represents aggregated subscription statistics
 type Stats struct {
-	TotalMonthlySpend     float64            `json:"total_monthly_spend"`
-	TotalAnnualSpend      float64            `json:"total_annual_spend"`
-	ActiveSubscriptions   int                `json:"active_subscriptions"`
-	CancelledSubscriptions int               `json:"cancelled_subscriptions"`
-	TotalSaved            float64            `json:"total_saved"`
-	MonthlySaved          float64            `json:"monthly_saved"`
-	UpcomingRenewals      int                `json:"upcoming_renewals"`
-	CategorySpending      map[string]float64 `json:"category_spending"`
+	TotalMonthlySpend      float64            `json:"total_monthly_spend"`
+	TotalAnnualSpend       float64            `json:"total_annual_spend"`
+	ActiveSubscriptions    int                `json:"active_subscriptions"`
+	CancelledSubscriptions int                `json:"cancelled_subscriptions"`
+	TotalSaved             float64            `json:"total_saved"`
+	MonthlySaved           float64            `json:"monthly_saved"`
+	UpcomingRenewals       int                `json:"upcoming_renewals"`
+	CategorySpending       map[string]float64 `json:"category_spending"`
 }
 
 // CategoryStat represents spending by category
