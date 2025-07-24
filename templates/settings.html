@@ -664,7 +664,15 @@ function addCategory(e) {
 }
 function deleteCategory(id) {
     if (!confirm('Delete this category?')) return;
-    fetch(`/api/categories/${id}`, { method: 'DELETE' }).then(loadCategories);
+    fetch(`/api/categories/${id}`, { method: 'DELETE' })
+        .then(async response => {
+            if (!response.ok) {
+                const data = await response.json();
+                alert(data.error || "Failed to delete category.");
+            } else {
+                loadCategories();
+            }
+        });
 }
 function startEdit(id) {
     document.getElementById(`category-name-${id}`).style.display = 'none';
