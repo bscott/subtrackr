@@ -88,6 +88,15 @@ func main() {
 	// 	seedSampleData(subscriptionService)
 	// }
 
+	// After initializing repositories and services check if categories exist and create them if they don't - this is to make sure after people update the app they have the categories they need
+	categoryNames := []string{"Entertainment", "Productivity", "Storage", "Software", "Fitness", "Education", "Food", "Travel", "Business", "Other"}
+	categories, err := categoryService.GetAll()
+	if err == nil && len(categories) == 0 {
+		for _, name := range categoryNames {
+			_, _ = categoryService.Create(&models.Category{Name: name})
+		}
+	}
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -167,56 +176,4 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		v1.GET("/export/csv", handler.ExportCSV)
 		v1.GET("/export/json", handler.ExportJSON)
 	}
-}
-
-func seedSampleData(categoryService *service.CategoryService, subscriptionService *service.SubscriptionService) {
-	log.Println("Seeding sample data...")
-
-	// Define sample categories
-	categoryNames := []string{"Entertainment", "Productivity", "Storage"}
-	categoryIDs := make(map[string]uint)
-
-	// Create categories if they don't exist
-	for _, name := range categoryNames {
-		cat, err := categoryService.Create(&models.Category{Name: name})
-		if err == nil {
-			categoryIDs[name] = cat.ID
-		}
-	}
-
-	sampleSubscriptions := []struct {
-		Name     string
-		Cost     float64
-		Schedule string
-		Status   string
-		Category string
-		Account  string
-	}{
-		{"Netflix", 15.49, "Monthly", "Active", "Entertainment", "user@example.com"},
-		{"GitHub Copilot", 10.00, "Monthly", "Active", "Productivity", "dev@example.com"},
-		{"Dropbox", 9.99, "Monthly", "Active", "Storage", "user@example.com"},
-		{"Spotify", 9.99, "Monthly", "Cancelled", "Entertainment", "music@example.com"},
-		{"Adobe Creative Cloud", 52.99, "Monthly", "Active", "Productivity", "creative@example.com"},
-	}
-
-	for _, sub := range sampleSubscriptions {
-		catID, ok := categoryIDs[sub.Category]
-		if !ok {
-			continue
-		}
-		s := models.Subscription{
-			Name:       sub.Name,
-			Cost:       sub.Cost,
-			Schedule:   sub.Schedule,
-			Status:     sub.Status,
-			CategoryID: catID,
-			Account:    sub.Account,
-		}
-		_, err := subscriptionService.Create(&s)
-		if err != nil {
-			log.Printf("Failed to create sample subscription %s: %v", sub.Name, err)
-		}
-	}
-
-	log.Println("Sample data seeded successfully")
 }
