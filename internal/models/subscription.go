@@ -14,7 +14,7 @@ type Subscription struct {
 	Status   string  `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused"`
 	// Category         string    `json:"category" gorm:"not null" validate:"required,oneof=Entertainment Productivity Storage Health Utilities Other"`
 	CategoryID       uint       `json:"category_id" gorm:"not null"`
-	Category         Category   `json:"category" gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	Category         Category   `json:"category" gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	PaymentMethod    string     `json:"payment_method" gorm:""`
 	Account          string     `json:"account" gorm:""`
 	StartDate        *time.Time `json:"start_date" gorm:""`
