@@ -184,7 +184,7 @@
                 <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else}}bg-gray-400{{end}} rounded-full mr-4"></div>
                 <div>
                     <h3 class="text-sm font-medium text-gray-900">{{.Name}}</h3>
-                    <p class="text-sm text-gray-500">{{.Category}} • {{.Status}}</p>
+                    <p class="text-sm text-gray-500">{{.Category.Name}} • {{.Status}}</p>
                 </div>
             </div>
             <div class="text-right">

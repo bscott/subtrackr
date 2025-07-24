@@ -120,7 +120,12 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 
 	// Parse form data
 	subscription.Name = c.PostForm("name")
-	subscription.Category = c.PostForm("category")
+	// Parse category_id as uint
+	if categoryIDStr := c.PostForm("category_id"); categoryIDStr != "" {
+		if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
+			subscription.CategoryID = uint(categoryID)
+		}
+	}
 	subscription.Schedule = c.PostForm("schedule")
 	subscription.Status = c.PostForm("status")
 	subscription.PaymentMethod = c.PostForm("payment_method")
@@ -156,18 +161,25 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	}
 
 	// Create subscription
-	_, err := h.service.Create(&subscription)
+	created, err := h.service.Create(&subscription)
 	if err != nil {
-		c.Header("HX-Retarget", "#form-errors")
-		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
-			"Error": err.Error(),
-		})
+		if c.GetHeader("HX-Request") != "" {
+			c.Header("HX-Retarget", "#form-errors")
+			c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
+				"Error": err.Error(),
+			})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
-	// Return success response that triggers a page refresh
-	c.Header("HX-Refresh", "true")
-	c.Status(http.StatusCreated)
+	if c.GetHeader("HX-Request") != "" {
+		c.Header("HX-Refresh", "true")
+		c.Status(http.StatusCreated)
+	} else {
+		c.JSON(http.StatusCreated, created)
+	}
 }
 
 // GetSubscription returns a single subscription
@@ -199,7 +211,12 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 
 	// Parse form data (similar to CreateSubscription)
 	subscription.Name = c.PostForm("name")
-	subscription.Category = c.PostForm("category")
+	// Parse category_id as uint
+	if categoryIDStr := c.PostForm("category_id"); categoryIDStr != "" {
+		if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
+			subscription.CategoryID = uint(categoryID)
+		}
+	}
 	subscription.Schedule = c.PostForm("schedule")
 	subscription.Status = c.PostForm("status")
 	subscription.PaymentMethod = c.PostForm("payment_method")
@@ -277,10 +294,16 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 		}
 	}
 
+	categories, err := h.service.GetAllCategories()
+	if err != nil {
+		categories = []models.Category{}
+	}
+
 	c.HTML(http.StatusOK, "subscription-form.html", gin.H{
 		"Subscription":   subscription,
 		"IsEdit":         isEdit,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"Categories":     categories,
 	})
 }
 
@@ -304,10 +327,14 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 
 	// Write subscription data
 	for _, sub := range subscriptions {
+		categoryName := ""
+		if sub.Category.Name != "" {
+			categoryName = sub.Category.Name
+		}
 		record := []string{
 			fmt.Sprintf("%d", sub.ID),
 			sub.Name,
-			sub.Category,
+			categoryName,
 			fmt.Sprintf("%.2f", sub.Cost),
 			sub.Schedule,
 			sub.Status,
