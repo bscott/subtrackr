@@ -12,7 +12,7 @@ type Subscription struct {
 	Cost     float64 `json:"cost" gorm:"not null" validate:"required,gt=0"`
 	Schedule string  `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual"`
 	Status   string  `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused"`
-	// Category         string    `json:"category" gorm:"not null" validate:"required,oneof=Entertainment Productivity Storage Health Utilities Other"`
+// (Line removed)
 	CategoryID       uint       `json:"category_id" gorm:"not null"`
 	Category         Category   `json:"category" gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 	PaymentMethod    string     `json:"payment_method" gorm:""`
