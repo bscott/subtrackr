@@ -9,7 +9,6 @@ import (
 	"subtrackr/internal/database"
 	"subtrackr/internal/handlers"
 	"subtrackr/internal/middleware"
-	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
 	"subtrackr/internal/service"
 
@@ -26,10 +25,10 @@ func main() {
 		log.Fatal("Failed to initialize database:", err)
 	}
 
-	// Auto-migrate the schema
-	err = db.AutoMigrate(&models.Category{}, &models.Subscription{}, &models.Settings{}, &models.APIKey{})
+	// Run database migrations
+	err = database.RunMigrations(db)
 	if err != nil {
-		log.Fatal("Failed to migrate database:", err)
+		log.Fatal("Failed to run migrations:", err)
 	}
 
 	// Initialize repositories
@@ -88,14 +87,6 @@ func main() {
 	// 	seedSampleData(subscriptionService)
 	// }
 
-	// After initializing repositories and services check if categories exist and create them if they don't - this is to make sure after people update the app they have the categories they need
-	categoryNames := []string{"Entertainment", "Productivity", "Storage", "Software", "Fitness", "Education", "Food", "Travel", "Business", "Other"}
-	categories, err := categoryService.GetAll()
-	if err == nil && len(categories) == 0 {
-		for _, name := range categoryNames {
-			_, _ = categoryService.Create(&models.Category{Name: name})
-		}
-	}
 
 	// Start server
 	port := os.Getenv("PORT")
