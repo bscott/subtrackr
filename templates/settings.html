@@ -280,6 +280,25 @@
                 
                 <div id="currency-message" class="mt-2"></div>
             </div>
+
+            <!-- Category Management -->
+            <div class="border-t border-gray-200 pt-8">
+                <h3 class="text-base font-medium text-gray-900 mb-4">Categories</h3>
+                <p class="text-sm text-gray-600 mb-4">Manage your subscription categories</p>
+                <div id="categories-list" class="space-y-2 mb-4"></div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Add New Category</h4>
+                    <form id="add-category-form">
+                        <div class="flex items-end space-x-3">
+                            <div class="flex-1">
+                                <label for="category_name" class="block text-sm font-medium text-gray-700 mb-1">Category Name</label>
+                                <input type="text" id="category_name" name="name" required placeholder="e.g., Streaming" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">Add Category</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
             
             <!-- API Keys -->
             <div class="border-t border-gray-200 pt-8">
@@ -477,7 +496,7 @@
                                 <div class="ml-8">"cost": 15.99,</div>
                                 <div class="ml-8">"schedule": "Monthly",</div>
                                 <div class="ml-8">"status": "Active",</div>
-                                <div class="ml-8">"category": "Entertainment"</div>
+                                <div class="ml-8">"category_id": 1</div>
                                 <div class="ml-4">}' \</div>
                                 <div class="ml-4">http://localhost:8080/api/v1/subscriptions</div>
                             </div>
@@ -588,5 +607,84 @@
             }
         });
     </script>
+    <script>
+// --- Category Management Vanilla JS ---
+function renderCategories(categories) {
+    const list = document.getElementById('categories-list');
+    if (!categories.length) {
+        list.innerHTML = '<div class="text-center py-4 text-gray-500">No categories found.</div>';
+        return;
+    }
+    list.innerHTML = categories.map(cat => `
+        <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+            <div class="flex-1">
+                <span class="category-name text-sm font-medium text-gray-900" id="category-name-${cat.id}">${cat.name}</span>
+                <form id="edit-category-form-${cat.id}" class="hidden inline">
+                    <input type="text" name="name" value="${cat.name}" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                    <button type="submit" class="text-primary text-sm font-medium ml-2">Save</button>
+                    <button type="button" onclick="cancelEdit(${cat.id})" class="text-gray-500 text-sm ml-1">Cancel</button>
+                </form>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="startEdit(${cat.id})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                <button onclick="deleteCategory(${cat.id})" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+            </div>
+        </div>
+    `).join('');
+    // Attach edit form listeners
+    categories.forEach(cat => {
+        const form = document.getElementById(`edit-category-form-${cat.id}`);
+        if (form) {
+            form.onsubmit = function(e) {
+                e.preventDefault();
+                const name = form.elements['name'].value;
+                fetch(`/api/categories/${cat.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                }).then(r => r.json()).then(loadCategories);
+            };
+        }
+    });
+}
+function loadCategories() {
+    fetch('/api/categories').then(r => r.json()).then(renderCategories);
+}
+function addCategory(e) {
+    e.preventDefault();
+    const name = document.getElementById('category_name').value;
+    fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+    }).then(r => r.json()).then(() => {
+        document.getElementById('add-category-form').reset();
+        loadCategories();
+    });
+}
+function deleteCategory(id) {
+    if (!confirm('Delete this category?')) return;
+    fetch(`/api/categories/${id}`, { method: 'DELETE' })
+        .then(async response => {
+            if (!response.ok) {
+                const data = await response.json();
+                alert(data.error || "Failed to delete category.");
+            } else {
+                loadCategories();
+            }
+        });
+}
+function startEdit(id) {
+    document.getElementById(`category-name-${id}`).style.display = 'none';
+    document.getElementById(`edit-category-form-${id}`).classList.remove('hidden');
+}
+function cancelEdit(id) {
+    document.getElementById(`edit-category-form-${id}`).classList.add('hidden');
+    document.getElementById(`category-name-${id}`).style.display = '';
+}
+document.getElementById('add-category-form').onsubmit = addCategory;
+window.loadCategories = loadCategories;
+document.addEventListener('DOMContentLoaded', loadCategories);
+</script>
 </body>
 </html>

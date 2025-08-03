@@ -1,0 +1,21 @@
+{{if .}}
+    {{range .}}
+        <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+            <div class="flex-1">
+                <span class="category-name text-sm font-medium text-gray-900" id="category-name-{{.ID}}">{{.Name}}</span>
+                <form id="edit-category-form-{{.ID}}" class="hidden inline" hx-put="/api/categories/{{.ID}}" hx-target="#categories-list" hx-swap="innerHTML">
+                    <input type="text" name="name" value="{{.Name}}" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                    <button type="submit" class="text-primary text-sm font-medium ml-2">Save</button>
+                    <button type="button" onclick="cancelEditCategory({{.ID}})" class="text-gray-500 text-sm ml-1">Cancel</button>
+                </form>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="edit-btn-{{.ID}}" onclick="startEditCategory({{.ID}})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                <button hx-delete="/api/categories/{{.ID}}" hx-confirm="Delete this category?" hx-target="#categories-list" hx-swap="innerHTML" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+            </div>
+        </div>
+    {{end}}
+{{else}}
+    <div class="text-center py-4 text-gray-500">No categories found.</div>
+{{end}} 
+<script src="/static/category-management.js"></script> 

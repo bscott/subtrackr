@@ -37,6 +37,8 @@ read
 
 # Test 3: Create a new subscription
 echo "Test 3: Creating a new subscription..."
+# Note: You'll need to replace category_id with an actual ID from your categories
+# You can get the list of categories with: curl -s "$BASE_URL/api/categories" | jq .
 curl -s -X POST \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
@@ -45,7 +47,7 @@ curl -s -X POST \
     "cost": 9.99,
     "schedule": "Monthly",
     "status": "Active",
-    "category": "Testing"
+    "category_id": 1
   }' \
   "$BASE_URL/api/v1/subscriptions" | jq .
 
