@@ -85,7 +85,7 @@ func (r *SubscriptionRepository) GetUpcomingRenewals(days int) ([]models.Subscri
 func (r *SubscriptionRepository) GetCategoryStats() ([]models.CategoryStat, error) {
 	var stats []models.CategoryStat
 	if err := r.db.Table("subscriptions").
-		Select("categories.name as category, SUM(CASE WHEN subscriptions.schedule = 'Monthly' THEN subscriptions.cost ELSE subscriptions.cost/12 END) as amount, COUNT(*) as count").
+		Select("categories.name as category, SUM(CASE WHEN subscriptions.schedule = 'Annual' THEN subscriptions.cost/12 WHEN subscriptions.schedule = 'Monthly' THEN subscriptions.cost WHEN subscriptions.schedule = 'Weekly' THEN subscriptions.cost*4.33 WHEN subscriptions.schedule = 'Daily' THEN subscriptions.cost*30.44 ELSE subscriptions.cost END) as amount, COUNT(*) as count").
 		Joins("left join categories on subscriptions.category_id = categories.id").
 		Where("subscriptions.status = ?", "Active").
 		Group("categories.name").

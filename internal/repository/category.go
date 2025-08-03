@@ -47,3 +47,9 @@ func (r *CategoryRepository) Update(id uint, category *models.Category) (*models
 func (r *CategoryRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Category{}, id).Error
 }
+
+func (r *CategoryRepository) HasSubscriptions(id uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&models.Subscription{}).Where("category_id = ?", id).Count(&count).Error
+	return count > 0, err
+}

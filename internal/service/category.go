@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
 )
@@ -31,5 +32,13 @@ func (s *CategoryService) Update(id uint, category *models.Category) (*models.Ca
 }
 
 func (s *CategoryService) Delete(id uint) error {
+	// Check if category has any subscriptions
+	hasSubscriptions, err := s.repo.HasSubscriptions(id)
+	if err != nil {
+		return err
+	}
+	if hasSubscriptions {
+		return errors.New("cannot delete category with active subscriptions")
+	}
 	return s.repo.Delete(id)
 }
