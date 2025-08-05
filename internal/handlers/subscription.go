@@ -166,7 +166,8 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	if err != nil {
 		// Log the error for debugging
 		log.Printf("Failed to create subscription: %v", err)
-		log.Printf("Subscription data: %+v", subscription)
+		log.Printf("Subscription data: Name=%s, CategoryID=%d, Status=%s, Schedule=%s", 
+			subscription.Name, subscription.CategoryID, subscription.Status, subscription.Schedule)
 		
 		if c.GetHeader("HX-Request") != "" {
 			c.Header("HX-Retarget", "#form-errors")

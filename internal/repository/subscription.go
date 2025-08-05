@@ -9,44 +9,64 @@ import (
 
 type SubscriptionRepository struct {
 	db *gorm.DB
+	hasLegacyColumn *bool
 }
 
 func NewSubscriptionRepository(db *gorm.DB) *SubscriptionRepository {
 	return &SubscriptionRepository{db: db}
 }
 
+func (r *SubscriptionRepository) checkLegacyColumn() bool {
+	if r.hasLegacyColumn != nil {
+		return *r.hasLegacyColumn
+	}
+	
+	var exists bool
+	r.db.Raw("SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&exists)
+	r.hasLegacyColumn = &exists
+	return exists
+}
+
 func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*models.Subscription, error) {
 	// Check if the old category column exists (for legacy schema support)
-	var columnExists bool
-	r.db.Raw("SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&columnExists)
+	columnExists := r.checkLegacyColumn()
 	
 	if columnExists && subscription.CategoryID > 0 {
 		// For legacy schema, we need to populate the old category column
 		var category models.Category
 		if err := r.db.First(&category, subscription.CategoryID).Error; err == nil {
-			// Use raw SQL to insert with the old category column
-			result := r.db.Exec(`
-				INSERT INTO subscriptions (
-					name, cost, schedule, status, category_id, category,
-					payment_method, account, start_date, renewal_date, 
-					cancellation_date, url, notes, usage, created_at, updated_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				subscription.Name, subscription.Cost, subscription.Schedule, 
-				subscription.Status, subscription.CategoryID, category.Name,
-				subscription.PaymentMethod, subscription.Account, 
-				subscription.StartDate, subscription.RenewalDate,
-				subscription.CancellationDate, subscription.URL, 
-				subscription.Notes, subscription.Usage,
-				time.Now(), time.Now())
+			// Use transaction for thread safety
+			err := r.db.Transaction(func(tx *gorm.DB) error {
+				result := tx.Exec(`
+					INSERT INTO subscriptions (
+						name, cost, schedule, status, category_id, category,
+						payment_method, account, start_date, renewal_date, 
+						cancellation_date, url, notes, usage, created_at, updated_at
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					subscription.Name, subscription.Cost, subscription.Schedule, 
+					subscription.Status, subscription.CategoryID, category.Name,
+					subscription.PaymentMethod, subscription.Account, 
+					subscription.StartDate, subscription.RenewalDate,
+					subscription.CancellationDate, subscription.URL, 
+					subscription.Notes, subscription.Usage,
+					time.Now(), time.Now())
+				
+				if result.Error != nil {
+					return result.Error
+				}
+				
+				// Get the last inserted ID within the transaction
+				var lastID int64
+				if err := tx.Raw("SELECT last_insert_rowid()").Scan(&lastID).Error; err != nil {
+					return err
+				}
+				subscription.ID = uint(lastID)
+				return nil
+			})
 			
-			if result.Error != nil {
-				return nil, result.Error
+			if err != nil {
+				return nil, err
 			}
-			
-			// Get the last inserted ID
-			var lastID int64
-			r.db.Raw("SELECT last_insert_rowid()").Scan(&lastID)
-			subscription.ID = uint(lastID)
 			
 			return subscription, nil
 		}
@@ -77,8 +97,7 @@ func (r *SubscriptionRepository) GetByID(id uint) (*models.Subscription, error) 
 
 func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscription) (*models.Subscription, error) {
 	// Check if the old category column exists
-	var columnExists bool
-	r.db.Raw("SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&columnExists)
+	columnExists := r.checkLegacyColumn()
 	
 	if columnExists && subscription.CategoryID > 0 {
 		// For legacy schema, we need to update the old category column too
