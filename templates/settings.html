@@ -596,14 +596,22 @@
 
         document.body.addEventListener('htmx:afterRequest', function(evt) {
             const path = evt.detail.pathInfo.requestPath;
-            const response = JSON.parse(evt.detail.xhr.responseText);
-
-            if (path === '/api/settings/notifications/renewal') {
-                updateToggle(response, 'renewal-toggle');
-            }
-
-            if (path === '/api/settings/notifications/highcost') {
-                updateToggle(response, 'highcost-toggle');
+            
+            // Only parse JSON for notification endpoints
+            if (path.includes('/api/settings/notifications/')) {
+                try {
+                    const response = JSON.parse(evt.detail.xhr.responseText);
+                    
+                    if (path === '/api/settings/notifications/renewal') {
+                        updateToggle(response, 'renewal-toggle');
+                    }
+                    
+                    if (path === '/api/settings/notifications/highcost') {
+                        updateToggle(response, 'highcost-toggle');
+                    }
+                } catch (e) {
+                    // Response is not JSON, ignore
+                }
             }
         });
     </script>

@@ -13,7 +13,9 @@
     <div id="form-errors" class="mb-4"></div>
 
     <form {{if .IsEdit}}hx-put="/api/subscriptions/{{.Subscription.ID}}"{{else}}hx-post="/api/subscriptions"{{end}} 
-          hx-target="#form-errors">
+          hx-target="#form-errors"
+          hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful) { if(event.detail.xhr.status === 201 || event.detail.xhr.status === 200) { window.location.reload(); } }">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Name -->
             <div class="md:col-span-2">

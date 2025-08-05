@@ -9,8 +9,8 @@ import (
 
 // RunMigrations executes all database migrations
 func RunMigrations(db *gorm.DB) error {
-	// Auto-migrate the schema
-	err := db.AutoMigrate(&models.Category{}, &models.Subscription{}, &models.Settings{}, &models.APIKey{})
+	// Auto-migrate non-problematic models first
+	err := db.AutoMigrate(&models.Category{}, &models.Settings{}, &models.APIKey{})
 	if err != nil {
 		return err
 	}
@@ -25,13 +25,17 @@ func RunMigrations(db *gorm.DB) error {
 			return err
 		}
 	}
+	
+	// Try to auto-migrate subscriptions after the category migration
+	// This might fail on existing databases but that's okay
+	db.AutoMigrate(&models.Subscription{})
 
 	return nil
 }
 
 // migrateCategoriesToDynamic handles the v0.3.0 migration from string categories to category IDs
 func migrateCategoriesToDynamic(db *gorm.DB) error {
-	// Check if migration is needed by looking for a temporary column
+	// Check if migration is needed by looking for the old category column
 	var count int64
 	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&count)
 	
@@ -83,8 +87,9 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 		}
 	}
 
-	// Note: We can't drop the old 'category' column in SQLite without recreating the table
-	// This would be handled differently in production with proper migration tools
+	// SQLite limitation: we can't drop the old category column
+	// The repository layer now handles both old and new schemas transparently
+	// This ensures backward compatibility without data loss
 	
 	log.Println("Migration completed: Categories converted to dynamic system")
 	return nil

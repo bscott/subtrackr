@@ -11,10 +11,10 @@ type Subscription struct {
 	Name     string  `json:"name" gorm:"not null" validate:"required"`
 	Cost     float64 `json:"cost" gorm:"not null" validate:"required,gt=0"`
 	Schedule string  `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual Weekly Daily"`
-	Status   string  `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused"`
+	Status   string  `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused Trial"`
 // (Line removed)
 	CategoryID       uint       `json:"category_id"`
-	Category         Category   `json:"category" gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
+	Category         Category   `json:"category" gorm:"foreignKey:CategoryID"`
 	PaymentMethod    string     `json:"payment_method" gorm:""`
 	Account          string     `json:"account" gorm:""`
 	StartDate        *time.Time `json:"start_date" gorm:""`
@@ -22,7 +22,7 @@ type Subscription struct {
 	CancellationDate *time.Time `json:"cancellation_date" gorm:""`
 	URL              string     `json:"url" gorm:""`
 	Notes            string     `json:"notes" gorm:""`
-	Usage            string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low"`
+	Usage            string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low None"`
 	CreatedAt        time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt        time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }

@@ -16,6 +16,43 @@ func NewSubscriptionRepository(db *gorm.DB) *SubscriptionRepository {
 }
 
 func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*models.Subscription, error) {
+	// Check if the old category column exists (for legacy schema support)
+	var columnExists bool
+	r.db.Raw("SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&columnExists)
+	
+	if columnExists && subscription.CategoryID > 0 {
+		// For legacy schema, we need to populate the old category column
+		var category models.Category
+		if err := r.db.First(&category, subscription.CategoryID).Error; err == nil {
+			// Use raw SQL to insert with the old category column
+			result := r.db.Exec(`
+				INSERT INTO subscriptions (
+					name, cost, schedule, status, category_id, category,
+					payment_method, account, start_date, renewal_date, 
+					cancellation_date, url, notes, usage, created_at, updated_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				subscription.Name, subscription.Cost, subscription.Schedule, 
+				subscription.Status, subscription.CategoryID, category.Name,
+				subscription.PaymentMethod, subscription.Account, 
+				subscription.StartDate, subscription.RenewalDate,
+				subscription.CancellationDate, subscription.URL, 
+				subscription.Notes, subscription.Usage,
+				time.Now(), time.Now())
+			
+			if result.Error != nil {
+				return nil, result.Error
+			}
+			
+			// Get the last inserted ID
+			var lastID int64
+			r.db.Raw("SELECT last_insert_rowid()").Scan(&lastID)
+			subscription.ID = uint(lastID)
+			
+			return subscription, nil
+		}
+	}
+	
+	// Normal creation for migrated schema
 	if err := r.db.Create(subscription).Error; err != nil {
 		return nil, err
 	}
@@ -39,6 +76,40 @@ func (r *SubscriptionRepository) GetByID(id uint) (*models.Subscription, error) 
 }
 
 func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscription) (*models.Subscription, error) {
+	// Check if the old category column exists
+	var columnExists bool
+	r.db.Raw("SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&columnExists)
+	
+	if columnExists && subscription.CategoryID > 0 {
+		// For legacy schema, we need to update the old category column too
+		var category models.Category
+		if err := r.db.First(&category, subscription.CategoryID).Error; err == nil {
+			// Update with the category name
+			updates := map[string]interface{}{
+				"name":               subscription.Name,
+				"cost":               subscription.Cost,
+				"schedule":           subscription.Schedule,
+				"status":             subscription.Status,
+				"category_id":        subscription.CategoryID,
+				"category":           category.Name,
+				"payment_method":     subscription.PaymentMethod,
+				"account":            subscription.Account,
+				"start_date":         subscription.StartDate,
+				"renewal_date":       subscription.RenewalDate,
+				"cancellation_date":  subscription.CancellationDate,
+				"url":                subscription.URL,
+				"notes":              subscription.Notes,
+				"usage":              subscription.Usage,
+				"updated_at":         time.Now(),
+			}
+			if err := r.db.Model(&models.Subscription{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+				return nil, err
+			}
+			return r.GetByID(id)
+		}
+	}
+	
+	// Normal update for migrated schema
 	if err := r.db.Model(&models.Subscription{}).Where("id = ?", id).Updates(subscription).Error; err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"subtrackr/internal/models"
@@ -163,6 +164,10 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	// Create subscription
 	created, err := h.service.Create(&subscription)
 	if err != nil {
+		// Log the error for debugging
+		log.Printf("Failed to create subscription: %v", err)
+		log.Printf("Subscription data: %+v", subscription)
+		
 		if c.GetHeader("HX-Request") != "" {
 			c.Header("HX-Retarget", "#form-errors")
 			c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
