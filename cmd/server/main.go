@@ -3,6 +3,7 @@ package main
 import (
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"subtrackr/internal/config"
@@ -66,8 +67,15 @@ func main() {
 		},
 	})
 
-	// Load HTML templates
-	router.LoadHTMLGlob("templates/*")
+	// Load HTML templates with error handling
+	tmpl := loadTemplates()
+	if tmpl != nil && len(tmpl.Templates()) > 0 {
+		router.SetHTMLTemplate(tmpl)
+	} else {
+		log.Printf("Warning: Template loading failed, using fallback")
+		// Fallback to LoadHTMLGlob for compatibility
+		router.LoadHTMLGlob("templates/*")
+	}
 
 	// Serve static files
 	router.Static("/static", "./web/static")
@@ -96,6 +104,93 @@ func main() {
 
 	log.Printf("SubTrackr server starting on port %s", port)
 	log.Fatal(router.Run(":" + port))
+}
+
+// loadTemplates loads HTML templates with better error handling for arm64 compatibility
+func loadTemplates() *template.Template {
+	tmpl := template.New("")
+	
+	// Add template functions
+	tmpl.Funcs(template.FuncMap{
+		"add": func(a, b float64) float64 { return a + b },
+		"sub": func(a, b float64) float64 { return a - b },
+		"mul": func(a, b float64) float64 { return a * b },
+		"div": func(a, b float64) float64 {
+			if b == 0 {
+				log.Printf("Warning: Division by zero attempted in template")
+				return math.NaN()
+			}
+			return a / b
+		},
+	})
+	
+	// Critical templates required for basic functionality
+	criticalTemplates := []string{
+		"templates/dashboard.html",
+		"templates/subscriptions.html",
+		"templates/error.html",
+	}
+	
+	// All template files to load
+	templateFiles := []string{
+		"templates/dashboard.html",
+		"templates/subscriptions.html",
+		"templates/analytics.html",
+		"templates/settings.html",
+		"templates/subscription-form.html",
+		"templates/subscription-list.html",
+		"templates/categories-list.html",
+		"templates/api-keys-list.html",
+		"templates/smtp-message.html",
+		"templates/form-errors.html",
+		"templates/error.html",
+	}
+	
+	var parsedCount int
+	var failedCount int
+	var missingCritical []string
+	
+	// Load templates individually to catch arm64-specific issues
+	for _, file := range templateFiles {
+		if _, err := os.Stat(file); err != nil {
+			log.Printf("Warning: Template file not found: %s", file)
+			// Check if this is a critical template
+			for _, critical := range criticalTemplates {
+				if critical == file {
+					missingCritical = append(missingCritical, file)
+				}
+			}
+			continue
+		}
+		
+		if _, err := tmpl.ParseFiles(file); err != nil {
+			log.Printf("Error: Failed to parse template %s: %v", file, err)
+			failedCount++
+			// Check if this is a critical template
+			for _, critical := range criticalTemplates {
+				if critical == file {
+					missingCritical = append(missingCritical, file)
+				}
+			}
+		} else {
+			parsedCount++
+		}
+	}
+	
+	// Log template loading summary
+	log.Printf("Template loading summary: %d parsed, %d failed, %d total", parsedCount, failedCount, len(templateFiles))
+	
+	// Fatal error if critical templates are missing
+	if len(missingCritical) > 0 {
+		log.Fatalf("Critical templates failed to load: %v. Application cannot continue.", missingCritical)
+	}
+	
+	// Warn if too many templates failed
+	if failedCount > len(templateFiles)/2 {
+		log.Printf("Warning: More than half of templates failed to load (%d/%d). Application may not function correctly.", failedCount, len(templateFiles))
+	}
+	
+	return tmpl
 }
 
 func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, settingsHandler *handlers.SettingsHandler, settingsService *service.SettingsService, categoryHandler *handlers.CategoryHandler) {
