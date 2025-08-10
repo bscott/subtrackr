@@ -66,8 +66,15 @@ func main() {
 		},
 	})
 
-	// Load HTML templates
-	router.LoadHTMLGlob("templates/*")
+	// Load HTML templates with error handling
+	tmpl := loadTemplates()
+	if tmpl != nil && len(tmpl.Templates()) > 0 {
+		router.SetHTMLTemplate(tmpl)
+	} else {
+		log.Printf("Warning: Template loading failed, using fallback")
+		// Fallback to LoadHTMLGlob for compatibility
+		router.LoadHTMLGlob("templates/*")
+	}
 
 	// Serve static files
 	router.Static("/static", "./web/static")
@@ -96,6 +103,49 @@ func main() {
 
 	log.Printf("SubTrackr server starting on port %s", port)
 	log.Fatal(router.Run(":" + port))
+}
+
+// loadTemplates loads HTML templates with better error handling for arm64 compatibility
+func loadTemplates() *template.Template {
+	tmpl := template.New("")
+	
+	// Add template functions
+	tmpl.Funcs(template.FuncMap{
+		"add": func(a, b float64) float64 { return a + b },
+		"sub": func(a, b float64) float64 { return a - b },
+		"mul": func(a, b float64) float64 { return a * b },
+		"div": func(a, b float64) float64 {
+			if b == 0 {
+				return 0
+			}
+			return a / b
+		},
+	})
+	
+	// Load templates individually to catch arm64-specific issues
+	templateFiles := []string{
+		"templates/dashboard.html",
+		"templates/subscriptions.html",
+		"templates/analytics.html",
+		"templates/settings.html",
+		"templates/subscription-form.html",
+		"templates/subscription-list.html",
+		"templates/categories-list.html",
+		"templates/api-keys-list.html",
+		"templates/smtp-message.html",
+		"templates/form-errors.html",
+		"templates/error.html",
+	}
+	
+	for _, file := range templateFiles {
+		if _, err := os.Stat(file); err == nil {
+			if _, err := tmpl.ParseFiles(file); err != nil {
+				log.Printf("Warning: Failed to parse template %s: %v", file, err)
+			}
+		}
+	}
+	
+	return tmpl
 }
 
 func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, settingsHandler *handlers.SettingsHandler, settingsService *service.SettingsService, categoryHandler *handlers.CategoryHandler) {

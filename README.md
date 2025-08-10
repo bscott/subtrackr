@@ -6,7 +6,7 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 
 ![SubTrackr Dashboard](https://img.shields.io/badge/version-1.0.0-blue)
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.21-00ADD8)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 
 ## 🚀 Features
 
@@ -365,7 +365,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -373,10 +373,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - UI powered by [HTMX](https://htmx.org/) and [Tailwind CSS](https://tailwindcss.com/)
 - Icons from [Heroicons](https://heroicons.com/)
 
+## ⚠️ Known Limitations
+
+- **Price History**: SubTrackr currently tracks only the current price per subscription. If a subscription changes price over time, annual spend calculations will be based on the current price multiplied by the billing cycle, which may not reflect actual historical spending. For accurate historical tracking, consider manually updating subscription costs when prices change or keeping external records.
+
 ## 📞 Support
 
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/subtrackr/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/subtrackr/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/bscott/subtrackr/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/bscott/subtrackr/discussions)
 
 ---
 

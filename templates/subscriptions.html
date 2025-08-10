@@ -111,7 +111,7 @@
                             {{end}}
                         </div>
                         <div class="text-right">
-                            <p class="text-sm font-medium text-gray-900">${{printf "%.2f" .Cost}}</p>
+                            <p class="text-sm font-medium text-gray-900">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</p>
                             <p class="text-sm text-gray-500">{{.Schedule}}</p>
                             {{if .RenewalDate}}
                             <p class="text-xs text-gray-400">Renews: {{.RenewalDate.Format "Jan 2, 2006"}}</p>
