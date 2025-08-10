@@ -3,6 +3,7 @@ package main
 import (
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"subtrackr/internal/config"
@@ -116,13 +117,21 @@ func loadTemplates() *template.Template {
 		"mul": func(a, b float64) float64 { return a * b },
 		"div": func(a, b float64) float64 {
 			if b == 0 {
-				return 0
+				log.Printf("Warning: Division by zero attempted in template")
+				return math.NaN()
 			}
 			return a / b
 		},
 	})
 	
-	// Load templates individually to catch arm64-specific issues
+	// Critical templates required for basic functionality
+	criticalTemplates := []string{
+		"templates/dashboard.html",
+		"templates/subscriptions.html",
+		"templates/error.html",
+	}
+	
+	// All template files to load
 	templateFiles := []string{
 		"templates/dashboard.html",
 		"templates/subscriptions.html",
@@ -137,12 +146,48 @@ func loadTemplates() *template.Template {
 		"templates/error.html",
 	}
 	
+	var parsedCount int
+	var failedCount int
+	var missingCritical []string
+	
+	// Load templates individually to catch arm64-specific issues
 	for _, file := range templateFiles {
-		if _, err := os.Stat(file); err == nil {
-			if _, err := tmpl.ParseFiles(file); err != nil {
-				log.Printf("Warning: Failed to parse template %s: %v", file, err)
+		if _, err := os.Stat(file); err != nil {
+			log.Printf("Warning: Template file not found: %s", file)
+			// Check if this is a critical template
+			for _, critical := range criticalTemplates {
+				if critical == file {
+					missingCritical = append(missingCritical, file)
+				}
 			}
+			continue
 		}
+		
+		if _, err := tmpl.ParseFiles(file); err != nil {
+			log.Printf("Error: Failed to parse template %s: %v", file, err)
+			failedCount++
+			// Check if this is a critical template
+			for _, critical := range criticalTemplates {
+				if critical == file {
+					missingCritical = append(missingCritical, file)
+				}
+			}
+		} else {
+			parsedCount++
+		}
+	}
+	
+	// Log template loading summary
+	log.Printf("Template loading summary: %d parsed, %d failed, %d total", parsedCount, failedCount, len(templateFiles))
+	
+	// Fatal error if critical templates are missing
+	if len(missingCritical) > 0 {
+		log.Fatalf("Critical templates failed to load: %v. Application cannot continue.", missingCritical)
+	}
+	
+	// Warn if too many templates failed
+	if failedCount > len(templateFiles)/2 {
+		log.Printf("Warning: More than half of templates failed to load (%d/%d). Application may not function correctly.", failedCount, len(templateFiles))
 	}
 	
 	return tmpl
