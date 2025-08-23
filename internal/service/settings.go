@@ -134,7 +134,15 @@ func (s *SettingsService) ValidateAPIKey(key string) (*models.APIKey, error) {
 // SetCurrency saves the currency preference
 func (s *SettingsService) SetCurrency(currency string) error {
 	// Validate currency
-	if currency != "USD" && currency != "EUR" && currency != "PLN" {
+	validCurrencies := []string{"USD", "EUR", "PLN", "GBP", "RUB", "JPY", "SEK"}
+	isValid := false
+	for _, c := range validCurrencies {
+		if currency == c {
+			isValid = true
+			break
+		}
+	}
+	if !isValid {
 		return fmt.Errorf("invalid currency: %s", currency)
 	}
 	return s.repo.Set("currency", currency)
@@ -157,7 +165,25 @@ func (s *SettingsService) GetCurrencySymbol() string {
 		return "€"
 	case "PLN":
 		return "zł"
+	case "GBP":
+		return "£"
+	case "RUB":
+		return "₽"
+	case "JPY":
+		return "¥"
+	case "SEK":
+		return "kr"
 	default:
 		return "$"
 	}
+}
+
+// SetDarkMode saves the dark mode preference
+func (s *SettingsService) SetDarkMode(enabled bool) error {
+	return s.SetBoolSetting("dark_mode", enabled)
+}
+
+// IsDarkModeEnabled returns whether dark mode is enabled
+func (s *SettingsService) IsDarkModeEnabled() bool {
+	return s.GetBoolSettingWithDefault("dark_mode", false)
 }

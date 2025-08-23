@@ -239,6 +239,9 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		// Currency setting
 		api.POST("/settings/currency", settingsHandler.UpdateCurrency)
 
+		// Dark mode setting
+		api.POST("/settings/dark-mode", settingsHandler.ToggleDarkMode)
+
 		// Category management routes
 		api.GET("/categories", categoryHandler.ListCategories)
 		api.POST("/categories", categoryHandler.CreateCategory)

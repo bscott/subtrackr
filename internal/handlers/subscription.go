@@ -52,6 +52,7 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 		"Stats":          stats,
 		"Subscriptions":  recentSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 	})
 }
 
@@ -68,6 +69,7 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		"CurrentPage":    "subscriptions",
 		"Subscriptions":  subscriptions,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 	})
 }
 
@@ -84,6 +86,7 @@ func (h *SubscriptionHandler) Analytics(c *gin.Context) {
 		"CurrentPage":    "analytics",
 		"Stats":          stats,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 	})
 }
 
@@ -97,6 +100,7 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"RenewalReminders": h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
 		"HighCostAlerts":   h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
 		"ReminderDays":     h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
+		"DarkMode":         h.settingsService.IsDarkModeEnabled(),
 		"Version":          version.GetVersion(),
 	})
 }

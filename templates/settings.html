@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{{if .DarkMode}}dark{{end}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -19,30 +20,99 @@
                 }
             }
         }
+        
+        // Enhanced Dark Mode Management
+        class DarkModeManager {
+            constructor() {
+                this.init();
+            }
+            
+            init() {
+                // Check system preference first, then saved preference
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const savedPreference = localStorage.getItem('darkMode');
+                const shouldBeDark = savedPreference ? savedPreference === 'true' : systemPrefersDark;
+                
+                this.setDarkMode(shouldBeDark, false); // Don't save on init
+                this.setupSystemPreferenceListener();
+            }
+            
+            setDarkMode(enabled, save = true) {
+                document.documentElement.classList.toggle('dark', enabled);
+                if (save) {
+                    localStorage.setItem('darkMode', enabled.toString());
+                    this.syncWithServer(enabled);
+                }
+                
+                // Update toggle switch to match current state
+                const toggle = document.querySelector('input[hx-post="/api/settings/dark-mode"]');
+                if (toggle) {
+                    toggle.checked = enabled;
+                }
+            }
+            
+            toggle() {
+                const isDark = document.documentElement.classList.contains('dark');
+                this.setDarkMode(!isDark);
+            }
+            
+            syncWithServer(enabled) {
+                fetch('/api/settings/dark-mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `enabled=${enabled}`
+                }).catch(err => console.log('Failed to sync dark mode with server:', err));
+            }
+            
+            setupSystemPreferenceListener() {
+                window.matchMedia('(prefers-color-scheme: dark)')
+                      .addEventListener('change', (e) => {
+                          // Only auto-switch if user hasn't set a manual preference
+                          if (!localStorage.getItem('darkMode')) {
+                              this.setDarkMode(e.matches, false);
+                          }
+                      });
+            }
+        }
+        
+        // Initialize dark mode manager
+        let darkModeManager;
+        
+        // Legacy toggle function for backward compatibility
+        function toggleDarkMode() {
+            if (darkModeManager) {
+                darkModeManager.toggle();
+            }
+        }
+        
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            darkModeManager = new DarkModeManager();
+        });
     </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
     <div class="flex flex-col min-h-screen">
         <!-- Header -->
-        <header class="bg-white border-b border-gray-200 px-4 py-3">
+        <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 transition-colors duration-200">
             <div class="flex items-center justify-between max-w-7xl mx-auto">
                 <div class="flex items-center space-x-8">
                     <img src="/static/images/logo.svg" alt="SubTrackr" class="h-8 w-auto">
                     <nav class="flex space-x-1">
-                        <a href="/" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                        <a href="/" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"></path>
                             </svg>
                             Dashboard
                         </a>
-                        <a href="/subscriptions" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                        <a href="/subscriptions" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                             Subscriptions
                         </a>
-                        <a href="/analytics" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                        <a href="/analytics" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                             </svg>
@@ -56,7 +126,7 @@
                         hx-target="#modal-content"
                         hx-trigger="click"
                         onclick="document.getElementById('modal').classList.remove('hidden')"
-                        class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 flex items-center">
+                        class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 flex items-center transition-colors duration-150">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
@@ -77,30 +147,30 @@
             <div class="max-w-7xl mx-auto">
 
 <div class="max-w-4xl mx-auto">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="p-6 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Settings</h2>
-            <p class="text-sm text-gray-600 mt-1">Manage your SubTrackr preferences and data</p>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Settings</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Manage your SubTrackr preferences and data</p>
         </div>
         
         <div class="p-6 space-y-8">
             <!-- Export Data -->
             <div>
-                <h3 class="text-base font-medium text-gray-900 mb-4">Export Data</h3>
-                <p class="text-sm text-gray-600 mb-4">Download your subscription data in various formats</p>
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Export Data</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Download your subscription data in various formats</p>
                 <div class="flex space-x-3">
-                    <a href="/api/export/csv" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 inline-block">
+                    <a href="/api/export/csv" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 inline-block transition-colors duration-150">
                         Export as CSV
                     </a>
-                    <a href="/api/export/json" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 inline-block">
+                    <a href="/api/export/json" class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 inline-block transition-colors duration-150">
                         Export as JSON
                     </a>
                 </div>
             </div>
             
             <!-- Data Management -->
-            <div class="border-t border-gray-200 pt-8">
-                <h3 class="text-base font-medium text-gray-900 mb-4">Data Management</h3>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Data Management</h3>
                 <div class="space-y-4">
                     <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                         <div>
@@ -130,8 +200,8 @@
             </div>
             
             <!-- Email Notifications -->
-            <div class="border-t border-gray-200 pt-8">
-                <h3 class="text-base font-medium text-gray-900 mb-4">Email Notifications</h3>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Email Notifications</h3>
                 
                 <!-- SMTP Settings -->
                 <div class="bg-gray-50 rounded-lg p-4 mb-4">
@@ -191,8 +261,8 @@
                 <div class="space-y-4">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h4 class="text-sm font-medium text-gray-900">Renewal Reminders</h4>
-                            <p class="text-sm text-gray-600">Get notified before subscriptions renew</p>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">Renewal Reminders</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Get notified before subscriptions renew</p>
                         </div>
                         <button hx-post="/api/settings/notifications/renewal" 
                                 hx-trigger="click"
@@ -205,8 +275,8 @@
                     
                     <div class="flex items-center justify-between">
                         <div>
-                            <h4 class="text-sm font-medium text-gray-900">High Cost Alerts</h4>
-                            <p class="text-sm text-gray-600">Alert when adding expensive subscriptions</p>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">High Cost Alerts</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Alert when adding expensive subscriptions</p>
                         </div>
                         <button hx-post="/api/settings/notifications/highcost"
                                 hx-trigger="click"
@@ -219,8 +289,8 @@
                     
                     <div class="flex items-center justify-between">
                         <div>
-                            <h4 class="text-sm font-medium text-gray-900">Days Before Renewal</h4>
-                            <p class="text-sm text-gray-600">How many days before renewal to send reminder</p>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">Days Before Renewal</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">How many days before renewal to send reminder</p>
                         </div>
                         <input type="number" 
                                name="reminder_days"
@@ -230,17 +300,41 @@
                                hx-post="/api/settings/notifications/days"
                                hx-trigger="change"
                                hx-swap="none"
-                               class="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                               class="w-16 px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-150">
                     </div>
                 </div>
             </div>
             
+            <!-- Appearance Settings -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Appearance</h3>
+                <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg transition-colors duration-200">
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Switch between light and dark appearance</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" 
+                               value="" 
+                               class="sr-only peer"
+                               {{if .DarkMode}}checked{{end}}
+                               hx-post="/api/settings/dark-mode"
+                               hx-trigger="change"
+                               hx-vals='js:{"enabled": event.target.checked}'
+                               hx-swap="none"
+                               onchange="toggleDarkMode()">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <div id="dark-mode-message" class="mt-2"></div>
+            </div>
+            
             <!-- Currency Settings -->
-            <div class="border-t border-gray-200 pt-8">
-                <h3 class="text-base font-medium text-gray-900 mb-4">Currency</h3>
-                <p class="text-sm text-gray-600 mb-4">Choose your preferred currency for displaying subscription costs</p>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Currency</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Choose your preferred currency for displaying subscription costs</p>
                 
-                <div class="flex items-center space-x-4">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <label class="flex items-center">
                         <input type="radio" 
                                name="currency" 
@@ -250,7 +344,7 @@
                                hx-trigger="change"
                                hx-vals='{"currency": "USD"}'
                                class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700">$ USD (US Dollar)</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">$ USD (US Dollar)</span>
                     </label>
                     
                     <label class="flex items-center">
@@ -262,7 +356,55 @@
                                hx-trigger="change"
                                hx-vals='{"currency": "EUR"}'
                                class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700">€ EUR (Euro)</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">€ EUR (Euro)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="radio" 
+                               name="currency" 
+                               value="GBP"
+                               {{if eq .Currency "GBP"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "GBP"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">£ GBP (British Pound)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="radio" 
+                               name="currency" 
+                               value="JPY"
+                               {{if eq .Currency "JPY"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "JPY"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">¥ JPY (Japanese Yen)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="radio" 
+                               name="currency" 
+                               value="RUB"
+                               {{if eq .Currency "RUB"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "RUB"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">₽ RUB (Russian Ruble)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="radio" 
+                               name="currency" 
+                               value="SEK"
+                               {{if eq .Currency "SEK"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "SEK"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">kr SEK (Swedish Krona)</span>
                     </label>
 
                     <label class="flex items-center">
@@ -274,7 +416,7 @@
                                hx-trigger="change"
                                hx-vals='{"currency": "PLN"}'
                                class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700">zł PLN (Polish Zloty)</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">zł PLN (Polish Zloty)</span>
                     </label>
                 </div>
                 
@@ -282,11 +424,11 @@
             </div>
 
             <!-- Category Management -->
-            <div class="border-t border-gray-200 pt-8">
-                <h3 class="text-base font-medium text-gray-900 mb-4">Categories</h3>
-                <p class="text-sm text-gray-600 mb-4">Manage your subscription categories</p>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Categories</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Manage your subscription categories</p>
                 <div id="categories-list" class="space-y-2 mb-4"></div>
-                <div class="bg-gray-50 rounded-lg p-4">
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 transition-colors duration-200">
                     <h4 class="text-sm font-medium text-gray-900 mb-3">Add New Category</h4>
                     <form id="add-category-form">
                         <div class="flex items-end space-x-3">
@@ -301,9 +443,9 @@
             </div>
             
             <!-- API Keys -->
-            <div class="border-t border-gray-200 pt-8">
-                <h3 class="text-base font-medium text-gray-900 mb-4">API Keys</h3>
-                <p class="text-sm text-gray-600 mb-4">Create API keys to access SubTrackr from external applications</p>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">API Keys</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Create API keys to access SubTrackr from external applications</p>
                 
                 <!-- API Key List -->
                 <div id="api-keys-list" class="space-y-2 mb-4">
@@ -315,7 +457,7 @@
                 </div>
                 
                 <!-- Create New API Key -->
-                <div class="bg-gray-50 rounded-lg p-4">
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 transition-colors duration-200">
                     <h4 class="text-sm font-medium text-gray-900 mb-3">Create New API Key</h4>
                     <form hx-post="/api/settings/apikeys" hx-target="#api-keys-list" hx-swap="innerHTML">
                         <div class="flex items-end space-x-3">
@@ -345,20 +487,20 @@
             </div>
             
             <!-- About -->
-            <div class="border-t border-gray-200 pt-8">
-                <h3 class="text-base font-medium text-gray-900 mb-4">About SubTrackr</h3>
-                <div class="bg-gray-50 rounded-lg p-4">
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">About SubTrackr</h3>
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 transition-colors duration-200">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700">Version</span>
-                        <span class="text-sm text-gray-600">{{.Version}}</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Version</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-300">{{.Version}}</span>
                     </div>
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-medium text-gray-700">Build</span>
-                        <span class="text-sm text-gray-600">Go + HTMX</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Build</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Go + HTMX</span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-gray-700">Database</span>
-                        <span class="text-sm text-gray-600">SQLite</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Database</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-300">SQLite</span>
                     </div>
                 </div>
             </div>
@@ -554,7 +696,7 @@
 
     <!-- Modal -->
     <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4 transition-colors duration-200">
             <div id="modal-content">
                 <!-- Dynamic content loaded here -->
             </div>

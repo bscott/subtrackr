@@ -303,3 +303,18 @@ func (h *SettingsHandler) UpdateCurrency(c *gin.Context) {
 		"symbol": h.service.GetCurrencySymbol(),
 	})
 }
+
+// ToggleDarkMode toggles dark mode preference
+func (h *SettingsHandler) ToggleDarkMode(c *gin.Context) {
+	enabled := c.PostForm("enabled") == "true"
+	
+	err := h.service.SetDarkMode(enabled)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"dark_mode": enabled,
+	})
+}
