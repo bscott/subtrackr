@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"subtrackr/internal/models"
 	"subtrackr/internal/service"
+	"subtrackr/internal/version"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -96,6 +97,7 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"RenewalReminders": h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
 		"HighCostAlerts":   h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
 		"ReminderDays":     h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
+		"Version":          version.GetVersion(),
 	})
 }
 
@@ -235,6 +237,25 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	if costStr := c.PostForm("cost"); costStr != "" {
 		if cost, err := strconv.ParseFloat(costStr, 64); err == nil {
 			subscription.Cost = cost
+		}
+	}
+
+	// Parse dates
+	if startDateStr := c.PostForm("start_date"); startDateStr != "" {
+		if startDate, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			subscription.StartDate = &startDate
+		}
+	}
+
+	if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
+		if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
+			subscription.RenewalDate = &renewalDate
+		}
+	}
+
+	if cancellationDateStr := c.PostForm("cancellation_date"); cancellationDateStr != "" {
+		if cancellationDate, err := time.Parse("2006-01-02", cancellationDateStr); err == nil {
+			subscription.CancellationDate = &cancellationDate
 		}
 	}
 
