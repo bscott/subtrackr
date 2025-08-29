@@ -254,7 +254,7 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 	v1.Use(middleware.APIKeyAuth(settingsService))
 	{
 		// Subscription endpoints
-		v1.GET("/subscriptions", handler.GetSubscriptions)
+		v1.GET("/subscriptions", handler.GetSubscriptionsAPI)
 		v1.POST("/subscriptions", handler.CreateSubscription)
 		v1.GET("/subscriptions/:id", handler.GetSubscription)
 		v1.PUT("/subscriptions/:id", handler.UpdateSubscription)
