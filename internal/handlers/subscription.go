@@ -121,6 +121,17 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	})
 }
 
+// GetSubscriptionsAPI returns subscriptions as JSON for API calls
+func (h *SubscriptionHandler) GetSubscriptionsAPI(c *gin.Context) {
+	subscriptions, err := h.service.GetAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, subscriptions)
+}
+
 // CreateSubscription handles creating a new subscription
 func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	var subscription models.Subscription
