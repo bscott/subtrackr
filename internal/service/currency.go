@@ -78,7 +78,7 @@ func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string
 
 	// Free Fixer.io plan only supports EUR as base currency
 	// Always fetch with EUR as base and calculate cross-rates if needed
-	url := fmt.Sprintf("http://data.fixer.io/api/latest?access_key=%s&base=EUR&symbols=%s",
+	url := fmt.Sprintf("https://data.fixer.io/api/latest?access_key=%s&base=EUR&symbols=%s",
 		s.apiKey, symbols)
 
 	resp, err := http.Get(url)

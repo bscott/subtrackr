@@ -178,18 +178,11 @@
 
 <script>
 function calculateRenewalDate() {
-    console.log('calculateRenewalDate called');
-
     const scheduleSelect = document.getElementById('schedule');
     const statusSelect = document.getElementById('status');
     const renewalDateInput = document.getElementById('renewal_date');
 
-    console.log('Schedule:', scheduleSelect ? scheduleSelect.value : 'not found');
-    console.log('Status:', statusSelect ? statusSelect.value : 'not found');
-    console.log('Renewal input:', renewalDateInput ? 'found' : 'not found');
-
     if (!scheduleSelect.value) {
-        console.log('No schedule selected');
         return;
     }
 
@@ -204,14 +197,21 @@ function calculateRenewalDate() {
         case 'Weekly':
             renewalDate.setDate(today.getDate() + 7);
             break;
-        case 'Monthly':
-            renewalDate.setMonth(today.getMonth() + 1);
+        case 'Monthly': {
+            // Robust month addition: handle month-end dates
+            const targetMonth = today.getMonth() + 1;
+            const targetYear = today.getFullYear() + (targetMonth > 11 ? 1 : 0);
+            const normalizedMonth = targetMonth % 12;
+            // Get last day of target month
+            const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+            const day = Math.min(today.getDate(), lastDayOfTargetMonth);
+            renewalDate = new Date(targetYear, normalizedMonth, day);
             break;
+        }
         case 'Annual':
             renewalDate.setFullYear(today.getFullYear() + 1);
             break;
         default:
-            console.log('Unknown schedule:', scheduleSelect.value);
             return;
     }
 
@@ -220,29 +220,23 @@ function calculateRenewalDate() {
     const month = String(renewalDate.getMonth() + 1).padStart(2, '0');
     const day = String(renewalDate.getDate()).padStart(2, '0');
     const formattedDate = `${year}-${month}-${day}`;
-    console.log('Setting renewal date to:', formattedDate);
     renewalDateInput.value = formattedDate;
 }
 
 // Add event listeners when modal content loads
 function initRenewalCalculator() {
-    console.log('Initializing renewal calculator');
 
     const scheduleSelect = document.getElementById('schedule');
     const statusSelect = document.getElementById('status');
 
     if (scheduleSelect) {
         scheduleSelect.addEventListener('change', calculateRenewalDate);
-        console.log('Added schedule change listener');
-    } else {
-        console.log('Schedule select not found');
+    }
     }
 
     if (statusSelect) {
         statusSelect.addEventListener('change', calculateRenewalDate);
-        console.log('Added status change listener');
-    } else {
-        console.log('Status select not found');
+    }
     }
 }
 
