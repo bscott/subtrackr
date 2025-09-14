@@ -6,14 +6,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
 	"time"
 )
 
-// Supported currencies for exchange rate fetching
-// Keep in sync with settings.SupportedCurrencies
-const supportedCurrencySymbols = "USD,EUR,GBP,JPY,RUB,SEK,PLN,INR"
+// SupportedCurrencies defines the list of currencies supported for exchange rates and settings
+var SupportedCurrencies = []string{"USD", "EUR", "GBP", "JPY", "RUB", "SEK", "PLN", "INR"}
+
+// supportedCurrencySymbols returns the currencies as a comma-separated string for API calls
+func supportedCurrencySymbols() string {
+	return strings.Join(SupportedCurrencies, ",")
+}
 
 type CurrencyService struct {
 	repo   *repository.ExchangeRateRepository
@@ -78,8 +83,8 @@ func (s *CurrencyService) ConvertAmount(amount float64, fromCurrency, toCurrency
 
 // fetchAndCacheRates fetches rates from Fixer.io and caches them
 func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string) (float64, error) {
-	// Use package-level currency symbols constant
-	symbols := supportedCurrencySymbols
+	// Use supported currencies as comma-separated string
+	symbols := supportedCurrencySymbols()
 
 	// Free Fixer.io plan only supports EUR as base currency
 	// Always fetch with EUR as base and calculate cross-rates if needed
