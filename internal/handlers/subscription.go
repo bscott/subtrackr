@@ -47,7 +47,7 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 	result := make([]SubscriptionWithConversion, len(subscriptions))
 
 	for i := range subscriptions {
-		// Create a copy of the subscription to avoid pointer to loop variable issue
+		// Create a copy of the subscription for modification; this pattern is correct for Go 1.22+
 		sub := subscriptions[i]
 		enriched := SubscriptionWithConversion{
 			Subscription:          &sub,
