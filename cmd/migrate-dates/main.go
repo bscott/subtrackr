@@ -118,7 +118,7 @@ func compareAllSubscriptions(db *gorm.DB) {
 			v2Str = v2Date.Format("2006-01-02")
 		}
 		if v1Date != nil && v2Date != nil {
-			diff := v2Date.Sub(*v1Date).Hours() / 24
+			diff := v2Date.Sub(*v1Date).Truncate(24*time.Hour).Hours() / 24
 			diffStr = fmt.Sprintf("%.1f", diff)
 		}
 
