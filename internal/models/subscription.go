@@ -99,16 +99,16 @@ func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 	return nil
 }
 
-// calculateNextRenewalDate calculates the next renewal date based on schedule and version
+// calculateNextRenewalDate calculates the next renewal date based on schedule and version.
+// By default, subscriptions use the original date calculation logic (V1) for backward compatibility.
+// Existing subscriptions will continue using V1 unless explicitly migrated to V2 by setting DateCalculationVersion = 2.
 func (s *Subscription) calculateNextRenewalDate() {
 	// Use versioned calculation approach
 	switch s.DateCalculationVersion {
 	case 2:
 		s.calculateNextRenewalDateV2()
 	default:
-		// Default to V1 for backward compatibility:
-		// Existing subscriptions will continue using the original date calculation logic (V1)
-		// unless explicitly migrated to V2 by setting DateCalculationVersion = 2.
+		// Use V1 logic for backward compatibility
 		s.calculateNextRenewalDateV1()
 	}
 }
