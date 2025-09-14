@@ -83,7 +83,9 @@ func (s *CurrencyService) ConvertAmount(amount float64, fromCurrency, toCurrency
 	return amount * rate, nil
 }
 
-// fetchAndCacheRates fetches rates from Fixer.io and caches them
+// fetchAndCacheRates fetches rates from Fixer.io and caches them.
+// Note: Free Fixer.io plan only supports EUR base, so baseCurrency parameter
+// is used for cross-rate calculations but API always fetches with EUR base.
 func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string) (float64, error) {
 	// Use supported currencies as comma-separated string
 	symbols := supportedCurrencySymbols()
@@ -195,7 +197,7 @@ func (s *CurrencyService) RefreshRates() error {
 	baseCurrencies := []string{"USD", "EUR"}
 
 	for _, base := range baseCurrencies {
-		_, err := s.fetchAndCacheRates(base, "USD") // Fetch rates for all supported currencies with base currency
+		_, err := s.fetchAndCacheRates(base, "USD") // Fetch all supported currencies (EUR base only due to free plan)
 		if err != nil {
 			return fmt.Errorf("failed to refresh rates for %s: %w", base, err)
 		}
