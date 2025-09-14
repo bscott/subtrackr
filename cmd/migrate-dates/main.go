@@ -152,8 +152,8 @@ func compareSubscription(checker *models.DateMigrationSafetyCheck, id uint) {
 	}
 
 	if v1Date != nil && v2Date != nil {
-		diff := v2Date.Sub(*v1Date)
-		fmt.Printf("Difference: %.1f days\n", diff.Hours()/24)
+		diff := v2Date.Sub(*v1Date).Truncate(24*time.Hour).Hours() / 24
+		fmt.Printf("Difference: %.1f days\n", diff)
 	}
 }
 

@@ -41,14 +41,14 @@ func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*mod
 					INSERT INTO subscriptions (
 						name, cost, schedule, status, category_id, category, original_currency,
 						payment_method, account, start_date, renewal_date,
-						cancellation_date, url, notes, usage, created_at, updated_at
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						cancellation_date, url, notes, usage, date_calculation_version, created_at, updated_at
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 					subscription.Name, subscription.Cost, subscription.Schedule,
 					subscription.Status, subscription.CategoryID, category.Name, subscription.OriginalCurrency,
 					subscription.PaymentMethod, subscription.Account,
 					subscription.StartDate, subscription.RenewalDate,
 					subscription.CancellationDate, subscription.URL,
-					subscription.Notes, subscription.Usage,
+					subscription.Notes, subscription.Usage, subscription.DateCalculationVersion,
 					time.Now(), time.Now())
 				
 				if result.Error != nil {

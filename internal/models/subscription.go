@@ -100,8 +100,17 @@ func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 }
 
 // calculateNextRenewalDate calculates the next renewal date based on schedule and version.
-// By default, subscriptions use the original date calculation logic (V1) for backward compatibility.
-// Existing subscriptions will continue using V1 unless explicitly migrated to V2 by setting DateCalculationVersion = 2.
+//
+// Version Selection Logic:
+// - V1 (default): Original calculation logic for backward compatibility
+//   - All existing subscriptions use V1 unless explicitly migrated
+//   - Uses standard Go time.AddDate() which may cause edge cases
+//   - Example: Jan 31 + 1 month = Mar 3 (due to Feb having 28 days)
+// - V2: Enhanced calculation using Carbon library for robust date arithmetic
+//   - Must be explicitly set via DateCalculationVersion = 2
+//   - Uses Carbon's AddMonthsNoOverflow/AddYearsNoOverflow for better handling
+//   - Example: Jan 31 + 1 month = Feb 28 (preserves month-end semantics)
+//   - Recommended for new subscriptions and can be migrated via migrate-dates command
 func (s *Subscription) calculateNextRenewalDate() {
 	// Use versioned calculation approach
 	switch s.DateCalculationVersion {

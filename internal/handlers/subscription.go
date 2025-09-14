@@ -346,23 +346,10 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		}
 	}
 
-	// Get the existing subscription to check for schedule changes
-	existingSub, err := h.service.GetByID(uint(id))
-	if err != nil {
-		c.Header("HX-Retarget", "#form-errors")
-		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
-			"Error": "Subscription not found",
-		})
-		return
-	}
-
-	// Only parse renewal date if schedule hasn't changed
-	// If schedule changed, let the BeforeUpdate hook recalculate it
-	if existingSub.Schedule == subscription.Schedule {
-		if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
-			if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
-				subscription.RenewalDate = &renewalDate
-			}
+	// Always parse renewal date if provided; let service/model layer handle schedule change logic
+	if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
+		if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
+			subscription.RenewalDate = &renewalDate
 		}
 	}
 

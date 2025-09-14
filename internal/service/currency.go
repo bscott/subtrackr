@@ -1,10 +1,12 @@
 package service
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"subtrackr/internal/models"
@@ -88,14 +90,28 @@ func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string
 
 	// Free Fixer.io plan only supports EUR as base currency
 	// Always fetch with EUR as base and calculate cross-rates if needed
-	url := fmt.Sprintf("https://data.fixer.io/api/latest?access_key=%s&base=EUR&symbols=%s",
+	apiURL := fmt.Sprintf("https://data.fixer.io/api/latest?access_key=%s&base=EUR&symbols=%s",
 		s.apiKey, symbols)
 
-	// Configure HTTP client with timeout for production reliability
+	// Validate URL to ensure we're calling the expected API
+	parsedURL, err := url.Parse(apiURL)
+	if err != nil {
+		return 0, fmt.Errorf("invalid API URL: %w", err)
+	}
+	if parsedURL.Host != "data.fixer.io" {
+		return 0, fmt.Errorf("unauthorized API host: %s", parsedURL.Host)
+	}
+
+	// Configure HTTP client with security and timeout settings
 	client := &http.Client{
 		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12, // Require TLS 1.2 or higher
+			},
+		},
 	}
-	resp, err := client.Get(url)
+	resp, err := client.Get(apiURL)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch exchange rates: %w", err)
 	}
