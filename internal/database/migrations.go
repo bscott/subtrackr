@@ -10,7 +10,7 @@ import (
 // RunMigrations executes all database migrations
 func RunMigrations(db *gorm.DB) error {
 	// Auto-migrate non-problematic models first
-	err := db.AutoMigrate(&models.Category{}, &models.Settings{}, &models.APIKey{})
+	err := db.AutoMigrate(&models.Category{}, &models.Settings{}, &models.APIKey{}, &models.ExchangeRate{})
 	if err != nil {
 		return err
 	}
@@ -18,6 +18,8 @@ func RunMigrations(db *gorm.DB) error {
 	// Run specific migrations
 	migrations := []func(*gorm.DB) error{
 		migrateCategoriesToDynamic,
+		migrateCurrencyFields,
+		migrateDateCalculationVersioning,
 	}
 
 	for _, migration := range migrations {
@@ -25,7 +27,7 @@ func RunMigrations(db *gorm.DB) error {
 			return err
 		}
 	}
-	
+
 	// Try to auto-migrate subscriptions after the category migration
 	// This might fail on existing databases but that's okay
 	db.AutoMigrate(&models.Subscription{})
@@ -92,5 +94,61 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 	// This ensures backward compatibility without data loss
 	
 	log.Println("Migration completed: Categories converted to dynamic system")
+	return nil
+}
+
+// migrateCurrencyFields adds original_currency field to existing subscriptions
+func migrateCurrencyFields(db *gorm.DB) error {
+	// Check if original_currency column already exists
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='original_currency'").Scan(&count)
+
+	if count > 0 {
+		// Migration already completed
+		return nil
+	}
+
+	log.Println("Running migration: Adding currency fields...")
+
+	// Add original_currency column with default 'USD'
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN original_currency TEXT DEFAULT 'USD'").Error; err != nil {
+		// Column might already exist, that's okay
+		log.Printf("Note: Could not add original_currency column: %v", err)
+	}
+
+	// Set USD as default for existing subscriptions
+	if err := db.Exec("UPDATE subscriptions SET original_currency = 'USD' WHERE original_currency IS NULL OR original_currency = ''").Error; err != nil {
+		log.Printf("Warning: Could not update existing subscriptions with default currency: %v", err)
+	}
+
+	log.Println("Migration completed: Currency fields added")
+	return nil
+}
+
+// migrateDateCalculationVersioning adds date_calculation_version field for versioned date logic
+func migrateDateCalculationVersioning(db *gorm.DB) error {
+	// Check if date_calculation_version column already exists
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='date_calculation_version'").Scan(&count)
+
+	if count > 0 {
+		// Migration already completed
+		return nil
+	}
+
+	log.Println("Running migration: Adding date calculation versioning...")
+
+	// Add date_calculation_version column with default 1 (existing logic)
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN date_calculation_version INTEGER DEFAULT 1").Error; err != nil {
+		// Column might already exist, that's okay
+		log.Printf("Note: Could not add date_calculation_version column: %v", err)
+	}
+
+	// Set version 1 for all existing subscriptions (maintain backward compatibility)
+	if err := db.Exec("UPDATE subscriptions SET date_calculation_version = 1 WHERE date_calculation_version IS NULL").Error; err != nil {
+		log.Printf("Warning: Could not update existing subscriptions with default version: %v", err)
+	}
+
+	log.Println("Migration completed: Date calculation versioning added")
 	return nil
 }

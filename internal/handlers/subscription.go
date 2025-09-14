@@ -14,15 +14,82 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SubscriptionWithConversion represents a subscription with currency conversion info
+type SubscriptionWithConversion struct {
+	*models.Subscription
+	ConvertedCost         float64 `json:"converted_cost"`
+	ConvertedAnnualCost   float64 `json:"converted_annual_cost"`
+	ConvertedMonthlyCost  float64 `json:"converted_monthly_cost"`
+	DisplayCurrency       string  `json:"display_currency"`
+	DisplayCurrencySymbol string  `json:"display_currency_symbol"`
+	ShowConversion        bool    `json:"show_conversion"`
+}
+
 type SubscriptionHandler struct {
 	service         *service.SubscriptionService
 	settingsService *service.SettingsService
+	currencyService *service.CurrencyService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
+		currencyService: currencyService,
+	}
+}
+
+// enrichWithCurrencyConversion adds currency conversion info to subscriptions
+func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []models.Subscription) []SubscriptionWithConversion {
+	displayCurrency := h.settingsService.GetCurrency()
+	displaySymbol := h.settingsService.GetCurrencySymbol()
+
+	result := make([]SubscriptionWithConversion, len(subscriptions))
+
+	for i := range subscriptions {
+		// Create a copy of the subscription to avoid pointer to loop variable issue
+		sub := subscriptions[i]
+		enriched := SubscriptionWithConversion{
+			Subscription:          &sub,
+			DisplayCurrency:       displayCurrency,
+			DisplayCurrencySymbol: displaySymbol,
+			ShowConversion:        false,
+		}
+
+		// Only show conversion if currency service is enabled and currencies differ
+		if h.currencyService.IsEnabled() && sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
+			if convertedCost, err := h.currencyService.ConvertAmount(sub.Cost, sub.OriginalCurrency, displayCurrency); err == nil {
+				enriched.ConvertedCost = convertedCost
+				enriched.ConvertedAnnualCost = convertedCost * h.getScheduleMultiplier(sub.Schedule)
+				enriched.ConvertedMonthlyCost = enriched.ConvertedAnnualCost / 12
+				enriched.ShowConversion = true
+			}
+		} else {
+			// Same currency or no conversion needed
+			enriched.ConvertedCost = sub.Cost
+			enriched.ConvertedAnnualCost = sub.AnnualCost()
+			enriched.ConvertedMonthlyCost = sub.MonthlyCost()
+		}
+
+		result[i] = enriched
+	}
+
+	return result
+}
+
+// getScheduleMultiplier returns the annual multiplier for a schedule
+func (h *SubscriptionHandler) getScheduleMultiplier(schedule string) float64 {
+	switch schedule {
+	case "Annual":
+		return 1
+	case "Monthly":
+		return 12
+	case "Weekly":
+		return 52
+	case "Daily":
+		return 365
+	default:
+		return 12
 	}
 }
 
@@ -46,11 +113,14 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 		recentSubs = subscriptions[:5]
 	}
 
+	// Enrich with currency conversion
+	enrichedSubs := h.enrichWithCurrencyConversion(recentSubs)
+
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"Title":          "Dashboard",
 		"CurrentPage":    "dashboard",
 		"Stats":          stats,
-		"Subscriptions":  recentSubs,
+		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 	})
@@ -64,10 +134,13 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		return
 	}
 
+	// Enrich with currency conversion
+	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
+
 	c.HTML(http.StatusOK, "subscriptions.html", gin.H{
 		"Title":          "Subscriptions",
 		"CurrentPage":    "subscriptions",
-		"Subscriptions":  subscriptions,
+		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 	})
@@ -115,8 +188,11 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 		return
 	}
 
+	// Enrich with currency conversion
+	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
+
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
-		"Subscriptions":  subscriptions,
+		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 	})
 }
@@ -146,6 +222,10 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	}
 	subscription.Schedule = c.PostForm("schedule")
 	subscription.Status = c.PostForm("status")
+	subscription.OriginalCurrency = c.PostForm("original_currency")
+	if subscription.OriginalCurrency == "" {
+		subscription.OriginalCurrency = "USD" // Default to USD
+	}
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
@@ -242,6 +322,10 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	}
 	subscription.Schedule = c.PostForm("schedule")
 	subscription.Status = c.PostForm("status")
+	subscription.OriginalCurrency = c.PostForm("original_currency")
+	if subscription.OriginalCurrency == "" {
+		subscription.OriginalCurrency = "USD" // Default to USD
+	}
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
@@ -262,9 +346,23 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		}
 	}
 
-	if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
-		if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
-			subscription.RenewalDate = &renewalDate
+	// Get the existing subscription to check for schedule changes
+	existingSub, err := h.service.GetByID(uint(id))
+	if err != nil {
+		c.Header("HX-Retarget", "#form-errors")
+		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
+			"Error": "Subscription not found",
+		})
+		return
+	}
+
+	// Only parse renewal date if schedule hasn't changed
+	// If schedule changed, let the BeforeUpdate hook recalculate it
+	if existingSub.Schedule == subscription.Schedule {
+		if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
+			if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
+				subscription.RenewalDate = &renewalDate
+			}
 		}
 	}
 

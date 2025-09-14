@@ -341,8 +341,8 @@
                     </label>
 
                     <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
+                        <input type="radio"
+                               name="currency"
                                value="PLN"
                                {{if eq .Currency "PLN"}}checked{{end}}
                                hx-post="/api/settings/currency"
@@ -350,6 +350,18 @@
                                hx-vals='{"currency": "PLN"}'
                                class="mr-2 text-primary focus:ring-primary">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-200">zł PLN (Polish Zloty)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="radio"
+                               name="currency"
+                               value="INR"
+                               {{if eq .Currency "INR"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "INR"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">₹ INR (Indian Rupee)</span>
                     </label>
                 </div>
                 

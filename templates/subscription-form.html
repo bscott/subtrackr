@@ -48,6 +48,22 @@
                 </div>
             </div>
 
+            <!-- Original Currency -->
+            <div>
+                <label for="original_currency" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Currency *</label>
+                <select id="original_currency" name="original_currency" required
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
+                    <option value="USD" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "USD"}}selected{{end}}{{else}}selected{{end}}>$ USD</option>
+                    <option value="EUR" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "EUR"}}selected{{end}}{{end}}>€ EUR</option>
+                    <option value="GBP" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "GBP"}}selected{{end}}{{end}}>£ GBP</option>
+                    <option value="JPY" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "JPY"}}selected{{end}}{{end}}>¥ JPY</option>
+                    <option value="RUB" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "RUB"}}selected{{end}}{{end}}>₽ RUB</option>
+                    <option value="SEK" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "SEK"}}selected{{end}}{{end}}>kr SEK</option>
+                    <option value="PLN" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "PLN"}}selected{{end}}{{end}}>zł PLN</option>
+                    <option value="INR" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "INR"}}selected{{end}}{{end}}>₹ INR</option>
+                </select>
+            </div>
+
             <!-- Schedule -->
             <div>
                 <label for="schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Schedule *</label>
@@ -159,3 +175,80 @@
         </div>
     </form>
 </div>
+
+<script>
+function calculateRenewalDate() {
+    console.log('calculateRenewalDate called');
+
+    const scheduleSelect = document.getElementById('schedule');
+    const statusSelect = document.getElementById('status');
+    const renewalDateInput = document.getElementById('renewal_date');
+
+    console.log('Schedule:', scheduleSelect ? scheduleSelect.value : 'not found');
+    console.log('Status:', statusSelect ? statusSelect.value : 'not found');
+    console.log('Renewal input:', renewalDateInput ? 'found' : 'not found');
+
+    if (!scheduleSelect.value) {
+        console.log('No schedule selected');
+        return;
+    }
+
+    // Calculate renewal date regardless of status for live preview
+    const today = new Date();
+    let renewalDate = new Date(today);
+
+    switch (scheduleSelect.value) {
+        case 'Daily':
+            renewalDate.setDate(today.getDate() + 1);
+            break;
+        case 'Weekly':
+            renewalDate.setDate(today.getDate() + 7);
+            break;
+        case 'Monthly':
+            renewalDate.setMonth(today.getMonth() + 1);
+            break;
+        case 'Annual':
+            renewalDate.setFullYear(today.getFullYear() + 1);
+            break;
+        default:
+            console.log('Unknown schedule:', scheduleSelect.value);
+            return;
+    }
+
+    // Format date as YYYY-MM-DD for input field (using local timezone)
+    const year = renewalDate.getFullYear();
+    const month = String(renewalDate.getMonth() + 1).padStart(2, '0');
+    const day = String(renewalDate.getDate()).padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+    console.log('Setting renewal date to:', formattedDate);
+    renewalDateInput.value = formattedDate;
+}
+
+// Add event listeners when modal content loads
+function initRenewalCalculator() {
+    console.log('Initializing renewal calculator');
+
+    const scheduleSelect = document.getElementById('schedule');
+    const statusSelect = document.getElementById('status');
+
+    if (scheduleSelect) {
+        scheduleSelect.addEventListener('change', calculateRenewalDate);
+        console.log('Added schedule change listener');
+    } else {
+        console.log('Schedule select not found');
+    }
+
+    if (statusSelect) {
+        statusSelect.addEventListener('change', calculateRenewalDate);
+        console.log('Added status change listener');
+    } else {
+        console.log('Status select not found');
+    }
+}
+
+// Initialize immediately since this script loads with the form
+initRenewalCalculator();
+
+// Also initialize on DOM content loaded as backup
+document.addEventListener('DOMContentLoaded', initRenewalCalculator);
+</script>
