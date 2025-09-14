@@ -332,8 +332,16 @@ func TestSubscription_BeforeCreate_WithStartDate(t *testing.T) {
 				// The renewal should be after now but follow the schedule pattern
 				switch tt.schedule {
 				case "Monthly":
-					// Should be on the same day of month as start date (or close to it)
-					assert.Equal(t, tt.startDate.Day(), sub.RenewalDate.Day())
+					// Should be on the same day of month as start date, unless start date is month-end
+					startYear, startMonth, _ := tt.startDate.Date()
+					renewalYear, renewalMonth, _ := sub.RenewalDate.Date()
+					startLastDay := time.Date(startYear, startMonth+1, 0, 0, 0, 0, 0, tt.startDate.Location()).Day()
+					renewalLastDay := time.Date(renewalYear, renewalMonth+1, 0, 0, 0, 0, 0, sub.RenewalDate.Location()).Day()
+					if tt.startDate.Day() == startLastDay {
+						assert.Equal(t, renewalLastDay, sub.RenewalDate.Day(), "Renewal date should be last day of month if start date was")
+					} else {
+						assert.Equal(t, tt.startDate.Day(), sub.RenewalDate.Day())
+					}
 				case "Annual":
 					// Should be on same month/day as start date
 					assert.Equal(t, tt.startDate.Month(), sub.RenewalDate.Month())

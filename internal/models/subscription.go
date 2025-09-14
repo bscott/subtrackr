@@ -106,7 +106,9 @@ func (s *Subscription) calculateNextRenewalDate() {
 	case 2:
 		s.calculateNextRenewalDateV2()
 	default:
-		// Default to V1 for backward compatibility
+		// Default to V1 for backward compatibility:
+		// Existing subscriptions will continue using the original date calculation logic (V1)
+		// unless explicitly migrated to V2 by setting DateCalculationVersion = 2.
 		s.calculateNextRenewalDateV1()
 	}
 }

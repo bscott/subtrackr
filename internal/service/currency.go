@@ -73,8 +73,9 @@ func (s *CurrencyService) ConvertAmount(amount float64, fromCurrency, toCurrency
 
 // fetchAndCacheRates fetches rates from Fixer.io and caches them
 func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string) (float64, error) {
-	// Supported currencies
-	symbols := "USD,EUR,GBP,JPY,RUB,SEK,PLN,INR"
+	// Supported currencies - keep in sync with settings.SupportedCurrencies
+	const supportedCurrencies = "USD,EUR,GBP,JPY,RUB,SEK,PLN,INR"
+	symbols := supportedCurrencies
 
 	// Free Fixer.io plan only supports EUR as base currency
 	// Always fetch with EUR as base and calculate cross-rates if needed
