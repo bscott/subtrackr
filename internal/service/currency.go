@@ -195,7 +195,7 @@ func (s *CurrencyService) RefreshRates() error {
 	baseCurrencies := []string{"USD", "EUR"}
 
 	for _, base := range baseCurrencies {
-		_, err := s.fetchAndCacheRates(base, "USD") // Fetch all supported currencies
+		_, err := s.fetchAndCacheRates(base, "USD") // Fetch rates for all supported currencies with base currency
 		if err != nil {
 			return fmt.Errorf("failed to refresh rates for %s: %w", base, err)
 		}
