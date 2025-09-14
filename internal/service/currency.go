@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"subtrackr/internal/models"
@@ -85,7 +86,11 @@ func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string
 	url := fmt.Sprintf("https://data.fixer.io/api/latest?access_key=%s&base=EUR&symbols=%s",
 		s.apiKey, symbols)
 
-	resp, err := http.Get(url)
+	// Configure HTTP client with timeout for production reliability
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch exchange rates: %w", err)
 	}
@@ -130,7 +135,7 @@ func (s *CurrencyService) fetchAndCacheRates(baseCurrency, targetCurrency string
 	if len(ratesToSave) > 0 {
 		if err := s.repo.SaveRates(ratesToSave); err != nil {
 			// Log error but don't fail the request
-			fmt.Printf("Warning: failed to cache exchange rates: %v\n", err)
+			log.Printf("Warning: failed to cache exchange rates: %v", err)
 		}
 	}
 
