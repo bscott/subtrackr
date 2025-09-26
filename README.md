@@ -15,6 +15,7 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 - 📈 **Analytics**: Visualize spending by category and track savings
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
 - 📤 **Data Export**: Export your data as CSV or JSON
+- 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, and INR (with optional real-time conversion)
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
 - 📱 **Mobile Responsive**: Works great on all devices
@@ -29,6 +30,8 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 ## 🚀 Quick Start
 
 SubTrackr is available as a multi-platform Docker image supporting both AMD64 and ARM64 architectures (including Apple Silicon).
+
+**Note:** SubTrackr works fully out-of-the-box with no external dependencies. The Fixer.io API key is completely optional for currency conversion features.
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -48,6 +51,8 @@ services:
     environment:
       - GIN_MODE=release
       - DATABASE_PATH=/app/data/subtrackr.db
+      # Optional: Enable automatic currency conversion (requires Fixer.io API key)
+      # - FIXER_API_KEY=your_fixer_api_key_here
     restart: unless-stopped
 ```
 
@@ -67,6 +72,15 @@ docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
   -e GIN_MODE=release \
+  ghcr.io/bscott/subtrackr:latest
+
+# Optional: With currency conversion enabled
+docker run -d \
+  --name subtrackr \
+  -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -e GIN_MODE=release \
+  -e FIXER_API_KEY=your_fixer_api_key_here \
   ghcr.io/bscott/subtrackr:latest
 ```
 
@@ -174,6 +188,32 @@ docker-compose up -d --build
 | `PORT` | Server port | `8080` |
 | `DATABASE_PATH` | SQLite database file path | `./data/subtrackr.db` |
 | `GIN_MODE` | Gin framework mode (debug/release) | `debug` |
+| `FIXER_API_KEY` | Fixer.io API key for currency conversion (optional) | None |
+
+### Currency Conversion (Optional)
+
+SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
+
+**Without API key:** (Fully functional)
+- Basic multi-currency support with display symbols
+- Manual currency selection per subscription
+- Subscriptions displayed in their original currency
+- No automatic conversion between currencies
+
+**With Fixer.io API key:**
+- Real-time exchange rates (cached for 24 hours)
+- Automatic conversion between any supported currencies
+- Display original amount + converted amount in your preferred currency
+
+**Setup:**
+1. Sign up for free at [Fixer.io](https://fixer.io/) (1000 requests/month)
+2. Get your API key from the dashboard
+3. Add `FIXER_API_KEY=your_key_here` to your environment variables
+4. Restart SubTrackr - currency conversion will be automatically enabled
+
+**Note:** The free Fixer.io plan only allows EUR as the base currency. SubTrackr automatically handles cross-rate calculations (e.g., USD→INR goes through EUR) so all currency conversions work correctly regardless of this limitation.
+
+**Supported currencies:** USD, EUR, GBP, JPY, RUB, SEK, PLN, INR
 
 ### Email Notifications (SMTP)
 

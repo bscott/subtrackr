@@ -36,14 +36,16 @@ func main() {
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	settingsRepo := repository.NewSettingsRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
+	exchangeRateRepo := repository.NewExchangeRateRepository(db)
 
 	// Initialize services
 	categoryService := service.NewCategoryService(categoryRepo)
+	currencyService := service.NewCurrencyService(exchangeRateRepo)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
 	settingsService := service.NewSettingsService(settingsRepo)
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 

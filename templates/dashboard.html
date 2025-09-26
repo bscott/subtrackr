@@ -190,7 +190,12 @@
                 </div>
             </div>
             <div class="text-right">
+                {{if .ShowConversion}}
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{.DisplayCurrencySymbol}}{{printf "%.2f" .ConvertedCost}}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{.OriginalCurrency}} {{printf "%.2f" .Cost}}</p>
+                {{else}}
                 <p class="text-sm font-medium text-gray-900 dark:text-white">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</p>
+                {{end}}
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{.Schedule}}</p>
             </div>
         </div>

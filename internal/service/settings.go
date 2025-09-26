@@ -133,10 +133,9 @@ func (s *SettingsService) ValidateAPIKey(key string) (*models.APIKey, error) {
 
 // SetCurrency saves the currency preference
 func (s *SettingsService) SetCurrency(currency string) error {
-	// Validate currency
-	validCurrencies := []string{"USD", "EUR", "PLN", "GBP", "RUB", "JPY", "SEK"}
+	// Validate currency using shared constant
 	isValid := false
-	for _, c := range validCurrencies {
+	for _, c := range SupportedCurrencies {
 		if currency == c {
 			isValid = true
 			break
@@ -173,6 +172,8 @@ func (s *SettingsService) GetCurrencySymbol() string {
 		return "¥"
 	case "SEK":
 		return "kr"
+	case "INR":
+		return "₹"
 	default:
 		return "$"
 	}
