@@ -43,9 +43,10 @@ func main() {
 	currencyService := service.NewCurrencyService(exchangeRateRepo)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
 	settingsService := service.NewSettingsService(settingsRepo)
+	emailService := service.NewEmailService(settingsService)
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 

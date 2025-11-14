@@ -32,6 +32,7 @@ func (h *SettingsHandler) SaveSMTPSettings(c *gin.Context) {
 	config.Password = c.PostForm("smtp_password")
 	config.From = c.PostForm("smtp_from")
 	config.FromName = c.PostForm("smtp_from_name")
+	config.To = c.PostForm("smtp_to")
 
 	// Parse port
 	if portStr := c.PostForm("smtp_port"); portStr != "" {
@@ -41,9 +42,9 @@ func (h *SettingsHandler) SaveSMTPSettings(c *gin.Context) {
 	}
 
 	// Validate required fields
-	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" || config.From == "" {
+	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" || config.From == "" || config.To == "" {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
-			"Error": "All SMTP fields are required",
+			"Error": "All SMTP fields are required (including To email)",
 			"Type":  "error",
 		})
 		return
@@ -75,6 +76,7 @@ func (h *SettingsHandler) TestSMTPConnection(c *gin.Context) {
 	config.Password = c.PostForm("smtp_password")
 	config.From = c.PostForm("smtp_from")
 	config.FromName = c.PostForm("smtp_from_name")
+	config.To = c.PostForm("smtp_to")
 
 	// Parse port
 	if portStr := c.PostForm("smtp_port"); portStr != "" {

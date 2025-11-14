@@ -137,43 +137,51 @@
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Email Notifications</h3>
                 
                 <!-- SMTP Settings -->
-                <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h4 class="text-sm font-medium text-gray-900 mb-4">SMTP Configuration</h4>
-                    <form id="smtp-form" hx-post="/api/settings/smtp" hx-trigger="submit" hx-target="#smtp-message">
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4 transition-colors duration-200">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">SMTP Configuration</h4>
+                    <form id="smtp-form" hx-post="/api/settings/smtp" hx-trigger="submit" hx-target="#smtp-message" hx-swap="innerHTML">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
-                                <label for="smtp_host" class="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
-                                <input type="text" id="smtp_host" name="smtp_host" placeholder="smtp.gmail.com"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <label for="smtp_host" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">SMTP Host</label>
+                                <input type="text" id="smtp_host" name="smtp_host" placeholder="smtp.gmail.com" value="{{if .SMTPConfig}}{{.SMTPConfig.Host}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <div>
-                                <label for="smtp_port" class="block text-sm font-medium text-gray-700 mb-1">SMTP Port</label>
-                                <input type="number" id="smtp_port" name="smtp_port" placeholder="587"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <label for="smtp_port" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">SMTP Port</label>
+                                <input type="number" id="smtp_port" name="smtp_port" placeholder="587" value="{{if .SMTPConfig}}{{.SMTPConfig.Port}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <div>
-                                <label for="smtp_username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                                <input type="text" id="smtp_username" name="smtp_username" placeholder="username or email"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <label for="smtp_username" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Username</label>
+                                <input type="text" id="smtp_username" name="smtp_username" placeholder="username or email" value="{{if .SMTPConfig}}{{.SMTPConfig.Username}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <div>
-                                <label for="smtp_password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <label for="smtp_password" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Password</label>
                                 <input type="password" id="smtp_password" name="smtp_password" placeholder="••••••••"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <div>
-                                <label for="smtp_from" class="block text-sm font-medium text-gray-700 mb-1">From Email</label>
-                                <input type="email" id="smtp_from" name="smtp_from" placeholder="noreply@example.com"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <label for="smtp_from" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">From Email</label>
+                                <input type="email" id="smtp_from" name="smtp_from" placeholder="noreply@example.com" value="{{if .SMTPConfig}}{{.SMTPConfig.From}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <div>
-                                <label for="smtp_from_name" class="block text-sm font-medium text-gray-700 mb-1">From Name</label>
-                                <input type="text" id="smtp_from_name" name="smtp_from_name" placeholder="SubTrackr"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <label for="smtp_from_name" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">From Name</label>
+                                <input type="text" id="smtp_from_name" name="smtp_from_name" placeholder="SubTrackr" value="{{if .SMTPConfig}}{{.SMTPConfig.FromName}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label for="smtp_to" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">To Email (Notification Recipient)</label>
+                                <input type="email" id="smtp_to" name="smtp_to" placeholder="your-email@example.com" value="{{if .SMTPConfig}}{{.SMTPConfig.To}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">This is where notification emails will be sent</p>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between">
+                        <div class="mb-4">
                             <div id="smtp-message"></div>
+                        </div>
+                        <div class="flex items-center justify-end">
                             <div class="flex space-x-2">
                                 <button type="button"
                                         id="test-smtp-btn"
@@ -181,8 +189,8 @@
                                         hx-include="#smtp-form"
                                         hx-target="#smtp-message"
                                         hx-indicator="#smtp-spinner"
-                                        class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center">
-                                    <svg id="smtp-spinner" class="htmx-indicator animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        class="bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center transition-colors duration-150">
+                                    <svg id="smtp-spinner" class="htmx-indicator animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
@@ -385,7 +393,7 @@
                         <div class="flex items-end space-x-3">
                             <div class="flex-1">
                                 <label for="category_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category Name</label>
-                                <input type="text" id="category_name" name="name" required placeholder="e.g., Streaming" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <input type="text" id="category_name" name="name" required placeholder="e.g., Streaming" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">Add Category</button>
                         </div>
@@ -409,17 +417,17 @@
                 
                 <!-- Create New API Key -->
                 <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 transition-colors duration-200">
-                    <h4 class="text-sm font-medium text-gray-900 mb-3">Create New API Key</h4>
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Create New API Key</h4>
                     <form hx-post="/api/settings/apikeys" hx-target="#api-keys-list" hx-swap="innerHTML">
                         <div class="flex items-end space-x-3">
                             <div class="flex-1">
-                                <label for="api_key_name" class="block text-sm font-medium text-gray-700 mb-1">Key Name</label>
+                                <label for="api_key_name" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Key Name</label>
                                 <input type="text" 
                                        id="api_key_name" 
                                        name="name" 
                                        required
                                        placeholder="e.g., Home Assistant Integration"
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                             </div>
                             <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
                                 Generate API Key
@@ -429,10 +437,10 @@
                 </div>
                 
                 <!-- API Documentation Link -->
-                <div class="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p class="text-sm text-blue-800">
-                        <strong>API Documentation:</strong> Include the API key in the <code class="bg-blue-100 px-1 py-0.5 rounded">X-API-Key</code> header for all requests.
-                        <a href="#api-docs" class="text-blue-600 hover:text-blue-800 underline ml-1">View full API documentation</a>
+                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg transition-colors duration-200">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>API Documentation:</strong> Include the API key in the <code class="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded text-blue-800 dark:text-blue-200">X-API-Key</code> header for all requests.
+                        <a href="#api-docs" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline ml-1">View full API documentation</a>
                     </p>
                 </div>
             </div>
@@ -461,68 +469,68 @@
 
 <!-- API Documentation -->
 <div id="api-docs" class="mt-6">
-    <div class="bg-white rounded-lg shadow-sm">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm transition-colors duration-200">
         <div class="p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">API Documentation</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">API Documentation</h2>
             
             <div class="space-y-6">
                 <!-- Authentication -->
                 <div>
-                    <h3 class="text-md font-medium text-gray-900 mb-2">Authentication</h3>
-                    <p class="text-sm text-gray-600 mb-3">All API requests require authentication using an API key. Include your API key in the request headers:</p>
-                    <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm">
+                    <h3 class="text-md font-medium text-gray-900 dark:text-white mb-2">Authentication</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">All API requests require authentication using an API key. Include your API key in the request headers:</p>
+                    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 font-mono text-sm transition-colors duration-200">
                         <div class="mb-2">
-                            <span class="text-gray-500"># Authorization header (recommended)</span><br>
-                            Authorization: Bearer sk_your_api_key_here
+                            <span class="text-gray-500 dark:text-gray-400"># Authorization header (recommended)</span><br>
+                            <span class="text-gray-900 dark:text-gray-100">Authorization: Bearer sk_your_api_key_here</span>
                         </div>
                         <div>
-                            <span class="text-gray-500"># X-API-Key header (alternative)</span><br>
-                            X-API-Key: sk_your_api_key_here
+                            <span class="text-gray-500 dark:text-gray-400"># X-API-Key header (alternative)</span><br>
+                            <span class="text-gray-900 dark:text-gray-100">X-API-Key: sk_your_api_key_here</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Endpoints -->
                 <div>
-                    <h3 class="text-md font-medium text-gray-900 mb-3">API Endpoints</h3>
+                    <h3 class="text-md font-medium text-gray-900 dark:text-white mb-3">API Endpoints</h3>
                     
                     <!-- Subscriptions -->
                     <div class="mb-4">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Subscriptions</h4>
-                        <div class="bg-gray-50 rounded-lg overflow-hidden">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Subscriptions</h4>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200">
                             <table class="min-w-full">
-                                <thead class="bg-gray-100">
+                                <thead class="bg-gray-100 dark:bg-gray-600">
                                     <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Method</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Endpoint</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Method</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Endpoint</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Description</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200">
+                                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">List all subscriptions</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/subscriptions</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">List all subscriptions</td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">POST</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Create a new subscription</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded text-xs font-medium">POST</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/subscriptions</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Create a new subscription</td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions/:id</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Get subscription details</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/subscriptions/:id</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Get subscription details</td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">PUT</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions/:id</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Update subscription</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300 rounded text-xs font-medium">PUT</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/subscriptions/:id</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Update subscription</td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">DELETE</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/subscriptions/:id</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Delete subscription</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded text-xs font-medium">DELETE</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/subscriptions/:id</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Delete subscription</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -531,31 +539,31 @@
 
                     <!-- Statistics & Export -->
                     <div>
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Statistics & Export</h4>
-                        <div class="bg-gray-50 rounded-lg overflow-hidden">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Statistics & Export</h4>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200">
                             <table class="min-w-full">
-                                <thead class="bg-gray-100">
+                                <thead class="bg-gray-100 dark:bg-gray-600">
                                     <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Method</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Endpoint</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Method</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Endpoint</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Description</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-200">
+                                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/stats</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Get subscription statistics</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/stats</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Get subscription statistics</td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/export/csv</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Export subscriptions as CSV</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/export/csv</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Export subscriptions as CSV</td>
                                     </tr>
                                     <tr>
-                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">GET</span></td>
-                                        <td class="px-4 py-2 text-sm font-mono">/api/v1/export/json</td>
-                                        <td class="px-4 py-2 text-sm text-gray-600">Export subscriptions as JSON</td>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/api/v1/export/json</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Export subscriptions as JSON</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -565,12 +573,12 @@
 
                 <!-- Example Requests -->
                 <div>
-                    <h3 class="text-md font-medium text-gray-900 mb-3">Example Requests</h3>
+                    <h3 class="text-md font-medium text-gray-900 dark:text-white mb-3">Example Requests</h3>
                     
                     <div class="space-y-4">
                         <!-- List Subscriptions -->
                         <div>
-                            <h4 class="text-sm font-medium text-gray-700 mb-2">List Subscriptions</h4>
+                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">List Subscriptions</h4>
                             <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
                                 <div class="text-green-400">curl -H "Authorization: Bearer sk_your_api_key_here" \</div>
                                 <div class="ml-4">http://localhost:8080/api/v1/subscriptions</div>
@@ -579,7 +587,7 @@
 
                         <!-- Create Subscription -->
                         <div>
-                            <h4 class="text-sm font-medium text-gray-700 mb-2">Create Subscription</h4>
+                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Create Subscription</h4>
                             <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
                                 <div class="text-green-400">curl -X POST \</div>
                                 <div class="ml-4">-H "Authorization: Bearer sk_your_api_key_here" \</div>
@@ -597,14 +605,14 @@
 
                         <!-- Get Statistics -->
                         <div>
-                            <h4 class="text-sm font-medium text-gray-700 mb-2">Get Statistics</h4>
+                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Get Statistics</h4>
                             <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm overflow-x-auto">
                                 <div class="text-green-400">curl -H "Authorization: Bearer sk_your_api_key_here" \</div>
                                 <div class="ml-4">http://localhost:8080/api/v1/stats</div>
                             </div>
                             <div class="mt-2">
-                                <h5 class="text-xs font-medium text-gray-600 mb-1">Response:</h5>
-                                <div class="bg-gray-50 rounded-lg p-3 font-mono text-xs">
+                                <h5 class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Response:</h5>
+                                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 font-mono text-xs transition-colors duration-200">
 <pre>{
   "total_count": 15,
   "active_count": 12,
@@ -623,15 +631,15 @@
 
                 <!-- Additional Resources -->
                 <div>
-                    <h3 class="text-md font-medium text-gray-900 mb-2">Additional Resources</h3>
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 class="text-md font-medium text-gray-900 dark:text-white mb-2">Additional Resources</h3>
+                    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 transition-colors duration-200">
                         <div class="flex items-start">
-                            <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                             </svg>
-                            <div class="text-sm text-blue-800">
+                            <div class="text-sm text-blue-800 dark:text-blue-200">
                                 <p>For more detailed API documentation and examples, check the README file in the project repository.</p>
-                                <p class="mt-1">The test script <code class="bg-blue-100 px-1 py-0.5 rounded">test-api.sh</code> provides interactive examples of API usage.</p>
+                                <p class="mt-1">The test script <code class="bg-blue-100 dark:bg-blue-800 px-1 py-0.5 rounded text-blue-800 dark:text-blue-200">test-api.sh</code> provides interactive examples of API usage.</p>
                             </div>
                         </div>
                     </div>

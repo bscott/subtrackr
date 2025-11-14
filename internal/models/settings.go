@@ -21,6 +21,7 @@ type SMTPConfig struct {
 	Password string `json:"smtp_password"`
 	From     string `json:"smtp_from"`
 	FromName string `json:"smtp_from_name"`
+	To       string `json:"smtp_to"` // Recipient email address for notifications
 }
 
 // NotificationSettings represents notification preferences

@@ -29,13 +29,15 @@ type SubscriptionHandler struct {
 	service         *service.SubscriptionService
 	settingsService *service.SettingsService
 	currencyService *service.CurrencyService
+	emailService    *service.EmailService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
 		currencyService: currencyService,
+		emailService:    emailService,
 	}
 }
 
@@ -165,6 +167,15 @@ func (h *SubscriptionHandler) Analytics(c *gin.Context) {
 
 // Settings renders the settings page
 func (h *SubscriptionHandler) Settings(c *gin.Context) {
+	// Load SMTP config if available (without password)
+	var smtpConfig *models.SMTPConfig
+	config, err := h.settingsService.GetSMTPConfig()
+	if err == nil && config != nil {
+		// Don't include password in template
+		config.Password = ""
+		smtpConfig = config
+	}
+
 	c.HTML(http.StatusOK, "settings.html", gin.H{
 		"Title":            "Settings",
 		"CurrentPage":      "settings",
@@ -175,6 +186,7 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"ReminderDays":     h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
 		"DarkMode":         h.settingsService.IsDarkModeEnabled(),
 		"Version":          version.GetVersion(),
+		"SMTPConfig":       smtpConfig,
 	})
 }
 
@@ -277,6 +289,18 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		return
 	}
 
+	// Send high-cost alert email if applicable
+	if created.IsHighCost() {
+		// Reload subscription with category for email template
+		subscriptionWithCategory, err := h.service.GetByID(created.ID)
+		if err == nil && subscriptionWithCategory != nil {
+			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				// Log error but don't fail the request
+				log.Printf("Failed to send high-cost alert email: %v", err)
+			}
+		}
+	}
+
 	if c.GetHeader("HX-Request") != "" {
 		c.Header("HX-Refresh", "true")
 		c.Status(http.StatusCreated)
@@ -359,14 +383,30 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		}
 	}
 
+	// Get the original subscription to check if it was high-cost before update
+	original, _ := h.service.GetByID(uint(id))
+	wasHighCost := original != nil && original.IsHighCost()
+
 	// Update subscription
-	_, err = h.service.Update(uint(id), &subscription)
+	updated, err := h.service.Update(uint(id), &subscription)
 	if err != nil {
 		c.Header("HX-Retarget", "#form-errors")
 		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
 			"Error": err.Error(),
 		})
 		return
+	}
+
+	// Send high-cost alert email if subscription became high-cost (wasn't before, but is now)
+	if updated != nil && !wasHighCost && updated.IsHighCost() {
+		// Reload subscription with category for email template
+		subscriptionWithCategory, err := h.service.GetByID(updated.ID)
+		if err == nil && subscriptionWithCategory != nil {
+			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				// Log error but don't fail the request
+				log.Printf("Failed to send high-cost alert email: %v", err)
+			}
+		}
 	}
 
 	// Return success response that triggers a page refresh
