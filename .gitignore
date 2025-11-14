@@ -63,3 +63,8 @@ docker-data/
 product-spec.md
 CleanShot*.png
 .playwright-mcp/
+node_modules/
+server.log
+server
+*.db
+subtrackr
