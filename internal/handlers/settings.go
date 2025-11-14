@@ -44,7 +44,7 @@ func (h *SettingsHandler) SaveSMTPSettings(c *gin.Context) {
 	// Validate required fields
 	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" || config.From == "" || config.To == "" {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
-			"Error": "All SMTP fields are required (including To email)",
+			"Error": "Required SMTP fields: Host, Port, Username, Password, From email, To email",
 			"Type":  "error",
 		})
 		return
@@ -85,10 +85,10 @@ func (h *SettingsHandler) TestSMTPConnection(c *gin.Context) {
 		}
 	}
 
-	// Validate
+	// Validate required fields for testing (connection test doesn't need From/To, but we validate for consistency)
 	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
-			"Error": "All SMTP fields are required for testing",
+			"Error": "Host, Port, Username, and Password are required for testing",
 			"Type":  "error",
 		})
 		return
