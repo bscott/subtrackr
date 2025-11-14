@@ -29,6 +29,7 @@ FROM debian:bookworm-slim
 # Install runtime dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     sqlite3 \
     tzdata \
     && rm -rf /var/lib/apt/lists/* \
@@ -49,6 +50,10 @@ EXPOSE 8080
 # Set environment variables
 ENV GIN_MODE=release
 ENV DATABASE_PATH=/app/data/subtrackr.db
+
+# Healthcheck to verify the application is running
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/ || exit 1
 
 # Run the application
 CMD ["./subtrackr"]
