@@ -100,9 +100,30 @@ func main() {
 	router.Static("/static", "./web/static")
 	router.StaticFile("/favicon.ico", "./web/static/favicon.ico")
 
-	// Health check endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	// Health check endpoint with database connectivity check
+	router.GET("/healthz", func(c *gin.Context) {
+		// Check database connectivity
+		sqlDB, err := db.DB()
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unhealthy",
+				"error":  "database connection unavailable",
+			})
+			return
+		}
+
+		// Ping the database to verify connectivity
+		if err := sqlDB.Ping(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unhealthy",
+				"error":  "database ping failed",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+		})
 	})
 
 	// Routes
