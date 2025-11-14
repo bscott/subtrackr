@@ -67,4 +67,5 @@ node_modules/
 server.log
 server
 *.db
+data/
 subtrackr
