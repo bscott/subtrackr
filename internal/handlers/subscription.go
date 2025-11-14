@@ -117,6 +117,21 @@ func (h *SubscriptionHandler) getScheduleMultiplier(schedule string) float64 {
 	}
 }
 
+// parseDatePtr parses a date string in "2006-01-02" format and returns a pointer to time.Time.
+// Returns nil if the string is empty or if parsing fails.
+// Logs parsing errors for debugging purposes.
+func parseDatePtr(dateStr string) *time.Time {
+	if dateStr == "" {
+		return nil
+	}
+	if date, err := time.Parse("2006-01-02", dateStr); err == nil {
+		return &date
+	}
+	// Log parsing errors for debugging (invalid date format from form)
+	log.Printf("Failed to parse date string '%s': expected format YYYY-MM-DD", dateStr)
+	return nil
+}
+
 // Dashboard renders the main dashboard page
 func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 	stats, err := h.service.GetStats()
@@ -431,24 +446,10 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		}
 	}
 
-	// Parse dates
-	if startDateStr := c.PostForm("start_date"); startDateStr != "" {
-		if startDate, err := time.Parse("2006-01-02", startDateStr); err == nil {
-			subscription.StartDate = &startDate
-		}
-	}
-
-	if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
-		if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
-			subscription.RenewalDate = &renewalDate
-		}
-	}
-
-	if cancellationDateStr := c.PostForm("cancellation_date"); cancellationDateStr != "" {
-		if cancellationDate, err := time.Parse("2006-01-02", cancellationDateStr); err == nil {
-			subscription.CancellationDate = &cancellationDate
-		}
-	}
+	// Parse dates using helper function
+	subscription.StartDate = parseDatePtr(c.PostForm("start_date"))
+	subscription.RenewalDate = parseDatePtr(c.PostForm("renewal_date"))
+	subscription.CancellationDate = parseDatePtr(c.PostForm("cancellation_date"))
 
 	// Fetch logo synchronously before creation if URL is provided and icon_url is empty
 	h.fetchAndSetLogo(&subscription)
@@ -547,25 +548,11 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		}
 	}
 
-	// Parse dates
-	if startDateStr := c.PostForm("start_date"); startDateStr != "" {
-		if startDate, err := time.Parse("2006-01-02", startDateStr); err == nil {
-			subscription.StartDate = &startDate
-		}
-	}
-
+	// Parse dates using helper function
 	// Always parse renewal date if provided; let service/model layer handle schedule change logic
-	if renewalDateStr := c.PostForm("renewal_date"); renewalDateStr != "" {
-		if renewalDate, err := time.Parse("2006-01-02", renewalDateStr); err == nil {
-			subscription.RenewalDate = &renewalDate
-		}
-	}
-
-	if cancellationDateStr := c.PostForm("cancellation_date"); cancellationDateStr != "" {
-		if cancellationDate, err := time.Parse("2006-01-02", cancellationDateStr); err == nil {
-			subscription.CancellationDate = &cancellationDate
-		}
-	}
+	subscription.StartDate = parseDatePtr(c.PostForm("start_date"))
+	subscription.RenewalDate = parseDatePtr(c.PostForm("renewal_date"))
+	subscription.CancellationDate = parseDatePtr(c.PostForm("cancellation_date"))
 
 	// Get the original subscription to check if it was high-cost before update
 	original, _ := h.service.GetByID(uint(id))
