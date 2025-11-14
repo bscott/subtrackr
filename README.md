@@ -4,6 +4,10 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 
 ![SubTrackr Dashboard](dashboard-screenshot.png)
 
+![SubTrackr Calendar View](calendar-screenshot.png)
+
+![SubTrackr Mobile View](mobile-screenshot.png)
+
 ![Version](https://img.shields.io/github/v/release/bscott/subtrackr?logo=github&label=version)
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.21-00ADD8)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
@@ -11,14 +15,15 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 ## 🚀 Features
 
 - 📊 **Dashboard Overview**: Real-time stats showing monthly/annual spending
-- 💰 **Subscription Management**: Track all your subscriptions in one place
+- 💰 **Subscription Management**: Track all your subscriptions in one place with logos
+- 📅 **Calendar View**: Visual calendar showing all subscription renewal dates with iCal export
 - 📈 **Analytics**: Visualize spending by category and track savings
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
-- 📤 **Data Export**: Export your data as CSV or JSON
+- 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
 - 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, and INR (with optional real-time conversion)
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
-- 📱 **Mobile Responsive**: Works great on all devices
+- 📱 **Mobile Responsive**: Optimized mobile experience with hamburger menu navigation
 
 ## 🏗️ Tech Stack
 
