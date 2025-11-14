@@ -71,6 +71,7 @@
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
                     <option value="">Select schedule</option>
                     <option value="Monthly" {{if .Subscription}}{{if eq .Subscription.Schedule "Monthly"}}selected{{end}}{{end}}>Monthly</option>
+                    <option value="Quarterly" {{if .Subscription}}{{if eq .Subscription.Schedule "Quarterly"}}selected{{end}}{{end}}>Quarterly</option>
                     <option value="Annual" {{if .Subscription}}{{if eq .Subscription.Schedule "Annual"}}selected{{end}}{{end}}>Annual</option>
                     <option value="Weekly" {{if .Subscription}}{{if eq .Subscription.Schedule "Weekly"}}selected{{end}}{{end}}>Weekly</option>
                     <option value="Daily" {{if .Subscription}}{{if eq .Subscription.Schedule "Daily"}}selected{{end}}{{end}}>Daily</option>
@@ -127,7 +128,24 @@
 
             <!-- Renewal Date -->
             <div>
-                <label for="renewal_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Next Renewal</label>
+                <label for="renewal_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <span class="flex items-center">
+                        Next Renewal
+                        <div class="relative group ml-1">
+                            <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 w-56">
+                                <div class="bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg">
+                                    Renewal date will automatically update after you click Update
+                                    <div class="absolute left-2 top-full -mt-1">
+                                        <div class="border-4 border-transparent border-t-gray-900 dark:border-t-gray-800"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </span>
+                </label>
                 <input type="date" id="renewal_date" name="renewal_date"
                        value="{{if .Subscription}}{{if .Subscription.RenewalDate}}{{.Subscription.RenewalDate.Format "2006-01-02"}}{{end}}{{end}}"
                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
@@ -201,6 +219,17 @@ function calculateRenewalDate() {
             // Robust month addition: handle month-end dates
             const targetMonth = today.getMonth() + 1;
             const targetYear = today.getFullYear() + (targetMonth > 11 ? 1 : 0);
+            const normalizedMonth = targetMonth % 12;
+            // Get last day of target month
+            const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+            const day = Math.min(today.getDate(), lastDayOfTargetMonth);
+            renewalDate = new Date(targetYear, normalizedMonth, day);
+            break;
+        }
+        case 'Quarterly': {
+            // Robust quarter addition: handle month-end dates (3 months)
+            const targetMonth = today.getMonth() + 3;
+            const targetYear = today.getFullYear() + Math.floor(targetMonth / 12);
             const normalizedMonth = targetMonth % 12;
             // Get last day of target month
             const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();

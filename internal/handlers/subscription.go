@@ -102,6 +102,8 @@ func (h *SubscriptionHandler) getScheduleMultiplier(schedule string) float64 {
 	switch schedule {
 	case "Annual":
 		return 1
+	case "Quarterly":
+		return 4
 	case "Monthly":
 		return 12
 	case "Weekly":
@@ -127,14 +129,8 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 		return
 	}
 
-	// Get recent subscriptions for the list
-	recentSubs := subscriptions
-	if len(subscriptions) > 5 {
-		recentSubs = subscriptions[:5]
-	}
-
 	// Enrich with currency conversion
-	enrichedSubs := h.enrichWithCurrencyConversion(recentSubs)
+	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
 
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"Title":          "Dashboard",
@@ -148,7 +144,12 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 
 // SubscriptionsList renders the subscriptions list page
 func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
-	subscriptions, err := h.service.GetAll()
+	// Get sort parameters from query string
+	sortBy := c.DefaultQuery("sort", "created_at")
+	order := c.DefaultQuery("order", "desc")
+
+	// Get sorted subscriptions
+	subscriptions, err := h.service.GetAllSorted(sortBy, order)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -163,6 +164,8 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
+		"SortBy":         sortBy,
+		"Order":          order,
 	})
 }
 
@@ -212,7 +215,12 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 
 // GetSubscriptions returns subscriptions as HTML fragments
 func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
-	subscriptions, err := h.service.GetAll()
+	// Get sort parameters from query string
+	sortBy := c.DefaultQuery("sort", "created_at")
+	order := c.DefaultQuery("order", "desc")
+
+	// Get sorted subscriptions
+	subscriptions, err := h.service.GetAllSorted(sortBy, order)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -224,6 +232,8 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
 		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"SortBy":         sortBy,
+		"Order":          order,
 	})
 }
 

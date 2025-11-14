@@ -12,7 +12,7 @@ type Subscription struct {
 	Name                   string     `json:"name" gorm:"not null" validate:"required"`
 	Cost                   float64    `json:"cost" gorm:"not null" validate:"required,gt=0"`
 	OriginalCurrency       string     `json:"original_currency" gorm:"size:3;default:'USD'"`
-	Schedule               string     `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual Weekly Daily"`
+	Schedule               string     `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual Weekly Daily Quarterly"`
 	Status                 string     `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused Trial"`
 	CategoryID             uint       `json:"category_id"`
 	Category               Category   `json:"category" gorm:"foreignKey:CategoryID"`
@@ -35,6 +35,8 @@ func (s *Subscription) AnnualCost() float64 {
 	switch s.Schedule {
 	case "Annual":
 		return s.Cost
+	case "Quarterly":
+		return s.Cost * 4
 	case "Monthly":
 		return s.Cost * 12
 	case "Weekly":
@@ -51,6 +53,8 @@ func (s *Subscription) MonthlyCost() float64 {
 	switch s.Schedule {
 	case "Annual":
 		return s.Cost / 12
+	case "Quarterly":
+		return s.Cost / 3
 	case "Monthly":
 		return s.Cost
 	case "Weekly":
@@ -81,9 +85,31 @@ func (s *Subscription) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// BeforeUpdate hook to recalculate renewal date when schedule changes
+// AfterFind hook to auto-update renewal date if it has passed (Issue #29)
+// This ensures renewal dates are automatically updated when subscriptions are loaded
+func (s *Subscription) AfterFind(tx *gorm.DB) error {
+	// Auto-update renewal date if it has passed and subscription is active
+	if s.RenewalDate != nil && s.Status == "Active" && s.ID > 0 {
+		now := time.Now()
+		if s.RenewalDate.Before(now) || s.RenewalDate.Equal(now) {
+			// Renewal date has passed, calculate the next one
+			oldRenewalDate := s.RenewalDate
+			s.calculateNextRenewalDate()
+			
+			// Only update if the date actually changed to avoid unnecessary writes
+			if s.RenewalDate != nil && !s.RenewalDate.Equal(*oldRenewalDate) {
+				// Update only the renewal_date field using UpdateColumn to avoid triggering hooks
+				// This prevents infinite recursion and only updates the specific field
+				tx.Model(s).UpdateColumn("renewal_date", s.RenewalDate)
+			}
+		}
+	}
+	return nil
+}
+
+// BeforeUpdate hook to recalculate renewal date when schedule changes, start date changes, or date passes
 func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
-	// Get the original values to check for schedule change
+	// Get the original values to check for schedule or start date changes
 	var original Subscription
 	if err := tx.Model(&Subscription{}).Where("id = ?", s.ID).First(&original).Error; err == nil {
 		// If schedule changed and status is Active, recalculate renewal date
@@ -91,12 +117,44 @@ func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 		if original.Schedule != s.Schedule && s.Status == "Active" {
 			s.calculateNextRenewalDate()
 		}
+
+		// If start date changed and status is Active, recalculate renewal date
+		// This ensures renewal dates update when start dates are modified
+		if s.Status == "Active" {
+			startDateChanged := false
+			if original.StartDate == nil && s.StartDate != nil {
+				// Start date was added
+				startDateChanged = true
+			} else if original.StartDate != nil && s.StartDate == nil {
+				// Start date was removed
+				startDateChanged = true
+			} else if original.StartDate != nil && s.StartDate != nil {
+				// Both exist, check if they're different
+				if !original.StartDate.Equal(*s.StartDate) {
+					startDateChanged = true
+				}
+			}
+
+			if startDateChanged {
+				s.calculateNextRenewalDate()
+			}
+		}
 	}
 
-	// Also calculate if renewal date is nil and status is Active
+	// Calculate if renewal date is nil and status is Active
 	if s.RenewalDate == nil && s.Status == "Active" {
 		s.calculateNextRenewalDate()
 	}
+
+	// Auto-update renewal date if it has passed (Issue #29)
+	if s.RenewalDate != nil && s.Status == "Active" {
+		now := time.Now()
+		if s.RenewalDate.Before(now) || s.RenewalDate.Equal(now) {
+			// Renewal date has passed, calculate the next one
+			s.calculateNextRenewalDate()
+		}
+	}
+
 	return nil
 }
 
@@ -149,6 +207,14 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 		current := start.Copy()
 		for current.Lte(now) {
 			current = current.AddMonthsNoOverflow(1)
+		}
+		renewalDate := current.StdTime()
+		s.RenewalDate = &renewalDate
+
+	case "Quarterly":
+		current := start.Copy()
+		for current.Lte(now) {
+			current = current.AddMonthsNoOverflow(3)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
@@ -210,6 +276,39 @@ func (s *Subscription) calculateNextRenewalDateFromStartDate() {
 				break
 			}
 			years++
+		}
+	case "Quarterly":
+		// Find the next quarterly anniversary (every 3 months)
+		// Handle month-end dates specially to preserve "last day of month" semantics
+		startDay := baseDate.Day()
+		startYear := baseDate.Year()
+		startMonth := int(baseDate.Month())
+		quarters := 1 // Start with first renewal period (3 months)
+
+		for {
+			// Calculate the target year and month properly (3-month increments)
+			totalMonths := startMonth + (quarters * 3) - 1 // Convert to 0-based
+			targetYear := startYear + totalMonths/12
+			targetMonth := time.Month((totalMonths % 12) + 1) // Convert back to 1-based
+
+			// Get the last day of the target month
+			lastDay := time.Date(targetYear, targetMonth+1, 0, 0, 0, 0, 0, baseDate.Location()).Day()
+
+			// If original date was on a day that doesn't exist in target month,
+			// use the last day of that month
+			targetDay := startDay
+			if startDay > lastDay {
+				targetDay = lastDay
+			}
+
+			renewalDate = time.Date(targetYear, targetMonth, targetDay,
+				baseDate.Hour(), baseDate.Minute(), baseDate.Second(),
+				baseDate.Nanosecond(), baseDate.Location())
+
+			if renewalDate.After(now) {
+				break
+			}
+			quarters++
 		}
 	case "Monthly":
 		// Find the next monthly anniversary
@@ -309,6 +408,8 @@ func (s *Subscription) calculateNextRenewalDateFromNow() {
 	switch s.Schedule {
 	case "Annual":
 		renewalDate = baseDate.AddDate(1, 0, 0)
+	case "Quarterly":
+		renewalDate = baseDate.AddDate(0, 3, 0)
 	case "Monthly":
 		renewalDate = baseDate.AddDate(0, 1, 0)
 	case "Weekly":
@@ -328,6 +429,9 @@ func (s *Subscription) calculateNextRenewalDateFromNowV2() {
 	switch s.Schedule {
 	case "Annual":
 		renewalDate := now.AddYear().StdTime()
+		s.RenewalDate = &renewalDate
+	case "Quarterly":
+		renewalDate := now.AddMonthsNoOverflow(3).StdTime()
 		s.RenewalDate = &renewalDate
 	case "Monthly":
 		renewalDate := now.AddMonthsNoOverflow(1).StdTime()

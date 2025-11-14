@@ -96,81 +96,217 @@
         </div>
     </div>
     
-    <div id="subscription-list">
-<div class="divide-y divide-gray-200 dark:divide-gray-700">
-    {{range .Subscriptions}}
-    <div class="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center flex-1">
-                {{if .IconURL}}
-                <img src="{{.IconURL}}" alt="{{.Name}}" class="w-8 h-8 rounded mr-3 flex-shrink-0" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" style="object-fit: contain;">
-                <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else if eq .Status "Cancelled"}}bg-danger{{else}}bg-warning{{end}} rounded-full mr-4" style="display:none;"></div>
-                {{else}}
-                <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else if eq .Status "Cancelled"}}bg-danger{{else}}bg-warning{{end}} rounded-full mr-4"></div>
+    <div id="subscription-list" class="overflow-x-auto">
+        {{if .Subscriptions}}
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button 
+                            hx-get="/api/subscriptions?sort=name&order={{if and (eq .SortBy "name") (eq .Order "asc")}}desc{{else}}asc{{end}}"
+                            hx-target="#subscription-list"
+                            hx-swap="outerHTML"
+                            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <span>Name</span>
+                            {{if eq .SortBy "name"}}
+                            <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{else}}
+                            <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{end}}
+                        </button>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button 
+                            hx-get="/api/subscriptions?sort=category&order={{if and (eq .SortBy "category") (eq .Order "asc")}}desc{{else}}asc{{end}}"
+                            hx-target="#subscription-list"
+                            hx-swap="outerHTML"
+                            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <span>Category</span>
+                            {{if eq .SortBy "category"}}
+                            <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{else}}
+                            <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{end}}
+                        </button>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button 
+                            hx-get="/api/subscriptions?sort=cost&order={{if and (eq .SortBy "cost") (eq .Order "asc")}}desc{{else}}asc{{end}}"
+                            hx-target="#subscription-list"
+                            hx-swap="outerHTML"
+                            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <span>Cost</span>
+                            {{if eq .SortBy "cost"}}
+                            <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{else}}
+                            <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{end}}
+                        </button>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button 
+                            hx-get="/api/subscriptions?sort=schedule&order={{if and (eq .SortBy "schedule") (eq .Order "asc")}}desc{{else}}asc{{end}}"
+                            hx-target="#subscription-list"
+                            hx-swap="outerHTML"
+                            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <span>Schedule</span>
+                            {{if eq .SortBy "schedule"}}
+                            <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{else}}
+                            <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{end}}
+                        </button>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button 
+                            hx-get="/api/subscriptions?sort=status&order={{if and (eq .SortBy "status") (eq .Order "asc")}}desc{{else}}asc{{end}}"
+                            hx-target="#subscription-list"
+                            hx-swap="outerHTML"
+                            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <span>Status</span>
+                            {{if eq .SortBy "status"}}
+                            <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{else}}
+                            <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{end}}
+                        </button>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <button 
+                            hx-get="/api/subscriptions?sort=renewal_date&order={{if and (eq .SortBy "renewal_date") (eq .Order "asc")}}desc{{else}}asc{{end}}"
+                            hx-target="#subscription-list"
+                            hx-swap="outerHTML"
+                            class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                            <span>Renewal Date</span>
+                            {{if eq .SortBy "renewal_date"}}
+                            <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{else}}
+                            <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                            </svg>
+                            {{end}}
+                        </button>
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {{range .Subscriptions}}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            {{if .IconURL}}
+                            <img src="{{.IconURL}}" alt="{{.Name}}" class="w-8 h-8 rounded mr-3 flex-shrink-0" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" style="object-fit: contain;">
+                            <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else if eq .Status "Cancelled"}}bg-danger{{else}}bg-warning{{end}} rounded-full mr-3" style="display:none;"></div>
+                            {{else}}
+                            <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else if eq .Status "Cancelled"}}bg-danger{{else}}bg-warning{{end}} rounded-full mr-3"></div>
+                            {{end}}
+                            <div>
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">{{.Name}}</div>
+                                {{if .URL}}
+                                <a href="{{.URL}}" target="_blank" class="text-xs text-primary hover:text-primary/80 dark:text-primary-light">{{.URL}}</a>
+                                {{end}}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900 dark:text-white">{{.Category.Name}}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900 dark:text-white">{{.Schedule}}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{if eq .Status "Active"}}bg-success/20 text-success{{else if eq .Status "Cancelled"}}bg-danger/20 text-danger{{else}}bg-warning/20 text-warning{{end}}">
+                            {{.Status}}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {{if .RenewalDate}}
+                        {{.RenewalDate.Format "Jan 2, 2006"}}
+                        {{else}}
+                        <span class="text-gray-400 dark:text-gray-500">—</span>
+                        {{end}}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div class="flex items-center justify-end space-x-2">
+                            <button 
+                                hx-get="/form/subscription/{{.ID}}"
+                                hx-target="#modal-content"
+                                hx-trigger="click"
+                                onclick="document.getElementById('modal').classList.remove('hidden')"
+                                class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                title="Edit">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            <button 
+                                hx-delete="/api/subscriptions/{{.ID}}"
+                                hx-confirm="Are you sure you want to delete this subscription?"
+                                hx-target="#subscription-list"
+                                hx-swap="outerHTML"
+                                class="text-gray-400 dark:text-gray-500 hover:text-danger dark:hover:text-red-400 transition-colors duration-150"
+                                title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {{if .Notes}}
+                <tr class="bg-gray-50 dark:bg-gray-900/50">
+                    <td colspan="7" class="px-6 py-2">
+                        <p class="text-xs text-gray-600 dark:text-gray-300">{{.Notes}}</p>
+                    </td>
+                </tr>
                 {{end}}
-                <div class="flex-1">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{.Name}}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{.Category.Name}} • {{.Status}}</p>
-                            {{if .URL}}
-                            <a href="{{.URL}}" target="_blank" class="text-xs text-primary hover:text-primary/80">{{.URL}}</a>
-                            {{end}}
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{.Schedule}}</p>
-                            {{if .RenewalDate}}
-                            <p class="text-xs text-gray-400 dark:text-gray-500">Renews: {{.RenewalDate.Format "Jan 2, 2006"}}</p>
-                            {{end}}
-                        </div>
-                    </div>
-                    {{if .Notes}}
-                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-2">{{.Notes}}</p>
-                    {{end}}
-                </div>
-            </div>
-            <div class="ml-4 flex items-center space-x-2">
-                <button 
-                    hx-get="/form/subscription/{{.ID}}"
-                    hx-target="#modal-content"
-                    hx-trigger="click"
-                    onclick="document.getElementById('modal').classList.remove('hidden')"
-                    class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                    </svg>
-                </button>
-                <button 
-                    hx-delete="/api/subscriptions/{{.ID}}"
-                    hx-confirm="Are you sure you want to delete this subscription?"
-                    hx-target="#subscription-list"
-                    hx-swap="outerHTML"
-                    class="text-gray-400 dark:text-gray-500 hover:text-danger dark:hover:text-red-400 transition-colors duration-150">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                    </svg>
-                </button>
-            </div>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <div class="p-12 text-center">
+            <svg class="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mb-4">No subscriptions yet</p>
+            <button 
+                hx-get="/form/subscription"
+                hx-target="#modal-content"
+                hx-trigger="click"
+                onclick="document.getElementById('modal').classList.remove('hidden')"
+                class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 transition-colors duration-150">
+                Add your first subscription
+            </button>
         </div>
-    </div>
-    {{else}}
-    <div class="p-12 text-center">
-        <svg class="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-        <p class="text-gray-500 text-sm mb-4">No subscriptions yet</p>
-        <button 
-            hx-get="/form/subscription"
-            hx-target="#modal-content"
-            hx-trigger="click"
-            onclick="document.getElementById('modal').classList.remove('hidden')"
-            class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
-            Add your first subscription
-        </button>
-    </div>
-    {{end}}
-</div>
+        {{end}}
     </div>
 </div>
 
