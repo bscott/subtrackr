@@ -22,6 +22,7 @@
         }
     </script>
     <script src="/static/js/darkmode.js"></script>
+    <script src="/static/js/mobile-menu.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
     <div class="flex flex-col min-h-screen">
@@ -408,37 +409,6 @@
     </div>
 
     <script>
-        // Mobile menu functions
-        function openMobileMenu() {
-            document.getElementById('mobile-menu').classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; // Prevent body scroll when menu is open
-        }
-
-        function closeMobileMenu() {
-            document.getElementById('mobile-menu').classList.add('hidden');
-            document.body.style.overflow = ''; // Restore body scroll
-        }
-
-        // Restore body scroll on page load (handles navigation before closeMobileMenu completes)
-        document.addEventListener('DOMContentLoaded', function() {
-            document.body.style.overflow = '';
-        });
-
-        // Open mobile menu when hamburger button is clicked
-        document.getElementById('mobile-menu-button').addEventListener('click', openMobileMenu);
-
-        // Close mobile menu on escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const mobileMenu = document.getElementById('mobile-menu');
-                if (!mobileMenu.classList.contains('hidden')) {
-                    closeMobileMenu();
-                }
-                // Also close modal if open
-                document.getElementById('modal').classList.add('hidden');
-            }
-        });
-
         // Close modal when clicking outside
         document.getElementById('modal').addEventListener('click', function(e) {
             if (e.target === this) {

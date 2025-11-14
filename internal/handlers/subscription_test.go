@@ -91,7 +91,7 @@ func TestParseDatePtr(t *testing.T) {
 			} else {
 				assert.NotNil(t, result, "Expected non-nil result for valid input")
 				if result != nil {
-					// Compare dates (ignore time component differences from parsing)
+					// Compare date components only (Year, Month, Day) as parseDatePtr returns UTC dates with zero time components
 					assert.Equal(t, tt.expected.Year(), result.Year(), "Year should match")
 					assert.Equal(t, tt.expected.Month(), result.Month(), "Month should match")
 					assert.Equal(t, tt.expected.Day(), result.Day(), "Day should match")
