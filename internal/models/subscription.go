@@ -22,6 +22,7 @@ type Subscription struct {
 	RenewalDate            *time.Time `json:"renewal_date" gorm:""`
 	CancellationDate       *time.Time `json:"cancellation_date" gorm:""`
 	URL                    string     `json:"url" gorm:""`
+	IconURL                string     `json:"icon_url" gorm:""` // URL to subscription icon/logo
 	Notes                  string     `json:"notes" gorm:""`
 	Usage                  string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low None"`
 	DateCalculationVersion int        `json:"date_calculation_version" gorm:"default:1"`

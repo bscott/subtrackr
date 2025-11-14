@@ -3,7 +3,12 @@
     <div class="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
         <div class="flex items-center justify-between">
             <div class="flex items-center flex-1">
+                {{if .IconURL}}
+                <img src="{{.IconURL}}" alt="{{.Name}}" class="w-8 h-8 rounded mr-3 flex-shrink-0" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" style="object-fit: contain;">
+                <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else if eq .Status "Cancelled"}}bg-danger{{else}}bg-warning{{end}} rounded-full mr-4" style="display:none;"></div>
+                {{else}}
                 <div class="w-3 h-3 {{if eq .Status "Active"}}bg-success{{else if eq .Status "Cancelled"}}bg-danger{{else}}bg-warning{{end}} rounded-full mr-4"></div>
+                {{end}}
                 <div class="flex-1">
                     <div class="flex items-center justify-between">
                         <div>

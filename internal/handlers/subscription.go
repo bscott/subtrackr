@@ -30,14 +30,16 @@ type SubscriptionHandler struct {
 	settingsService *service.SettingsService
 	currencyService *service.CurrencyService
 	emailService    *service.EmailService
+	logoService     *service.LogoService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, logoService *service.LogoService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
 		currencyService: currencyService,
 		emailService:    emailService,
+		logoService:     logoService,
 	}
 }
 
@@ -77,6 +79,22 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 	}
 
 	return result
+}
+
+// fetchAndSetLogo fetches a logo for a subscription if URL is provided and icon_url is empty
+// This is a helper method to avoid code duplication between create and update handlers
+func (h *SubscriptionHandler) fetchAndSetLogo(subscription *models.Subscription) {
+	if subscription.URL == "" || subscription.IconURL != "" {
+		return
+	}
+
+	iconURL, err := h.logoService.FetchLogoFromURL(subscription.URL)
+	if err == nil && iconURL != "" {
+		subscription.IconURL = iconURL
+		log.Printf("Fetched logo: %s -> %s", subscription.URL, iconURL)
+	} else if err != nil {
+		log.Printf("Failed to fetch logo for URL %s: %v", subscription.URL, err)
+	}
 }
 
 // getScheduleMultiplier returns the annual multiplier for a schedule
@@ -241,6 +259,7 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
+	subscription.IconURL = c.PostForm("icon_url") // Allow manual icon URL override
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
@@ -269,6 +288,9 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 			subscription.CancellationDate = &cancellationDate
 		}
 	}
+
+	// Fetch logo synchronously before creation if URL is provided and icon_url is empty
+	h.fetchAndSetLogo(&subscription)
 
 	// Create subscription
 	created, err := h.service.Create(&subscription)
@@ -353,6 +375,7 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
+	subscription.IconURL = c.PostForm("icon_url") // Allow manual icon URL override
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
@@ -386,6 +409,17 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	// Get the original subscription to check if it was high-cost before update
 	original, _ := h.service.GetByID(uint(id))
 	wasHighCost := original != nil && original.IsHighCost()
+
+	// Preserve existing IconURL if not explicitly set in form
+	if subscription.IconURL == "" && original != nil {
+		subscription.IconURL = original.IconURL
+	}
+
+	// Check if URL changed - if so, we should fetch a new logo
+	urlChanged := original != nil && original.URL != subscription.URL
+	if urlChanged || (subscription.URL != "" && subscription.IconURL == "") {
+		h.fetchAndSetLogo(&subscription)
+	}
 
 	// Update subscription
 	updated, err := h.service.Update(uint(id), &subscription)

@@ -225,18 +225,15 @@ function calculateRenewalDate() {
 
 // Add event listeners when modal content loads
 function initRenewalCalculator() {
-
     const scheduleSelect = document.getElementById('schedule');
     const statusSelect = document.getElementById('status');
 
     if (scheduleSelect) {
         scheduleSelect.addEventListener('change', calculateRenewalDate);
     }
-    }
 
     if (statusSelect) {
         statusSelect.addEventListener('change', calculateRenewalDate);
-    }
     }
 }
 

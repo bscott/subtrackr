@@ -38,6 +38,9 @@ data/
 *.swo
 *~
 
+# Plans (not committed yet)
+plans/
+
 # OS files
 .DS_Store
 Thumbs.db

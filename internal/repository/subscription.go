@@ -118,6 +118,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.RenewalDate = subscription.RenewalDate
 	existing.CancellationDate = subscription.CancellationDate
 	existing.URL = subscription.URL
+	existing.IconURL = subscription.IconURL
 	existing.Notes = subscription.Notes
 	existing.Usage = subscription.Usage
 
@@ -140,6 +141,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 				"renewal_date":       existing.RenewalDate,
 				"cancellation_date":  existing.CancellationDate,
 				"url":                existing.URL,
+				"icon_url":           existing.IconURL,
 				"notes":              existing.Notes,
 				"usage":              existing.Usage,
 				"updated_at":         time.Now(),
