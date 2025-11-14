@@ -17,6 +17,19 @@ function closeMobileMenu() {
     }
 }
 
+// Close mobile menu and execute callback after menu is closed
+// Uses requestAnimationFrame to ensure DOM updates are processed
+function closeMobileMenuAndThen(callback) {
+    closeMobileMenu();
+    // Use double requestAnimationFrame to ensure browser has processed the DOM changes
+    // This is more reliable than setTimeout and adapts to browser rendering speed
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            if (callback) callback();
+        });
+    });
+}
+
 // Initialize mobile menu functionality when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     // Restore body scroll on page load (handles navigation before closeMobileMenu completes)
@@ -29,16 +42,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Close mobile menu on escape key
+    // Close only the topmost element (modal first, then menu)
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-            const mobileMenu = document.getElementById('mobile-menu');
-            if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
-                closeMobileMenu();
-            }
-            // Also close modal if open
             const modal = document.getElementById('modal');
-            if (modal) {
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            // If modal is open, close it (modal is topmost)
+            if (modal && !modal.classList.contains('hidden')) {
                 modal.classList.add('hidden');
+            } 
+            // Otherwise, if mobile menu is open, close it
+            else if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+                closeMobileMenu();
             }
         }
     });
