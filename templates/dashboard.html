@@ -143,7 +143,7 @@
                         </a>
                         <div class="pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
                             <button 
-                                onclick="closeMobileMenu(); document.getElementById('modal').classList.remove('hidden');"
+                                onclick="closeMobileMenu(); setTimeout(function() { document.getElementById('modal').classList.remove('hidden'); }, 100);"
                                 hx-get="/form/subscription"
                                 hx-target="#modal-content"
                                 hx-trigger="click"
