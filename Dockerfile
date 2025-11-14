@@ -51,9 +51,9 @@ EXPOSE 8080
 ENV GIN_MODE=release
 ENV DATABASE_PATH=/app/data/subtrackr.db
 
-# Healthcheck to verify the application is running
+# Healthcheck to verify the application is running and database is accessible
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+    CMD curl -f http://localhost:8080/healthz || exit 1
 
 # Run the application
 CMD ["./subtrackr"]
