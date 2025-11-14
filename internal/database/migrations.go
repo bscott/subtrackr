@@ -20,6 +20,7 @@ func RunMigrations(db *gorm.DB) error {
 		migrateCategoriesToDynamic,
 		migrateCurrencyFields,
 		migrateDateCalculationVersioning,
+		migrateSubscriptionIcons,
 	}
 
 	for _, migration := range migrations {
@@ -150,5 +151,33 @@ func migrateDateCalculationVersioning(db *gorm.DB) error {
 	}
 
 	log.Println("Migration completed: Date calculation versioning added")
+	return nil
+}
+
+// migrateSubscriptionIcons adds icon_url field to subscriptions table
+func migrateSubscriptionIcons(db *gorm.DB) error {
+	// Check if icon_url column already exists
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='icon_url'").Scan(&count)
+
+	if count > 0 {
+		// Migration already completed
+		return nil
+	}
+
+	log.Println("Running migration: Adding subscription icon URLs...")
+
+	// Add icon_url column (nullable, empty string default)
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN icon_url TEXT DEFAULT ''").Error; err != nil {
+		// Column might already exist, that's okay
+		log.Printf("Note: Could not add icon_url column: %v", err)
+	}
+
+	// Set empty string as default for existing subscriptions
+	if err := db.Exec("UPDATE subscriptions SET icon_url = '' WHERE icon_url IS NULL").Error; err != nil {
+		log.Printf("Warning: Could not update existing subscriptions with default icon_url: %v", err)
+	}
+
+	log.Println("Migration completed: Subscription icon URLs added")
 	return nil
 }

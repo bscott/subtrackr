@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"strconv"
@@ -29,13 +31,17 @@ type SubscriptionHandler struct {
 	service         *service.SubscriptionService
 	settingsService *service.SettingsService
 	currencyService *service.CurrencyService
+	emailService    *service.EmailService
+	logoService     *service.LogoService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, logoService *service.LogoService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
 		currencyService: currencyService,
+		emailService:    emailService,
+		logoService:     logoService,
 	}
 }
 
@@ -77,11 +83,29 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 	return result
 }
 
+// fetchAndSetLogo fetches a logo for a subscription if URL is provided and icon_url is empty
+// This is a helper method to avoid code duplication between create and update handlers
+func (h *SubscriptionHandler) fetchAndSetLogo(subscription *models.Subscription) {
+	if subscription.URL == "" || subscription.IconURL != "" {
+		return
+	}
+
+	iconURL, err := h.logoService.FetchLogoFromURL(subscription.URL)
+	if err == nil && iconURL != "" {
+		subscription.IconURL = iconURL
+		log.Printf("Fetched logo: %s -> %s", subscription.URL, iconURL)
+	} else if err != nil {
+		log.Printf("Failed to fetch logo for URL %s: %v", subscription.URL, err)
+	}
+}
+
 // getScheduleMultiplier returns the annual multiplier for a schedule
 func (h *SubscriptionHandler) getScheduleMultiplier(schedule string) float64 {
 	switch schedule {
 	case "Annual":
 		return 1
+	case "Quarterly":
+		return 4
 	case "Monthly":
 		return 12
 	case "Weekly":
@@ -107,14 +131,8 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 		return
 	}
 
-	// Get recent subscriptions for the list
-	recentSubs := subscriptions
-	if len(subscriptions) > 5 {
-		recentSubs = subscriptions[:5]
-	}
-
 	// Enrich with currency conversion
-	enrichedSubs := h.enrichWithCurrencyConversion(recentSubs)
+	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
 
 	c.HTML(http.StatusOK, "dashboard.html", gin.H{
 		"Title":          "Dashboard",
@@ -128,7 +146,12 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 
 // SubscriptionsList renders the subscriptions list page
 func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
-	subscriptions, err := h.service.GetAll()
+	// Get sort parameters from query string
+	sortBy := c.DefaultQuery("sort", "created_at")
+	order := c.DefaultQuery("order", "desc")
+
+	// Get sorted subscriptions
+	subscriptions, err := h.service.GetAllSorted(sortBy, order)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -143,6 +166,8 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
+		"SortBy":         sortBy,
+		"Order":          order,
 	})
 }
 
@@ -163,8 +188,166 @@ func (h *SubscriptionHandler) Analytics(c *gin.Context) {
 	})
 }
 
+// Calendar renders the calendar page with subscription renewal dates
+func (h *SubscriptionHandler) Calendar(c *gin.Context) {
+	// Get all subscriptions with renewal dates
+	subscriptions, err := h.service.GetAll()
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+		return
+	}
+
+	// Filter subscriptions with renewal dates and group by date
+	// Create a simplified structure for JavaScript
+	type Event struct {
+		Name    string  `json:"name"`
+		Cost    float64 `json:"cost"`
+		ID      uint    `json:"id"`
+		IconURL string  `json:"icon_url"`
+	}
+	eventsByDate := make(map[string][]Event)
+	for _, sub := range subscriptions {
+		if sub.RenewalDate != nil && sub.Status == "Active" {
+			dateKey := sub.RenewalDate.Format("2006-01-02")
+			eventsByDate[dateKey] = append(eventsByDate[dateKey], Event{
+				Name:    sub.Name,
+				Cost:    sub.Cost,
+				ID:      sub.ID,
+				IconURL: sub.IconURL,
+			})
+		}
+	}
+
+	// Get current month/year or from query params
+	now := time.Now()
+	year := now.Year()
+	month := int(now.Month())
+
+	if y := c.Query("year"); y != "" {
+		if yInt, err := strconv.Atoi(y); err == nil {
+			year = yInt
+		}
+	}
+	if m := c.Query("month"); m != "" {
+		if mInt, err := strconv.Atoi(m); err == nil {
+			month = mInt
+		}
+	}
+
+	// Validate month range
+	if month < 1 {
+		month = 1
+	}
+	if month > 12 {
+		month = 12
+	}
+
+	// Calculate previous and next month
+	firstOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	prevMonth := firstOfMonth.AddDate(0, -1, 0)
+	nextMonth := firstOfMonth.AddDate(0, 1, 0)
+
+	// Serialize events to JSON for JavaScript
+	eventsJSON, _ := json.Marshal(eventsByDate)
+
+	// Prevent caching to ensure calendar updates when navigating months
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+
+	c.HTML(http.StatusOK, "calendar.html", gin.H{
+		"Title":          "Calendar",
+		"CurrentPage":    "calendar",
+		"Year":           year,
+		"Month":          month,
+		"MonthName":      firstOfMonth.Format("January 2006"),
+		"EventsByDate":   template.JS(string(eventsJSON)),
+		"FirstOfMonth":   firstOfMonth,
+		"PrevMonth":      prevMonth,
+		"NextMonth":      nextMonth,
+		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
+	})
+}
+
+// ExportICal generates and downloads an iCal file with all subscription renewal dates
+func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
+	subscriptions, err := h.service.GetAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Generate iCal content
+	icalContent := "BEGIN:VCALENDAR\r\n"
+	icalContent += "VERSION:2.0\r\n"
+	icalContent += "PRODID:-//SubTrackr//Subscription Renewals//EN\r\n"
+	icalContent += "CALSCALE:GREGORIAN\r\n"
+	icalContent += "METHOD:PUBLISH\r\n"
+
+	now := time.Now()
+	for _, sub := range subscriptions {
+		if sub.RenewalDate != nil && sub.Status == "Active" {
+			// Format dates in iCal format (YYYYMMDDTHHMMSSZ)
+			dtStart := sub.RenewalDate.Format("20060102T150000Z")
+			dtEnd := sub.RenewalDate.Add(1 * time.Hour).Format("20060102T150000Z")
+			dtStamp := now.Format("20060102T150000Z")
+			uid := fmt.Sprintf("subtrackr-%d-%d@subtrackr", sub.ID, sub.RenewalDate.Unix())
+
+			// Escape text for iCal (simplified - should escape commas, semicolons, etc.)
+			summary := fmt.Sprintf("%s Renewal", sub.Name)
+			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, h.settingsService.GetCurrencySymbol(), sub.Cost, sub.Schedule)
+			if sub.URL != "" {
+				description += fmt.Sprintf("\\nURL: %s", sub.URL)
+			}
+
+			icalContent += "BEGIN:VEVENT\r\n"
+			icalContent += fmt.Sprintf("UID:%s\r\n", uid)
+			icalContent += fmt.Sprintf("DTSTAMP:%s\r\n", dtStamp)
+			icalContent += fmt.Sprintf("DTSTART:%s\r\n", dtStart)
+			icalContent += fmt.Sprintf("DTEND:%s\r\n", dtEnd)
+			icalContent += fmt.Sprintf("SUMMARY:%s\r\n", summary)
+			icalContent += fmt.Sprintf("DESCRIPTION:%s\r\n", description)
+			icalContent += "STATUS:CONFIRMED\r\n"
+			icalContent += "SEQUENCE:0\r\n"
+
+			// Add recurrence rule based on schedule
+			switch sub.Schedule {
+			case "Daily":
+				icalContent += "RRULE:FREQ=DAILY;INTERVAL=1\r\n"
+			case "Weekly":
+				icalContent += "RRULE:FREQ=WEEKLY;INTERVAL=1\r\n"
+			case "Monthly":
+				icalContent += "RRULE:FREQ=MONTHLY;INTERVAL=1\r\n"
+			case "Quarterly":
+				icalContent += "RRULE:FREQ=MONTHLY;INTERVAL=3\r\n"
+			case "Annual":
+				icalContent += "RRULE:FREQ=YEARLY;INTERVAL=1\r\n"
+			}
+
+			icalContent += "END:VEVENT\r\n"
+		}
+	}
+
+	icalContent += "END:VCALENDAR\r\n"
+
+	// Set headers for file download
+	c.Header("Content-Type", "text/calendar; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="subtrackr-renewals.ics"`)
+	c.Data(http.StatusOK, "text/calendar; charset=utf-8", []byte(icalContent))
+}
+
 // Settings renders the settings page
 func (h *SubscriptionHandler) Settings(c *gin.Context) {
+	// Load SMTP config if available (without password)
+	var smtpConfig *models.SMTPConfig
+	config, err := h.settingsService.GetSMTPConfig()
+	if err == nil && config != nil {
+		// Don't include password in template
+		config.Password = ""
+		smtpConfig = config
+	}
+
 	c.HTML(http.StatusOK, "settings.html", gin.H{
 		"Title":            "Settings",
 		"CurrentPage":      "settings",
@@ -175,6 +358,7 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"ReminderDays":     h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
 		"DarkMode":         h.settingsService.IsDarkModeEnabled(),
 		"Version":          version.GetVersion(),
+		"SMTPConfig":       smtpConfig,
 	})
 }
 
@@ -182,7 +366,12 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 
 // GetSubscriptions returns subscriptions as HTML fragments
 func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
-	subscriptions, err := h.service.GetAll()
+	// Get sort parameters from query string
+	sortBy := c.DefaultQuery("sort", "created_at")
+	order := c.DefaultQuery("order", "desc")
+
+	// Get sorted subscriptions
+	subscriptions, err := h.service.GetAllSorted(sortBy, order)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -194,6 +383,8 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
 		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"SortBy":         sortBy,
+		"Order":          order,
 	})
 }
 
@@ -229,6 +420,7 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
+	subscription.IconURL = c.PostForm("icon_url") // Allow manual icon URL override
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
@@ -258,6 +450,9 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		}
 	}
 
+	// Fetch logo synchronously before creation if URL is provided and icon_url is empty
+	h.fetchAndSetLogo(&subscription)
+
 	// Create subscription
 	created, err := h.service.Create(&subscription)
 	if err != nil {
@@ -275,6 +470,18 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}
 		return
+	}
+
+	// Send high-cost alert email if applicable
+	if created.IsHighCost() {
+		// Reload subscription with category for email template
+		subscriptionWithCategory, err := h.service.GetByID(created.ID)
+		if err == nil && subscriptionWithCategory != nil {
+			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				// Log error but don't fail the request
+				log.Printf("Failed to send high-cost alert email: %v", err)
+			}
+		}
 	}
 
 	if c.GetHeader("HX-Request") != "" {
@@ -329,6 +536,7 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
+	subscription.IconURL = c.PostForm("icon_url") // Allow manual icon URL override
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
@@ -359,14 +567,41 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		}
 	}
 
+	// Get the original subscription to check if it was high-cost before update
+	original, _ := h.service.GetByID(uint(id))
+	wasHighCost := original != nil && original.IsHighCost()
+
+	// Preserve existing IconURL if not explicitly set in form
+	if subscription.IconURL == "" && original != nil {
+		subscription.IconURL = original.IconURL
+	}
+
+	// Check if URL changed - if so, we should fetch a new logo
+	urlChanged := original != nil && original.URL != subscription.URL
+	if urlChanged || (subscription.URL != "" && subscription.IconURL == "") {
+		h.fetchAndSetLogo(&subscription)
+	}
+
 	// Update subscription
-	_, err = h.service.Update(uint(id), &subscription)
+	updated, err := h.service.Update(uint(id), &subscription)
 	if err != nil {
 		c.Header("HX-Retarget", "#form-errors")
 		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
 			"Error": err.Error(),
 		})
 		return
+	}
+
+	// Send high-cost alert email if subscription became high-cost (wasn't before, but is now)
+	if updated != nil && !wasHighCost && updated.IsHighCost() {
+		// Reload subscription with category for email template
+		subscriptionWithCategory, err := h.service.GetByID(updated.ID)
+		if err == nil && subscriptionWithCategory != nil {
+			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				// Log error but don't fail the request
+				log.Printf("Failed to send high-cost alert email: %v", err)
+			}
+		}
 	}
 
 	// Return success response that triggers a page refresh

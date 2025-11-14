@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"strings"
 	"subtrackr/internal/models"
 	"time"
 
@@ -87,6 +88,48 @@ func (r *SubscriptionRepository) GetAll() ([]models.Subscription, error) {
 	return subscriptions, nil
 }
 
+// GetAllSorted returns all subscriptions sorted by the specified column and order
+// sortBy: name, cost, status, renewal_date, schedule, category, created_at
+// order: asc, desc
+func (r *SubscriptionRepository) GetAllSorted(sortBy, order string) ([]models.Subscription, error) {
+	var subscriptions []models.Subscription
+	query := r.db.Preload("Category")
+
+	// Validate and set sort column
+	validSortColumns := map[string]string{
+		"name":         "name",
+		"cost":         "cost",
+		"status":       "status",
+		"renewal_date": "renewal_date",
+		"schedule":     "schedule",
+		"category":     "categories.name",
+		"created_at":   "created_at",
+	}
+
+	sortColumn, ok := validSortColumns[sortBy]
+	if !ok {
+		sortColumn = "created_at" // default
+	}
+
+	// Validate order
+	if order != "asc" && order != "desc" {
+		order = "desc" // default
+	}
+
+	// Build order clause
+	orderClause := sortColumn + " " + strings.ToUpper(order)
+	
+	// Special handling for category (requires join)
+	if sortBy == "category" {
+		query = query.Joins("LEFT JOIN categories ON subscriptions.category_id = categories.id")
+	}
+
+	if err := query.Order(orderClause).Find(&subscriptions).Error; err != nil {
+		return nil, err
+	}
+	return subscriptions, nil
+}
+
 func (r *SubscriptionRepository) GetByID(id uint) (*models.Subscription, error) {
 	var subscription models.Subscription
 	if err := r.db.Preload("Category").First(&subscription, id).Error; err != nil {
@@ -118,6 +161,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.RenewalDate = subscription.RenewalDate
 	existing.CancellationDate = subscription.CancellationDate
 	existing.URL = subscription.URL
+	existing.IconURL = subscription.IconURL
 	existing.Notes = subscription.Notes
 	existing.Usage = subscription.Usage
 
@@ -140,6 +184,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 				"renewal_date":       existing.RenewalDate,
 				"cancellation_date":  existing.CancellationDate,
 				"url":                existing.URL,
+				"icon_url":           existing.IconURL,
 				"notes":              existing.Notes,
 				"usage":              existing.Usage,
 				"updated_at":         time.Now(),
@@ -202,7 +247,7 @@ func (r *SubscriptionRepository) GetUpcomingRenewals(days int) ([]models.Subscri
 func (r *SubscriptionRepository) GetCategoryStats() ([]models.CategoryStat, error) {
 	var stats []models.CategoryStat
 	if err := r.db.Table("subscriptions").
-		Select("categories.name as category, SUM(CASE WHEN subscriptions.schedule = 'Annual' THEN subscriptions.cost/12 WHEN subscriptions.schedule = 'Monthly' THEN subscriptions.cost WHEN subscriptions.schedule = 'Weekly' THEN subscriptions.cost*4.33 WHEN subscriptions.schedule = 'Daily' THEN subscriptions.cost*30.44 ELSE subscriptions.cost END) as amount, COUNT(*) as count").
+		Select("categories.name as category, SUM(CASE WHEN subscriptions.schedule = 'Annual' THEN subscriptions.cost/12 WHEN subscriptions.schedule = 'Quarterly' THEN subscriptions.cost/3 WHEN subscriptions.schedule = 'Monthly' THEN subscriptions.cost WHEN subscriptions.schedule = 'Weekly' THEN subscriptions.cost*4.33 WHEN subscriptions.schedule = 'Daily' THEN subscriptions.cost*30.44 ELSE subscriptions.cost END) as amount, COUNT(*) as count").
 		Joins("left join categories on subscriptions.category_id = categories.id").
 		Where("subscriptions.status = ?", "Active").
 		Group("categories.name").

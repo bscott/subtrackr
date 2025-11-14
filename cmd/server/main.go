@@ -12,6 +12,7 @@ import (
 	"subtrackr/internal/middleware"
 	"subtrackr/internal/repository"
 	"subtrackr/internal/service"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,9 +44,11 @@ func main() {
 	currencyService := service.NewCurrencyService(exchangeRateRepo)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
 	settingsService := service.NewSettingsService(settingsRepo)
+	emailService := service.NewEmailService(settingsService)
+	logoService := service.NewLogoService()
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, logoService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
@@ -66,6 +69,20 @@ func main() {
 				return 0
 			}
 			return a / b
+		},
+		"int": func(v interface{}) int {
+			switch val := v.(type) {
+			case int:
+				return val
+			case int64:
+				return int(val)
+			case float64:
+				return int(val)
+			case time.Month:
+				return int(val)
+			default:
+				return 0
+			}
 		},
 	})
 
@@ -124,6 +141,20 @@ func loadTemplates() *template.Template {
 			}
 			return a / b
 		},
+		"int": func(v interface{}) int {
+			switch val := v.(type) {
+			case int:
+				return val
+			case int64:
+				return int(val)
+			case float64:
+				return int(val)
+			case time.Month:
+				return int(val)
+			default:
+				return 0
+			}
+		},
 	})
 	
 	// Critical templates required for basic functionality
@@ -138,6 +169,7 @@ func loadTemplates() *template.Template {
 		"templates/dashboard.html",
 		"templates/subscriptions.html",
 		"templates/analytics.html",
+		"templates/calendar.html",
 		"templates/settings.html",
 		"templates/subscription-form.html",
 		"templates/subscription-list.html",
@@ -201,6 +233,7 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 	router.GET("/dashboard", handler.Dashboard)
 	router.GET("/subscriptions", handler.SubscriptionsList)
 	router.GET("/analytics", handler.Analytics)
+	router.GET("/calendar", handler.Calendar)
 	router.GET("/settings", handler.Settings)
 
 	// Form routes for HTMX modals
@@ -223,6 +256,7 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		// Export and data management routes
 		api.GET("/export/csv", handler.ExportCSV)
 		api.GET("/export/json", handler.ExportJSON)
+		api.GET("/export/ical", handler.ExportICal)
 		api.GET("/backup", handler.BackupData)
 		api.DELETE("/clear-all", handler.ClearAllData)
 

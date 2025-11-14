@@ -22,6 +22,10 @@ func (s *SubscriptionService) GetAll() ([]models.Subscription, error) {
 	return s.repo.GetAll()
 }
 
+func (s *SubscriptionService) GetAllSorted(sortBy, order string) ([]models.Subscription, error) {
+	return s.repo.GetAllSorted(sortBy, order)
+}
+
 func (s *SubscriptionService) GetByID(id uint) (*models.Subscription, error) {
 	return s.repo.GetByID(id)
 }

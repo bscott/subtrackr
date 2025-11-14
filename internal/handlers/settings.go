@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -24,107 +25,156 @@ func NewSettingsHandler(service *service.SettingsService) *SettingsHandler {
 // SaveSMTPSettings saves SMTP configuration
 func (h *SettingsHandler) SaveSMTPSettings(c *gin.Context) {
 	var config models.SMTPConfig
-	
+
 	// Parse form data
 	config.Host = c.PostForm("smtp_host")
 	config.Username = c.PostForm("smtp_username")
 	config.Password = c.PostForm("smtp_password")
 	config.From = c.PostForm("smtp_from")
 	config.FromName = c.PostForm("smtp_from_name")
-	
+	config.To = c.PostForm("smtp_to")
+
 	// Parse port
 	if portStr := c.PostForm("smtp_port"); portStr != "" {
 		if port, err := strconv.Atoi(portStr); err == nil {
 			config.Port = port
 		}
 	}
-	
+
 	// Validate required fields
-	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" || config.From == "" {
+	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" || config.From == "" || config.To == "" {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
-			"Error": "All SMTP fields are required",
-			"Type": "error",
+			"Error": "Required SMTP fields: Host, Port, Username, Password, From email, To email",
+			"Type":  "error",
 		})
 		return
 	}
-	
+
 	// Save configuration
 	err := h.service.SaveSMTPConfig(&config)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "smtp-message.html", gin.H{
 			"Error": err.Error(),
-			"Type": "error",
+			"Type":  "error",
 		})
 		return
 	}
-	
+
 	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
 		"Message": "SMTP settings saved successfully",
-		"Type": "success",
+		"Type":    "success",
 	})
 }
 
-// TestSMTPConnection tests SMTP configuration
+// TestSMTPConnection tests SMTP configuration with TLS/SSL support
 func (h *SettingsHandler) TestSMTPConnection(c *gin.Context) {
 	var config models.SMTPConfig
-	
+
 	// Parse form data
 	config.Host = c.PostForm("smtp_host")
 	config.Username = c.PostForm("smtp_username")
 	config.Password = c.PostForm("smtp_password")
 	config.From = c.PostForm("smtp_from")
 	config.FromName = c.PostForm("smtp_from_name")
-	
+	config.To = c.PostForm("smtp_to")
+
 	// Parse port
 	if portStr := c.PostForm("smtp_port"); portStr != "" {
 		if port, err := strconv.Atoi(portStr); err == nil {
 			config.Port = port
 		}
 	}
-	
-	// Validate
+
+	// Validate required fields for testing (connection test doesn't need From/To, but we validate for consistency)
 	if config.Host == "" || config.Port == 0 || config.Username == "" || config.Password == "" {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
-			"Error": "All SMTP fields are required for testing",
-			"Type": "error",
+			"Error": "Host, Port, Username, and Password are required for testing",
+			"Type":  "error",
 		})
 		return
 	}
-	
-	// Test connection
-	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
+
+	// Test connection with TLS/SSL support
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
-	
-	// Try to connect
-	client, err := smtp.Dial(addr)
-	if err != nil {
-		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
-			"Error": fmt.Sprintf("Failed to connect: %v", err),
-			"Type": "error",
-		})
-		return
+	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
+
+	// Determine if this is an implicit TLS port (SMTPS)
+	isSSLPort := config.Port == 465 || config.Port == 8465 || config.Port == 443
+
+	var client *smtp.Client
+	var err error
+
+	if isSSLPort {
+		// Use implicit TLS (direct SSL connection)
+		tlsConfig := &tls.Config{
+			ServerName: config.Host,
+		}
+
+		conn, err := tls.Dial("tcp", addr, tlsConfig)
+		if err != nil {
+			c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+				"Error": fmt.Sprintf("Failed to connect via SSL: %v", err),
+				"Type":  "error",
+			})
+			return
+		}
+
+		client, err = smtp.NewClient(conn, config.Host)
+		if err != nil {
+			conn.Close()
+			c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+				"Error": fmt.Sprintf("Failed to create SMTP client: %v", err),
+				"Type":  "error",
+			})
+			return
+		}
+	} else {
+		// Use STARTTLS (opportunistic TLS)
+		client, err = smtp.Dial(addr)
+		if err != nil {
+			c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+				"Error": fmt.Sprintf("Failed to connect: %v", err),
+				"Type":  "error",
+			})
+			return
+		}
+
+		// Upgrade to TLS
+		tlsConfig := &tls.Config{
+			ServerName: config.Host,
+		}
+
+		if err = client.StartTLS(tlsConfig); err != nil {
+			client.Close()
+			c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+				"Error": fmt.Sprintf("Failed to start TLS: %v", err),
+				"Type":  "error",
+			})
+			return
+		}
 	}
+
 	defer client.Close()
-	
+
 	// Try to authenticate
 	if err = client.Auth(auth); err != nil {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
 			"Error": fmt.Sprintf("Authentication failed: %v", err),
-			"Type": "error",
+			"Type":  "error",
 		})
 		return
 	}
-	
+
 	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
 		"Message": "SMTP connection test successful!",
-		"Type": "success",
+		"Type":    "success",
 	})
 }
 
 // UpdateNotificationSetting updates a notification preference
 func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 	setting := c.Param("setting")
-	
+
 	switch setting {
 	case "renewal":
 		current, _ := h.service.GetBoolSetting("renewal_reminders", false)
@@ -134,7 +184,7 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"enabled": !current})
-		
+
 	case "highcost":
 		current, _ := h.service.GetBoolSetting("high_cost_alerts", true)
 		err := h.service.SetBoolSetting("high_cost_alerts", !current)
@@ -143,7 +193,7 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"enabled": !current})
-		
+
 	case "days":
 		daysStr := c.PostForm("reminder_days")
 		if days, err := strconv.Atoi(daysStr); err == nil && days > 0 && days <= 30 {
@@ -156,7 +206,7 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 		} else {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid days value"})
 		}
-		
+
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown setting"})
 	}
@@ -169,7 +219,7 @@ func (h *SettingsHandler) GetNotificationSettings(c *gin.Context) {
 		HighCostAlerts:   h.service.GetBoolSettingWithDefault("high_cost_alerts", true),
 		ReminderDays:     h.service.GetIntSettingWithDefault("reminder_days", 7),
 	}
-	
+
 	c.JSON(http.StatusOK, settings)
 }
 
@@ -180,12 +230,12 @@ func (h *SettingsHandler) GetSMTPConfig(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"configured": false})
 		return
 	}
-	
+
 	// Don't send the password
 	config.Password = ""
 	c.JSON(http.StatusOK, gin.H{
 		"configured": true,
-		"config": config,
+		"config":     config,
 	})
 }
 
@@ -198,14 +248,14 @@ func (h *SettingsHandler) ListAPIKeys(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Don't send the actual key values for existing keys
 	for i := range keys {
 		if !keys[i].IsNew {
 			keys[i].Key = ""
 		}
 	}
-	
+
 	c.HTML(http.StatusOK, "api-keys-list.html", gin.H{
 		"Keys": keys,
 	})
@@ -220,7 +270,7 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Generate a secure random API key
 	keyBytes := make([]byte, 32)
 	if _, err := rand.Read(keyBytes); err != nil {
@@ -229,9 +279,9 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	apiKey := "sk_" + hex.EncodeToString(keyBytes)
-	
+
 	// Save the API key
 	newKey, err := h.service.CreateAPIKey(name, apiKey)
 	if err != nil {
@@ -240,7 +290,7 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Get all keys including the new one
 	keys, err := h.service.GetAllAPIKeys()
 	if err != nil {
@@ -249,7 +299,7 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Mark the new key and include its value
 	for i := range keys {
 		if keys[i].ID == newKey.ID {
@@ -259,7 +309,7 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 			keys[i].Key = ""
 		}
 	}
-	
+
 	c.HTML(http.StatusOK, "api-keys-list.html", gin.H{
 		"Keys": keys,
 	})
@@ -275,7 +325,7 @@ func (h *SettingsHandler) DeleteAPIKey(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	err = h.service.DeleteAPIKey(uint(id))
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "api-keys-list.html", gin.H{
@@ -283,7 +333,7 @@ func (h *SettingsHandler) DeleteAPIKey(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Return updated list
 	h.ListAPIKeys(c)
 }
@@ -291,29 +341,29 @@ func (h *SettingsHandler) DeleteAPIKey(c *gin.Context) {
 // UpdateCurrency updates the currency preference
 func (h *SettingsHandler) UpdateCurrency(c *gin.Context) {
 	currency := c.PostForm("currency")
-	
+
 	err := h.service.SetCurrency(currency)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"currency": currency,
-		"symbol": h.service.GetCurrencySymbol(),
+		"symbol":   h.service.GetCurrencySymbol(),
 	})
 }
 
 // ToggleDarkMode toggles dark mode preference
 func (h *SettingsHandler) ToggleDarkMode(c *gin.Context) {
 	enabled := c.PostForm("enabled") == "true"
-	
+
 	err := h.service.SetDarkMode(enabled)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"dark_mode": enabled,
 	})

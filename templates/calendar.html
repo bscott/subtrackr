@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" class="{{if .DarkMode}}dark{{end}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - SubTrackr</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#3b82f6',
+                        'success': '#10b981',
+                        'warning': '#f59e0b',
+                        'danger': '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="/static/js/darkmode.js"></script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 transition-colors duration-200">
+            <div class="flex items-center justify-between max-w-7xl mx-auto">
+                <div class="flex items-center space-x-8">
+                    <img src="/static/images/logo.svg" alt="SubTrackr" class="h-8 w-auto">
+                    <nav class="flex space-x-1">
+                        <a href="/" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v3H8V5z"></path>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <a href="/subscriptions" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Subscriptions
+                        </a>
+                        <a href="/analytics" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Analytics
+                        </a>
+                        <a href="/calendar" class="flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-light">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            Calendar
+                        </a>
+                    </nav>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button 
+                        hx-get="/form/subscription"
+                        hx-target="#modal-content"
+                        hx-trigger="click"
+                        onclick="document.getElementById('modal').classList.remove('hidden')"
+                        class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 flex items-center transition-colors duration-150">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Add
+                    </button>
+                    <a href="/settings" class="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors duration-150">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4">
+            <div class="max-w-7xl mx-auto">
+                <!-- Calendar Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center space-x-4">
+                        <a href="/calendar?year={{.PrevMonth.Year}}&month={{printf "%d" (int .PrevMonth.Month)}}" 
+                           class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                        </a>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{.MonthName}}</h1>
+                        <a href="/calendar?year={{.NextMonth.Year}}&month={{printf "%d" (int .NextMonth.Month)}}" 
+                           class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
+                        <a href="/calendar" class="ml-4 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                            Today
+                        </a>
+                    </div>
+                    <a href="/api/export/ical" 
+                       class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 flex items-center transition-colors duration-150">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Export to iCal
+                    </a>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <!-- Day Headers -->
+                    <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Sun</div>
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Mon</div>
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Tue</div>
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Wed</div>
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Thu</div>
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Fri</div>
+                        <div class="px-4 py-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900">Sat</div>
+                    </div>
+
+                    <!-- Calendar Days -->
+                    <div class="grid grid-cols-7" id="calendar-grid">
+                        <!-- Days will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="z-index: 9999;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4 transition-colors duration-200" style="z-index: 10000;">
+            <div id="modal-content">
+                <!-- Dynamic content loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Calendar data from server - parse JSON safely
+        let eventsByDate = {};
+        try {
+            const eventsData = {{.EventsByDate}};
+            if (typeof eventsData === 'string') {
+                eventsByDate = JSON.parse(eventsData);
+            } else if (typeof eventsData === 'object') {
+                eventsByDate = eventsData;
+            }
+        } catch (e) {
+            console.error('Error parsing eventsByDate:', e);
+            eventsByDate = {};
+        }
+        
+        const year = parseInt({{.Year}}) || new Date().getFullYear();
+        const month = parseInt({{.Month}}) || new Date().getMonth() + 1;
+        const currencySymbol = "{{.CurrencySymbol}}";
+        
+        console.log('Calendar initialized:', { year, month, eventsCount: Object.keys(eventsByDate).length });
+        
+        // Render calendar grid
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            if (!grid) {
+                console.error('Calendar grid not found');
+                return;
+            }
+            
+            grid.innerHTML = '';
+
+            const firstOfMonth = new Date(year, month - 1, 1);
+            const lastOfMonth = new Date(year, month, 0);
+            const daysInMonth = lastOfMonth.getDate();
+            const startDay = firstOfMonth.getDay(); // 0 = Sunday, 6 = Saturday
+
+            // Previous month days
+            const prevMonth = new Date(year, month - 2, 0);
+            const daysInPrevMonth = prevMonth.getDate();
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = daysInPrevMonth - i;
+                const cell = document.createElement('div');
+                cell.className = 'min-h-24 p-2 border-r border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50';
+                cell.innerHTML = `<div class="text-sm text-gray-400 dark:text-gray-600">${day}</div>`;
+                grid.appendChild(cell);
+            }
+
+            // Current month days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const events = eventsByDate[dateKey] || [];
+                const cell = document.createElement('div');
+                const hasEvents = events.length > 0;
+                cell.className = `min-h-24 p-2 border-r border-b border-gray-200 dark:border-gray-700 ${hasEvents ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`;
+                
+                let content = `<div class="text-sm font-medium text-gray-900 dark:text-white mb-1">${day}</div>`;
+                if (hasEvents) {
+                    content += '<div class="space-y-1">';
+                    events.forEach(event => {
+                        const eventName = (event.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        const eventId = event.id || 0;
+                        const iconURL = event.icon_url || '';
+                        const hasIcon = iconURL && iconURL.trim() !== '';
+                        
+                        let iconHtml = '';
+                        if (hasIcon) {
+                            const safeIconURL = iconURL.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                            iconHtml = `<img src="${safeIconURL}" alt="${eventName}" class="w-3 h-3 rounded mr-1.5 flex-shrink-0 inline-block" style="object-fit: contain;" onerror="this.style.display='none';">`;
+                        }
+                        
+                        const cost = (event.cost || 0).toFixed(2);
+                        content += `<button 
+                            hx-get="/form/subscription/${eventId}"
+                            hx-target="#modal-content"
+                            hx-swap="innerHTML"
+                            hx-trigger="click"
+                            class="w-full text-left text-xs px-2 py-1 rounded bg-primary/20 dark:bg-primary/30 text-primary dark:text-primary-light hover:bg-primary/30 dark:hover:bg-primary/40 transition-colors cursor-pointer flex items-center justify-between" 
+                            title="${eventName} - ${currencySymbol}${cost}"
+                            onclick="setTimeout(function() { document.getElementById('modal').classList.remove('hidden'); }, 50);">
+                            <span class="flex items-center min-w-0 flex-1">
+                                ${iconHtml}<span class="truncate">${eventName}</span>
+                            </span>
+                            <span class="ml-2 flex-shrink-0 font-medium">${currencySymbol}${cost}</span>
+                        </button>`;
+                    });
+                    content += '</div>';
+                }
+                cell.innerHTML = content;
+                grid.appendChild(cell);
+                
+                // Process HTMX attributes on newly created buttons
+                if (typeof htmx !== 'undefined') {
+                    htmx.process(cell);
+                }
+            }
+
+            // Next month days (fill remaining cells)
+            const totalCells = grid.children.length;
+            const remainingCells = 42 - totalCells; // 6 rows * 7 days = 42
+            for (let day = 1; day <= remainingCells; day++) {
+                const cell = document.createElement('div');
+                cell.className = 'min-h-24 p-2 border-r border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50';
+                cell.innerHTML = `<div class="text-sm text-gray-400 dark:text-gray-600">${day}</div>`;
+                grid.appendChild(cell);
+            }
+        }
+
+        // Initialize calendar on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', renderCalendar);
+        } else {
+            renderCalendar();
+        }
+
+        // Close modal when clicking outside
+        const modal = document.getElementById('modal');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            }
+        });
+        
+        // Listen for HTMX afterSwap to show modal when content loads
+        if (typeof htmx !== 'undefined') {
+            document.body.addEventListener('htmx:afterSwap', function(evt) {
+                if (evt.detail.target.id === 'modal-content' && evt.detail.target.innerHTML.trim() !== '') {
+                    const modal = document.getElementById('modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
