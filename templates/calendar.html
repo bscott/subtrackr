@@ -346,6 +346,11 @@
             document.body.style.overflow = ''; // Restore body scroll
         }
 
+        // Restore body scroll on page load (handles navigation before closeMobileMenu completes)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.style.overflow = '';
+        });
+
         // Open mobile menu when hamburger button is clicked
         document.getElementById('mobile-menu-button').addEventListener('click', openMobileMenu);
 
