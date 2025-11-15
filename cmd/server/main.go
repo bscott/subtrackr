@@ -396,13 +396,13 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 				renewalDateCopy := *sub.RenewalDate
 				sub.LastReminderRenewalDate = &renewalDateCopy
 			}
-			
+
 			// Update the subscription in the database
 			_, updateErr := subscriptionService.Update(sub.ID, sub)
 			if updateErr != nil {
 				log.Printf("Warning: Failed to update last reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
 			}
-			
+
 			log.Printf("Sent renewal reminder for subscription %s (renews in %d days)", sub.Name, daysUntil)
 			sentCount++
 		}

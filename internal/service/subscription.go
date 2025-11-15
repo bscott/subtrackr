@@ -1,9 +1,9 @@
 package service
 
 import (
-	"time"
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
+	"time"
 )
 
 type SubscriptionService struct {
@@ -119,18 +119,18 @@ func (s *SubscriptionService) GetSubscriptionsNeedingReminders(reminderDays int)
 
 		// Calculate days until renewal
 		daysUntil := int(sub.RenewalDate.Sub(now).Hours() / 24)
-		
+
 		// Only include if within the reminder window and not past due
 		if daysUntil >= 0 && daysUntil <= reminderDays {
 			// Check if we've already sent a reminder for this renewal date
 			// Skip if we've sent a reminder for the same renewal date
-			if sub.LastReminderRenewalDate != nil && 
-			   sub.RenewalDate != nil &&
-			   sub.LastReminderRenewalDate.Equal(*sub.RenewalDate) {
+			if sub.LastReminderRenewalDate != nil &&
+				sub.RenewalDate != nil &&
+				sub.LastReminderRenewalDate.Equal(*sub.RenewalDate) {
 				// Already sent reminder for this renewal date, skip
 				continue
 			}
-			
+
 			result[sub] = daysUntil
 		}
 	}

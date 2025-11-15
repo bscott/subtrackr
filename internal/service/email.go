@@ -277,7 +277,7 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 	}
 
 	data := ReminderData{
-		Subscription:      subscription,
+		Subscription:     subscription,
 		DaysUntilRenewal: daysUntilRenewal,
 	}
 
@@ -298,4 +298,3 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 	subject := fmt.Sprintf("Renewal Reminder: %s renews in %d %s", subscription.Name, daysUntilRenewal, daysText)
 	return e.SendEmail(subject, buf.String())
 }
-
