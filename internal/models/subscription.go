@@ -73,9 +73,9 @@ func (s *Subscription) DailyCost() float64 {
 	return s.MonthlyCost() / 30.44 // Average days per month
 }
 
-// IsHighCost determines if this is a high-cost subscription (>$50/month)
-func (s *Subscription) IsHighCost() bool {
-	return s.MonthlyCost() > 50
+// IsHighCost determines if this is a high-cost subscription based on the threshold
+func (s *Subscription) IsHighCost(threshold float64) bool {
+	return s.MonthlyCost() > threshold
 }
 
 // BeforeCreate hook to set renewal date for active subscriptions

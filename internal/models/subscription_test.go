@@ -447,6 +447,7 @@ func TestSubscription_DailyCost(t *testing.T) {
 
 // TestSubscription_IsHighCost tests high cost detection
 func TestSubscription_IsHighCost(t *testing.T) {
+	threshold := 50.0 // Default threshold
 	tests := []struct {
 		name     string
 		schedule string
@@ -498,7 +499,7 @@ func TestSubscription_IsHighCost(t *testing.T) {
 				Cost:     tt.cost,
 			}
 
-			result := sub.IsHighCost()
+			result := sub.IsHighCost(threshold)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

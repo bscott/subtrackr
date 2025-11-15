@@ -26,9 +26,10 @@ type SMTPConfig struct {
 
 // NotificationSettings represents notification preferences
 type NotificationSettings struct {
-	RenewalReminders bool `json:"renewal_reminders"`
-	HighCostAlerts   bool `json:"high_cost_alerts"`
-	ReminderDays     int  `json:"reminder_days"`
+	RenewalReminders  bool    `json:"renewal_reminders"`
+	HighCostAlerts    bool    `json:"high_cost_alerts"`
+	HighCostThreshold float64 `json:"high_cost_threshold"`
+	ReminderDays      int     `json:"reminder_days"`
 }
 
 // APIKey represents an API key for external access
