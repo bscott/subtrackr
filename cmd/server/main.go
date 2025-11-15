@@ -151,7 +151,7 @@ func main() {
 // loadTemplates loads HTML templates with better error handling for arm64 compatibility
 func loadTemplates() *template.Template {
 	tmpl := template.New("")
-	
+
 	// Add template functions
 	tmpl.Funcs(template.FuncMap{
 		"add": func(a, b float64) float64 { return a + b },
@@ -179,14 +179,14 @@ func loadTemplates() *template.Template {
 			}
 		},
 	})
-	
+
 	// Critical templates required for basic functionality
 	criticalTemplates := []string{
 		"templates/dashboard.html",
 		"templates/subscriptions.html",
 		"templates/error.html",
 	}
-	
+
 	// All template files to load
 	templateFiles := []string{
 		"templates/dashboard.html",
@@ -202,11 +202,11 @@ func loadTemplates() *template.Template {
 		"templates/form-errors.html",
 		"templates/error.html",
 	}
-	
+
 	var parsedCount int
 	var failedCount int
 	var missingCritical []string
-	
+
 	// Load templates individually to catch arm64-specific issues
 	for _, file := range templateFiles {
 		if _, err := os.Stat(file); err != nil {
@@ -219,7 +219,7 @@ func loadTemplates() *template.Template {
 			}
 			continue
 		}
-		
+
 		if _, err := tmpl.ParseFiles(file); err != nil {
 			log.Printf("Error: Failed to parse template %s: %v", file, err)
 			failedCount++
@@ -233,20 +233,20 @@ func loadTemplates() *template.Template {
 			parsedCount++
 		}
 	}
-	
+
 	// Log template loading summary
 	log.Printf("Template loading summary: %d parsed, %d failed, %d total", parsedCount, failedCount, len(templateFiles))
-	
+
 	// Fatal error if critical templates are missing
 	if len(missingCritical) > 0 {
 		log.Fatalf("Critical templates failed to load: %v. Application cannot continue.", missingCritical)
 	}
-	
+
 	// Warn if too many templates failed
 	if failedCount > len(templateFiles)/2 {
 		log.Printf("Warning: More than half of templates failed to load (%d/%d). Application may not function correctly.", failedCount, len(templateFiles))
 	}
-	
+
 	return tmpl
 }
 
@@ -389,6 +389,20 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 			log.Printf("Error sending renewal reminder for subscription %s (ID: %d): %v", sub.Name, sub.ID, err)
 			failedCount++
 		} else {
+			// Mark reminder as sent for this renewal date
+			now := time.Now()
+			sub.LastReminderSent = &now
+			if sub.RenewalDate != nil {
+				renewalDateCopy := *sub.RenewalDate
+				sub.LastReminderRenewalDate = &renewalDateCopy
+			}
+			
+			// Update the subscription in the database
+			_, updateErr := subscriptionService.Update(sub.ID, sub)
+			if updateErr != nil {
+				log.Printf("Warning: Failed to update last reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
+			}
+			
 			log.Printf("Sent renewal reminder for subscription %s (renews in %d days)", sub.Name, daysUntil)
 			sentCount++
 		}
