@@ -17,10 +17,18 @@ RUN go mod download && go mod verify
 # Copy only necessary source directories
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
+COPY .git/ ./.git/
 
-# Build the application with optimizations
-RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags="-w -s" \
+# Build arguments for version info (can be overridden from CI/CD)
+ARG GIT_TAG
+ARG GIT_COMMIT
+
+# Build the application with optimizations and version info
+# Extract git tag/commit if not provided as build args and .git exists
+RUN GIT_TAG=${GIT_TAG:-$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")} && \
+    GIT_COMMIT=${GIT_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")} && \
+    CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s -X 'subtrackr/internal/version.Version=$$GIT_TAG' -X 'subtrackr/internal/version.GitCommit=$$GIT_COMMIT'" \
     -o subtrackr ./cmd/server
 
 # Final stage

@@ -1,7 +1,8 @@
 # Variables
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS := -X 'subtrackr/internal/version.GitCommit=$(GIT_COMMIT)'
+LDFLAGS := -X 'subtrackr/internal/version.GitCommit=$(GIT_COMMIT)' -X 'subtrackr/internal/version.Version=$(GIT_TAG)'
 
 # Default target
 .PHONY: all
