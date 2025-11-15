@@ -169,6 +169,9 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 		return nil // Silently skip if disabled
 	}
 
+	// Get currency symbol
+	currencySymbol := e.settingsService.GetCurrencySymbol()
+
 	// Build email body
 	tmpl := `
 <!DOCTYPE html>
@@ -193,12 +196,12 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 		</div>
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
-			<div class="detail-row"><span class="label">Name:</span> {{.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> ${{printf "%.2f" .Cost}} {{.Schedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> ${{printf "%.2f" .MonthlyCost}}</div>
-			{{if and .Category .Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Category.Name}}</div>{{end}}
-			{{if .RenewalDate}}<div class="detail-row"><span class="label">Next Renewal:</span> {{.RenewalDate.Format "January 2, 2006"}}</div>{{end}}
-			{{if .URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.URL}}">{{.URL}}</a></div>{{end}}
+			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.Schedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
+			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
+			{{if .Subscription.RenewalDate}}<div class="detail-row"><span class="label">Next Renewal:</span> {{.Subscription.RenewalDate.Format "January 2, 2006"}}</div>{{end}}
+			{{if .Subscription.URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.Subscription.URL}}">{{.Subscription.URL}}</a></div>{{end}}
 		</div>
 		<div class="footer">
 			<p>This is an automated notification from SubTrackr.</p>
@@ -209,17 +212,27 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 </html>
 `
 
+	type AlertData struct {
+		Subscription   *models.Subscription
+		CurrencySymbol string
+	}
+
+	data := AlertData{
+		Subscription:   subscription,
+		CurrencySymbol: currencySymbol,
+	}
+
 	t, err := template.New("highCostAlert").Parse(tmpl)
 	if err != nil {
 		return fmt.Errorf("failed to parse email template: %w", err)
 	}
 
 	var buf bytes.Buffer
-	if err := t.Execute(&buf, subscription); err != nil {
+	if err := t.Execute(&buf, data); err != nil {
 		return fmt.Errorf("failed to execute email template: %w", err)
 	}
 
-	subject := fmt.Sprintf("High Cost Alert: %s - $%.2f/month", subscription.Name, subscription.MonthlyCost())
+	subject := fmt.Sprintf("High Cost Alert: %s - %s%.2f/month", subscription.Name, currencySymbol, subscription.MonthlyCost())
 	return e.SendEmail(subject, buf.String())
 }
 
@@ -230,6 +243,9 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 	if err != nil || !enabled {
 		return nil // Silently skip if disabled
 	}
+
+	// Get currency symbol
+	currencySymbol := e.settingsService.GetCurrencySymbol()
 
 	// Build email body
 	tmpl := `
@@ -251,16 +267,16 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 	<div class="container">
 		<h2>Subscription Renewal Reminder</h2>
 		<div class="reminder">
-			<strong>🔔 Reminder:</strong> Your subscription <strong>{{.Name}}</strong> will renew in {{.DaysUntilRenewal}} {{if eq .DaysUntilRenewal 1}}day{{else}}days{{end}}.
+			<strong>🔔 Reminder:</strong> Your subscription <strong>{{.Subscription.Name}}</strong> will renew in {{.DaysUntilRenewal}} {{if eq .DaysUntilRenewal 1}}day{{else}}days{{end}}.
 		</div>
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
-			<div class="detail-row"><span class="label">Name:</span> {{.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> ${{printf "%.2f" .Cost}} {{.Schedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> ${{printf "%.2f" .MonthlyCost}}</div>
-			{{if and .Category .Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Category.Name}}</div>{{end}}
-			{{if .RenewalDate}}<div class="detail-row"><span class="label">Renewal Date:</span> {{.RenewalDate.Format "January 2, 2006"}}</div>{{end}}
-			{{if .URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.URL}}">{{.URL}}</a></div>{{end}}
+			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.Schedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
+			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
+			{{if .Subscription.RenewalDate}}<div class="detail-row"><span class="label">Renewal Date:</span> {{.Subscription.RenewalDate.Format "January 2, 2006"}}</div>{{end}}
+			{{if .Subscription.URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.Subscription.URL}}">{{.Subscription.URL}}</a></div>{{end}}
 		</div>
 		<div class="footer">
 			<p>This is an automated reminder from SubTrackr.</p>
@@ -272,13 +288,15 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 `
 
 	type ReminderData struct {
-		*models.Subscription
+		Subscription     *models.Subscription
 		DaysUntilRenewal int
+		CurrencySymbol   string
 	}
 
 	data := ReminderData{
 		Subscription:     subscription,
 		DaysUntilRenewal: daysUntilRenewal,
+		CurrencySymbol:   currencySymbol,
 	}
 
 	t, err := template.New("renewalReminder").Parse(tmpl)
