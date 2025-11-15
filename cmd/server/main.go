@@ -336,8 +336,11 @@ func startRenewalReminderScheduler(subscriptionService *service.SubscriptionServ
 	}()
 
 	// Then run daily at midnight
+	// Note: Ticker is intentionally not stopped as this is a long-running server process.
+	// The ticker will run for the lifetime of the application, which is the desired behavior.
 	ticker := time.NewTicker(24 * time.Hour)
 	go func() {
+		defer ticker.Stop() // Clean up ticker if goroutine exits (defensive programming)
 		for range ticker.C {
 			// Recover from any panics in the reminder check to keep the scheduler running
 			func() {

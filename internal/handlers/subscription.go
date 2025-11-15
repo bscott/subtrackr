@@ -101,8 +101,10 @@ func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscr
 	// Convert monthly cost to display currency
 	convertedMonthlyCost, err := h.currencyService.ConvertAmount(monthlyCost, subscription.OriginalCurrency, displayCurrency)
 	if err != nil {
-		// If conversion fails, fall back to direct comparison (better than failing silently)
-		log.Printf("Warning: Failed to convert currency for high-cost check: %v", err)
+		// If conversion fails, fall back to direct comparison
+		// Note: This may not be accurate if currencies differ, but prevents silent failures
+		// The warning log helps identify when this fallback is used
+		log.Printf("Warning: Failed to convert currency for high-cost check (%s to %s): %v. Using direct comparison.", subscription.OriginalCurrency, displayCurrency, err)
 		return monthlyCost > threshold
 	}
 	

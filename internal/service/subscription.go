@@ -109,7 +109,6 @@ func (s *SubscriptionService) GetSubscriptionsNeedingReminders(reminderDays int)
 	}
 
 	result := make(map[*models.Subscription]int)
-	now := time.Now()
 
 	for i := range subscriptions {
 		sub := &subscriptions[i]
@@ -117,8 +116,9 @@ func (s *SubscriptionService) GetSubscriptionsNeedingReminders(reminderDays int)
 			continue
 		}
 
-		// Calculate days until renewal
-		daysUntil := int(sub.RenewalDate.Sub(now).Hours() / 24)
+		// Calculate days until renewal using proper date arithmetic
+		// Use time.Until for more accurate calculation (handles timezone differences better)
+		daysUntil := int(time.Until(*sub.RenewalDate).Hours() / 24)
 
 		// Only include if within the reminder window and not past due
 		if daysUntil >= 0 && daysUntil <= reminderDays {
