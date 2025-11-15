@@ -135,6 +135,8 @@ func main() {
 	// 	seedSampleData(subscriptionService)
 	// }
 
+	// Start renewal reminder scheduler
+	go startRenewalReminderScheduler(subscriptionService, emailService, settingsService)
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -322,4 +324,67 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		v1.GET("/export/csv", handler.ExportCSV)
 		v1.GET("/export/json", handler.ExportJSON)
 	}
+}
+
+// startRenewalReminderScheduler starts a background goroutine that checks for
+// upcoming renewals and sends reminder emails daily
+func startRenewalReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, settingsService *service.SettingsService) {
+	// Run immediately on startup (after a short delay to let server initialize)
+	go func() {
+		time.Sleep(30 * time.Second) // Wait 30 seconds for server to fully start
+		checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+	}()
+
+	// Then run daily at midnight
+	ticker := time.NewTicker(24 * time.Hour)
+	go func() {
+		for range ticker.C {
+			checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+		}
+	}()
+}
+
+// checkAndSendRenewalReminders checks for subscriptions needing reminders and sends emails
+func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, settingsService *service.SettingsService) {
+	// Check if renewal reminders are enabled
+	enabled, err := settingsService.GetBoolSetting("renewal_reminders", false)
+	if err != nil || !enabled {
+		return // Silently skip if disabled or error
+	}
+
+	// Get reminder days setting
+	reminderDays := settingsService.GetIntSettingWithDefault("reminder_days", 7)
+	if reminderDays <= 0 {
+		return // No reminders if days is 0 or negative
+	}
+
+	// Get subscriptions needing reminders
+	subscriptions, err := subscriptionService.GetSubscriptionsNeedingReminders(reminderDays)
+	if err != nil {
+		log.Printf("Error getting subscriptions for renewal reminders: %v", err)
+		return
+	}
+
+	if len(subscriptions) == 0 {
+		log.Printf("No subscriptions need renewal reminders today")
+		return
+	}
+
+	log.Printf("Checking %d subscription(s) for renewal reminders", len(subscriptions))
+
+	// Send reminder for each subscription
+	sentCount := 0
+	failedCount := 0
+	for sub, daysUntil := range subscriptions {
+		err := emailService.SendRenewalReminder(sub, daysUntil)
+		if err != nil {
+			log.Printf("Error sending renewal reminder for subscription %s (ID: %d): %v", sub.Name, sub.ID, err)
+			failedCount++
+		} else {
+			log.Printf("Sent renewal reminder for subscription %s (renews in %d days)", sub.Name, daysUntil)
+			sentCount++
+		}
+	}
+
+	log.Printf("Renewal reminder check complete: %d sent, %d failed", sentCount, failedCount)
 }
