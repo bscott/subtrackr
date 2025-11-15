@@ -339,7 +339,15 @@ func startRenewalReminderScheduler(subscriptionService *service.SubscriptionServ
 	ticker := time.NewTicker(24 * time.Hour)
 	go func() {
 		for range ticker.C {
-			checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+			// Recover from any panics in the reminder check to keep the scheduler running
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("Panic in renewal reminder check: %v", r)
+					}
+				}()
+				checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+			}()
 		}
 	}()
 }
