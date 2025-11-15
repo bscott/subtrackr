@@ -273,7 +273,7 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
 			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.Schedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.MonthlyCost}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .Subscription.RenewalDate}}<div class="detail-row"><span class="label">Renewal Date:</span> {{.Subscription.RenewalDate.Format "January 2, 2006"}}</div>{{end}}
 			{{if .Subscription.URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.Subscription.URL}}">{{.Subscription.URL}}</a></div>{{end}}
