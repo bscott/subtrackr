@@ -135,6 +135,8 @@ func main() {
 	// 	seedSampleData(subscriptionService)
 	// }
 
+	// Start renewal reminder scheduler
+	go startRenewalReminderScheduler(subscriptionService, emailService, settingsService)
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -149,7 +151,7 @@ func main() {
 // loadTemplates loads HTML templates with better error handling for arm64 compatibility
 func loadTemplates() *template.Template {
 	tmpl := template.New("")
-	
+
 	// Add template functions
 	tmpl.Funcs(template.FuncMap{
 		"add": func(a, b float64) float64 { return a + b },
@@ -177,14 +179,14 @@ func loadTemplates() *template.Template {
 			}
 		},
 	})
-	
+
 	// Critical templates required for basic functionality
 	criticalTemplates := []string{
 		"templates/dashboard.html",
 		"templates/subscriptions.html",
 		"templates/error.html",
 	}
-	
+
 	// All template files to load
 	templateFiles := []string{
 		"templates/dashboard.html",
@@ -200,11 +202,11 @@ func loadTemplates() *template.Template {
 		"templates/form-errors.html",
 		"templates/error.html",
 	}
-	
+
 	var parsedCount int
 	var failedCount int
 	var missingCritical []string
-	
+
 	// Load templates individually to catch arm64-specific issues
 	for _, file := range templateFiles {
 		if _, err := os.Stat(file); err != nil {
@@ -217,7 +219,7 @@ func loadTemplates() *template.Template {
 			}
 			continue
 		}
-		
+
 		if _, err := tmpl.ParseFiles(file); err != nil {
 			log.Printf("Error: Failed to parse template %s: %v", file, err)
 			failedCount++
@@ -231,20 +233,20 @@ func loadTemplates() *template.Template {
 			parsedCount++
 		}
 	}
-	
+
 	// Log template loading summary
 	log.Printf("Template loading summary: %d parsed, %d failed, %d total", parsedCount, failedCount, len(templateFiles))
-	
+
 	// Fatal error if critical templates are missing
 	if len(missingCritical) > 0 {
 		log.Fatalf("Critical templates failed to load: %v. Application cannot continue.", missingCritical)
 	}
-	
+
 	// Warn if too many templates failed
 	if failedCount > len(templateFiles)/2 {
 		log.Printf("Warning: More than half of templates failed to load (%d/%d). Application may not function correctly.", failedCount, len(templateFiles))
 	}
-	
+
 	return tmpl
 }
 
@@ -322,4 +324,92 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		v1.GET("/export/csv", handler.ExportCSV)
 		v1.GET("/export/json", handler.ExportJSON)
 	}
+}
+
+// startRenewalReminderScheduler starts a background goroutine that checks for
+// upcoming renewals and sends reminder emails daily
+func startRenewalReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, settingsService *service.SettingsService) {
+	// Run immediately on startup (after a short delay to let server initialize)
+	go func() {
+		time.Sleep(30 * time.Second) // Wait 30 seconds for server to fully start
+		checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+	}()
+
+	// Then run daily at midnight
+	// Note: Ticker is intentionally not stopped as this is a long-running server process.
+	// The ticker will run for the lifetime of the application, which is the desired behavior.
+	ticker := time.NewTicker(24 * time.Hour)
+	go func() {
+		defer ticker.Stop() // Clean up ticker if goroutine exits (defensive programming)
+		for range ticker.C {
+			// Recover from any panics in the reminder check to keep the scheduler running
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("Panic in renewal reminder check: %v", r)
+					}
+				}()
+				checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+			}()
+		}
+	}()
+}
+
+// checkAndSendRenewalReminders checks for subscriptions needing reminders and sends emails
+func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, settingsService *service.SettingsService) {
+	// Check if renewal reminders are enabled
+	enabled, err := settingsService.GetBoolSetting("renewal_reminders", false)
+	if err != nil || !enabled {
+		return // Silently skip if disabled or error
+	}
+
+	// Get reminder days setting
+	reminderDays := settingsService.GetIntSettingWithDefault("reminder_days", 7)
+	if reminderDays <= 0 {
+		return // No reminders if days is 0 or negative
+	}
+
+	// Get subscriptions needing reminders
+	subscriptions, err := subscriptionService.GetSubscriptionsNeedingReminders(reminderDays)
+	if err != nil {
+		log.Printf("Error getting subscriptions for renewal reminders: %v", err)
+		return
+	}
+
+	if len(subscriptions) == 0 {
+		log.Printf("No subscriptions need renewal reminders today")
+		return
+	}
+
+	log.Printf("Checking %d subscription(s) for renewal reminders", len(subscriptions))
+
+	// Send reminder for each subscription
+	sentCount := 0
+	failedCount := 0
+	for sub, daysUntil := range subscriptions {
+		err := emailService.SendRenewalReminder(sub, daysUntil)
+		if err != nil {
+			log.Printf("Error sending renewal reminder for subscription %s (ID: %d): %v", sub.Name, sub.ID, err)
+			failedCount++
+		} else {
+			// Mark reminder as sent for this renewal date
+			now := time.Now()
+			sub.LastReminderSent = &now
+			if sub.RenewalDate != nil {
+				renewalDateCopy := *sub.RenewalDate
+				sub.LastReminderRenewalDate = &renewalDateCopy
+			}
+
+			// Update the subscription in the database
+			_, updateErr := subscriptionService.Update(sub.ID, sub)
+			if updateErr != nil {
+				log.Printf("Warning: Failed to update last reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
+			}
+
+			log.Printf("Sent renewal reminder for subscription %s (renews in %d days)", sub.Name, daysUntil)
+			sentCount++
+		}
+	}
+
+	log.Printf("Renewal reminder check complete: %d sent, %d failed", sentCount, failedCount)
 }

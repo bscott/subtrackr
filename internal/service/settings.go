@@ -96,6 +96,35 @@ func (s *SettingsService) GetIntSettingWithDefault(key string, defaultValue int)
 	return value
 }
 
+// SetFloatSetting saves a float setting
+func (s *SettingsService) SetFloatSetting(key string, value float64) error {
+	return s.repo.Set(key, fmt.Sprintf("%.2f", value))
+}
+
+// GetFloatSetting retrieves a float setting
+func (s *SettingsService) GetFloatSetting(key string, defaultValue float64) (float64, error) {
+	value, err := s.repo.Get(key)
+	if err != nil {
+		return defaultValue, err
+	}
+	
+	floatValue, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return defaultValue, err
+	}
+	
+	return floatValue, nil
+}
+
+// GetFloatSettingWithDefault retrieves a float setting with default
+func (s *SettingsService) GetFloatSettingWithDefault(key string, defaultValue float64) float64 {
+	value, err := s.GetFloatSetting(key, defaultValue)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
 // CreateAPIKey creates a new API key
 func (s *SettingsService) CreateAPIKey(name, key string) (*models.APIKey, error) {
 	apiKey := &models.APIKey{
