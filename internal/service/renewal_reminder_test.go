@@ -398,6 +398,58 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_BoundaryCases(t *t
 	}
 }
 
+func TestSubscriptionService_GetSubscriptionsNeedingReminders_DuplicatePrevention(t *testing.T) {
+	db := setupRenewalReminderTestDB(t)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
+	categoryService := NewCategoryService(categoryRepo)
+	subscriptionService := NewSubscriptionService(subscriptionRepo, categoryService)
+
+	now := time.Now()
+	renewalDate := now.AddDate(0, 0, 5) // 5 days from now
+	lastReminderDate := now.AddDate(0, 0, -1) // 1 day ago
+
+	// Create subscription with reminder already sent for this renewal date
+	sub := &models.Subscription{
+		Name:                   "Test Subscription",
+		Cost:                   10.00,
+		Schedule:               "Monthly",
+		Status:                 "Active",
+		RenewalDate:            &renewalDate,
+		LastReminderSent:       &lastReminderDate,
+		LastReminderRenewalDate: &renewalDate, // Same as current renewal date
+	}
+	err := db.Create(sub).Error
+	assert.NoError(t, err)
+
+	// Get subscriptions needing reminders with 7 day window
+	result, err := subscriptionService.GetSubscriptionsNeedingReminders(7)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result), "Should not find subscription that already has reminder sent for this renewal date")
+
+	// Now update the renewal date (simulating renewal date change)
+	newRenewalDate := now.AddDate(0, 0, 10) // 10 days from now
+	sub.RenewalDate = &newRenewalDate
+	err = db.Save(sub).Error
+	assert.NoError(t, err)
+
+	// Should still not find it (outside reminder window)
+	result, err = subscriptionService.GetSubscriptionsNeedingReminders(7)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result), "Should not find subscription outside reminder window")
+
+	// Update to within window with different renewal date
+	newRenewalDate2 := now.AddDate(0, 0, 3) // 3 days from now
+	sub.RenewalDate = &newRenewalDate2
+	err = db.Save(sub).Error
+	assert.NoError(t, err)
+
+	// Should find it now because renewal date changed (different from LastReminderRenewalDate)
+	result, err = subscriptionService.GetSubscriptionsNeedingReminders(7)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result), "Should find subscription when renewal date changes")
+}
+
 // Helper function to create time pointer
 func timePtr(t time.Time) *time.Time {
 	return &t
