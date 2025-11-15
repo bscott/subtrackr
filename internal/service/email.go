@@ -256,8 +256,8 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> ${{printf "%.2f" .Cost}} {{.Schedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> ${{printf "%.2f" .MonthlyCost}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Cost}} {{.Schedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .MonthlyCost}}</div>
 			{{if and .Category .Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Category.Name}}</div>{{end}}
 			{{if .RenewalDate}}<div class="detail-row"><span class="label">Renewal Date:</span> {{.RenewalDate.Format "January 2, 2006"}}</div>{{end}}
 			{{if .URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.URL}}">{{.URL}}</a></div>{{end}}
@@ -274,11 +274,13 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 	type ReminderData struct {
 		*models.Subscription
 		DaysUntilRenewal int
+		CurrencySymbol   string
 	}
 
 	data := ReminderData{
 		Subscription:     subscription,
 		DaysUntilRenewal: daysUntilRenewal,
+		CurrencySymbol:   e.settingsService.GetCurrencySymbol(),
 	}
 
 	t, err := template.New("renewalReminder").Parse(tmpl)
