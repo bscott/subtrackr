@@ -83,6 +83,35 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 	return result
 }
 
+// isHighCostWithCurrency checks if a subscription is high-cost, respecting currency conversion
+// The threshold is in the user's display currency, so we convert the subscription's monthly cost
+// to the display currency before comparing
+func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscription) bool {
+	threshold := h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0)
+	displayCurrency := h.settingsService.GetCurrency()
+	
+	// Get monthly cost in subscription's original currency
+	monthlyCost := subscription.MonthlyCost()
+	
+	// If currencies match or conversion is disabled, compare directly
+	if subscription.OriginalCurrency == displayCurrency || !h.currencyService.IsEnabled() {
+		return monthlyCost > threshold
+	}
+	
+	// Convert monthly cost to display currency
+	convertedMonthlyCost, err := h.currencyService.ConvertAmount(monthlyCost, subscription.OriginalCurrency, displayCurrency)
+	if err != nil {
+		// If conversion fails, fall back to direct comparison
+		// Note: This may not be accurate if currencies differ, but prevents silent failures
+		// The warning log helps identify when this fallback is used
+		log.Printf("Warning: Failed to convert currency for high-cost check (%s to %s): %v. Using direct comparison.", subscription.OriginalCurrency, displayCurrency, err)
+		return monthlyCost > threshold
+	}
+	
+	// Compare converted monthly cost against threshold
+	return convertedMonthlyCost > threshold
+}
+
 // fetchAndSetLogo fetches a logo for a subscription if URL is provided and icon_url is empty
 // This is a helper method to avoid code duplication between create and update handlers
 func (h *SubscriptionHandler) fetchAndSetLogo(subscription *models.Subscription) {
@@ -364,16 +393,17 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "settings.html", gin.H{
-		"Title":            "Settings",
-		"CurrentPage":      "settings",
-		"Currency":         h.settingsService.GetCurrency(),
-		"CurrencySymbol":   h.settingsService.GetCurrencySymbol(),
-		"RenewalReminders": h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
-		"HighCostAlerts":   h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
-		"ReminderDays":     h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
-		"DarkMode":         h.settingsService.IsDarkModeEnabled(),
-		"Version":          version.GetVersion(),
-		"SMTPConfig":       smtpConfig,
+		"Title":              "Settings",
+		"CurrentPage":        "settings",
+		"Currency":           h.settingsService.GetCurrency(),
+		"CurrencySymbol":     h.settingsService.GetCurrencySymbol(),
+		"RenewalReminders":   h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
+		"HighCostAlerts":     h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
+		"HighCostThreshold":  h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
+		"ReminderDays":       h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
+		"DarkMode":           h.settingsService.IsDarkModeEnabled(),
+		"Version":            version.GetVersion(),
+		"SMTPConfig":         smtpConfig,
 	})
 }
 
@@ -474,7 +504,7 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	}
 
 	// Send high-cost alert email if applicable
-	if created.IsHighCost() {
+	if h.isHighCostWithCurrency(created) {
 		// Reload subscription with category for email template
 		subscriptionWithCategory, err := h.service.GetByID(created.ID)
 		if err == nil && subscriptionWithCategory != nil {
@@ -556,7 +586,7 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 
 	// Get the original subscription to check if it was high-cost before update
 	original, _ := h.service.GetByID(uint(id))
-	wasHighCost := original != nil && original.IsHighCost()
+	wasHighCost := original != nil && h.isHighCostWithCurrency(original)
 
 	// Preserve existing IconURL if not explicitly set in form
 	if subscription.IconURL == "" && original != nil {
@@ -580,7 +610,7 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	}
 
 	// Send high-cost alert email if subscription became high-cost (wasn't before, but is now)
-	if updated != nil && !wasHighCost && updated.IsHighCost() {
+	if updated != nil && !wasHighCost && h.isHighCostWithCurrency(updated) {
 		// Reload subscription with category for email template
 		subscriptionWithCategory, err := h.service.GetByID(updated.ID)
 		if err == nil && subscriptionWithCategory != nil {

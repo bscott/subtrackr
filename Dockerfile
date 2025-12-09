@@ -18,9 +18,14 @@ RUN go mod download && go mod verify
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 
-# Build the application with optimizations
+# Build arguments for version info (should be provided by CI/CD)
+ARG GIT_TAG=dev
+ARG GIT_COMMIT=unknown
+
+# Build the application with optimizations and version info
+# Use build args directly - no need for .git directory
 RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags="-w -s" \
+    -ldflags="-w -s -X 'subtrackr/internal/version.Version=${GIT_TAG}' -X 'subtrackr/internal/version.GitCommit=${GIT_COMMIT}'" \
     -o subtrackr ./cmd/server
 
 # Final stage

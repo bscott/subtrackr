@@ -69,3 +69,6 @@ server
 *.db
 data/
 subtrackr
+
+# Release notes (draft files, not committed)
+RELEASE_NOTES*.md

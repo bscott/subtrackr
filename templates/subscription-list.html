@@ -158,6 +158,24 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div class="flex items-center justify-end space-x-2">
+                        {{if .Notes}}
+                        <div class="relative group">
+                            <button 
+                                class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+                                aria-label="View note"
+                                aria-describedby="note-tooltip-{{.ID}}"
+                                title="View note">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </button>
+                            <div id="note-tooltip-{{.ID}}" class="absolute right-0 bottom-full mb-2 w-auto min-w-0 p-1.5 bg-gray-900 dark:bg-gray-700 text-white dark:text-gray-100 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 z-10 whitespace-nowrap">
+                                <p>{{.Notes}}</p>
+                                <div class="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                            </div>
+                        </div>
+                        {{end}}
                         <button 
                             hx-get="/form/subscription/{{.ID}}"
                             hx-target="#modal-content"
@@ -183,13 +201,6 @@
                     </div>
                 </td>
             </tr>
-            {{if .Notes}}
-            <tr class="bg-gray-50 dark:bg-gray-900/50">
-                <td colspan="7" class="px-6 py-2">
-                    <p class="text-xs text-gray-600 dark:text-gray-300">{{.Notes}}</p>
-                </td>
-            </tr>
-            {{end}}
             {{end}}
         </tbody>
     </table>

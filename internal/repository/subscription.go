@@ -158,6 +158,8 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.PaymentMethod = subscription.PaymentMethod
 	existing.Account = subscription.Account
 	existing.StartDate = subscription.StartDate
+	existing.LastReminderSent = subscription.LastReminderSent
+	existing.LastReminderRenewalDate = subscription.LastReminderRenewalDate
 	existing.RenewalDate = subscription.RenewalDate
 	existing.CancellationDate = subscription.CancellationDate
 	existing.URL = subscription.URL
@@ -181,12 +183,14 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 				"payment_method":     existing.PaymentMethod,
 				"account":            existing.Account,
 				"start_date":         existing.StartDate,
-				"renewal_date":       existing.RenewalDate,
-				"cancellation_date":  existing.CancellationDate,
-				"url":                existing.URL,
-				"icon_url":           existing.IconURL,
-				"notes":              existing.Notes,
-				"usage":              existing.Usage,
+				"renewal_date":                existing.RenewalDate,
+				"cancellation_date":           existing.CancellationDate,
+				"url":                         existing.URL,
+				"icon_url":                    existing.IconURL,
+				"notes":                       existing.Notes,
+				"usage":                       existing.Usage,
+				"last_reminder_sent":          existing.LastReminderSent,
+				"last_reminder_renewal_date":  existing.LastReminderRenewalDate,
 				"updated_at":         time.Now(),
 			}
 			if err := r.db.Model(&existing).Where("id = ?", id).Updates(updates).Error; err != nil {

@@ -21,6 +21,7 @@ func RunMigrations(db *gorm.DB) error {
 		migrateCurrencyFields,
 		migrateDateCalculationVersioning,
 		migrateSubscriptionIcons,
+		migrateReminderTracking,
 	}
 
 	for _, migration := range migrations {
@@ -179,5 +180,32 @@ func migrateSubscriptionIcons(db *gorm.DB) error {
 	}
 
 	log.Println("Migration completed: Subscription icon URLs added")
+	return nil
+}
+
+// migrateReminderTracking adds fields to track when reminders were sent
+func migrateReminderTracking(db *gorm.DB) error {
+	// Check if last_reminder_sent column already exists
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='last_reminder_sent'").Scan(&count)
+
+	if count > 0 {
+		// Migration already completed
+		return nil
+	}
+
+	log.Println("Running migration: Adding reminder tracking fields...")
+
+	// Add last_reminder_sent column
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN last_reminder_sent DATETIME").Error; err != nil {
+		log.Printf("Note: Could not add last_reminder_sent column: %v", err)
+	}
+
+	// Add last_reminder_renewal_date column
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN last_reminder_renewal_date DATETIME").Error; err != nil {
+		log.Printf("Note: Could not add last_reminder_renewal_date column: %v", err)
+	}
+
+	log.Println("Migration completed: Reminder tracking fields added")
 	return nil
 }

@@ -321,6 +321,26 @@
                     
                     <div class="flex items-center justify-between">
                         <div>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">High Cost Threshold</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Monthly cost threshold for high cost alerts (in {{.CurrencySymbol}})</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">{{.CurrencySymbol}}</span>
+                            <input type="number" 
+                                   name="high_cost_threshold"
+                                   value="{{printf "%.2f" .HighCostThreshold}}"
+                                   min="0"
+                                   max="10000"
+                                   step="0.01"
+                                   hx-post="/api/settings/notifications/threshold"
+                                   hx-trigger="change"
+                                   hx-swap="none"
+                                   class="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-150">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div>
                             <h4 class="text-sm font-medium text-gray-900 dark:text-white">Days Before Renewal</h4>
                             <p class="text-sm text-gray-600 dark:text-gray-300">How many days before renewal to send reminder</p>
                         </div>

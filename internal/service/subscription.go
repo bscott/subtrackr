@@ -3,6 +3,7 @@ package service
 import (
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
+	"time"
 )
 
 type SubscriptionService struct {
@@ -92,4 +93,47 @@ func (s *SubscriptionService) GetStats() (*models.Stats, error) {
 
 func (s *SubscriptionService) GetAllCategories() ([]models.Category, error) {
 	return s.categoryService.GetAll()
+}
+
+// GetSubscriptionsNeedingReminders returns subscriptions that need renewal reminders
+// based on the reminder_days setting. It returns a map of subscription to days until renewal.
+func (s *SubscriptionService) GetSubscriptionsNeedingReminders(reminderDays int) (map[*models.Subscription]int, error) {
+	if reminderDays <= 0 {
+		return make(map[*models.Subscription]int), nil
+	}
+
+	// Get all subscriptions with renewals in the next reminderDays
+	subscriptions, err := s.repo.GetUpcomingRenewals(reminderDays)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[*models.Subscription]int)
+
+	for i := range subscriptions {
+		sub := &subscriptions[i]
+		if sub.RenewalDate == nil {
+			continue
+		}
+
+		// Calculate days until renewal using proper date arithmetic
+		// Use time.Until for more accurate calculation (handles timezone differences better)
+		daysUntil := int(time.Until(*sub.RenewalDate).Hours() / 24)
+
+		// Only include if within the reminder window and not past due
+		if daysUntil >= 0 && daysUntil <= reminderDays {
+			// Check if we've already sent a reminder for this renewal date
+			// Skip if we've sent a reminder for the same renewal date
+			if sub.LastReminderRenewalDate != nil &&
+				sub.RenewalDate != nil &&
+				sub.LastReminderRenewalDate.Equal(*sub.RenewalDate) {
+				// Already sent reminder for this renewal date, skip
+				continue
+			}
+
+			result[sub] = daysUntil
+		}
+	}
+
+	return result, nil
 }

@@ -26,6 +26,8 @@ type Subscription struct {
 	Notes                  string     `json:"notes" gorm:""`
 	Usage                  string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low None"`
 	DateCalculationVersion int        `json:"date_calculation_version" gorm:"default:1"`
+	LastReminderSent       *time.Time `json:"last_reminder_sent" gorm:""` // Tracks when the last reminder was sent
+	LastReminderRenewalDate *time.Time `json:"last_reminder_renewal_date" gorm:""` // Tracks which renewal date the last reminder was for
 	CreatedAt              time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt              time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
@@ -71,9 +73,9 @@ func (s *Subscription) DailyCost() float64 {
 	return s.MonthlyCost() / 30.44 // Average days per month
 }
 
-// IsHighCost determines if this is a high-cost subscription (>$50/month)
-func (s *Subscription) IsHighCost() bool {
-	return s.MonthlyCost() > 50
+// IsHighCost determines if this is a high-cost subscription based on the threshold
+func (s *Subscription) IsHighCost(threshold float64) bool {
+	return s.MonthlyCost() > threshold
 }
 
 // BeforeCreate hook to set renewal date for active subscriptions
