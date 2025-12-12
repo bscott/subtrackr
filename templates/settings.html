@@ -482,8 +482,32 @@
                                class="mr-2 text-primary focus:ring-primary">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-200">₹ INR (Indian Rupee)</span>
                     </label>
+
+                    <label class="flex items-center">
+                        <input type="radio"
+                               name="currency"
+                               value="CHF"
+                               {{if eq .Currency "CHF"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "CHF"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">CHF (Swiss Franc)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="radio"
+                               name="currency"
+                               value="BRL"
+                               {{if eq .Currency "BRL"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "BRL"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">R$ BRL (Brazilian Real)</span>
+                    </label>
                 </div>
-                
+
                 <div id="currency-message" class="mt-2"></div>
             </div>
 
