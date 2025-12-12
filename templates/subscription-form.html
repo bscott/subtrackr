@@ -28,13 +28,40 @@
             <!-- Category -->
             <div>
                 <label for="category_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category *</label>
-                <select id="category_id" name="category_id" required
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
-                    <option value="">Select category</option>
-                    {{range .Categories}}
-                        <option value="{{.ID}}" {{if $.Subscription}}{{if eq $.Subscription.CategoryID .ID}}selected{{end}}{{end}}>{{.Name}}</option>
-                    {{end}}
-                </select>
+                <div class="flex gap-2">
+                    <div class="flex-1" id="category-select-container">
+                        <select id="category_id" name="category_id" required
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
+                            <option value="">Select category</option>
+                            {{range .Categories}}
+                                <option value="{{.ID}}" {{if $.Subscription}}{{if eq $.Subscription.CategoryID .ID}}selected{{end}}{{end}}>{{.Name}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                    <button type="button" id="add-category-btn" onclick="showNewCategoryInput()"
+                            class="px-3 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 transition-colors duration-150"
+                            title="Add new category">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                    </button>
+                </div>
+                <!-- Inline new category input (hidden by default) -->
+                <div id="new-category-container" class="hidden mt-2">
+                    <div class="flex gap-2">
+                        <input type="text" id="new-category-name" placeholder="New category name"
+                               class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
+                        <button type="button" onclick="createNewCategory()"
+                                class="px-3 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors duration-150">
+                            Add
+                        </button>
+                        <button type="button" onclick="hideNewCategoryInput()"
+                                class="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-150">
+                            Cancel
+                        </button>
+                    </div>
+                    <div id="new-category-error" class="text-sm text-danger mt-1 hidden"></div>
+                </div>
             </div>
 
             <!-- Cost -->
@@ -61,6 +88,8 @@
                     <option value="SEK" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "SEK"}}selected{{end}}{{end}}>kr SEK</option>
                     <option value="PLN" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "PLN"}}selected{{end}}{{end}}>zł PLN</option>
                     <option value="INR" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "INR"}}selected{{end}}{{end}}>₹ INR</option>
+                    <option value="CHF" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "CHF"}}selected{{end}}{{end}}>Fr. CHF</option>
+                    <option value="BRL" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "BRL"}}selected{{end}}{{end}}>R$ BRL</option>
                 </select>
             </div>
 
@@ -195,6 +224,88 @@
 </div>
 
 <script>
+// Inline category creation functions
+function showNewCategoryInput() {
+    document.getElementById('new-category-container').classList.remove('hidden');
+    document.getElementById('add-category-btn').classList.add('hidden');
+    document.getElementById('new-category-name').focus();
+}
+
+function hideNewCategoryInput() {
+    document.getElementById('new-category-container').classList.add('hidden');
+    document.getElementById('add-category-btn').classList.remove('hidden');
+    document.getElementById('new-category-name').value = '';
+    document.getElementById('new-category-error').classList.add('hidden');
+}
+
+let isCreatingCategory = false;
+
+async function createNewCategory() {
+    // Prevent double-submission
+    if (isCreatingCategory) return;
+
+    const nameInput = document.getElementById('new-category-name');
+    const errorDiv = document.getElementById('new-category-error');
+    const addBtn = document.querySelector('#new-category-container button');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+        errorDiv.textContent = 'Please enter a category name';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+
+    isCreatingCategory = true;
+    if (addBtn) addBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/categories', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: name }),
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to create category');
+        }
+
+        const newCategory = await response.json();
+
+        // Validate response before adding
+        if (!newCategory.id || !newCategory.name) {
+            throw new Error('Invalid response from server');
+        }
+
+        // Add new option to dropdown and select it
+        const select = document.getElementById('category_id');
+        const option = document.createElement('option');
+        option.value = newCategory.id;
+        option.textContent = newCategory.name;
+        option.selected = true;
+        select.appendChild(option);
+
+        // Hide the input and reset
+        hideNewCategoryInput();
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.classList.remove('hidden');
+    } finally {
+        isCreatingCategory = false;
+        if (addBtn) addBtn.disabled = false;
+    }
+}
+
+// Allow Enter key to submit new category
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && document.activeElement.id === 'new-category-name') {
+        e.preventDefault();
+        createNewCategory();
+    }
+});
+
 function calculateRenewalDate() {
     const scheduleSelect = document.getElementById('schedule');
     const statusSelect = document.getElementById('status');
@@ -255,15 +366,11 @@ function calculateRenewalDate() {
 // Add event listeners when modal content loads
 function initRenewalCalculator() {
     const scheduleSelect = document.getElementById('schedule');
-    const statusSelect = document.getElementById('status');
 
     if (scheduleSelect) {
         scheduleSelect.addEventListener('change', calculateRenewalDate);
     }
-
-    if (statusSelect) {
-        statusSelect.addEventListener('change', calculateRenewalDate);
-    }
+    // Note: Status changes should NOT trigger renewal date recalculation (fixes #68)
 }
 
 // Initialize immediately since this script loads with the form
