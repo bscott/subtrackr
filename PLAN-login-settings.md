@@ -6,6 +6,16 @@ Add optional authentication to SubTrackr that can be enabled/disabled from the S
 
 ---
 
+## Confirmed Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Login toggle location | Settings page | All config in one place |
+| Default state | **OFF** | No breaking changes for existing/new installs |
+| Scope | Single-user auth | Self-hosted personal tool, no multi-user needed |
+
+---
+
 ## Current State Analysis
 
 ### What Exists
@@ -41,10 +51,12 @@ Add optional authentication to SubTrackr that can be enabled/disabled from the S
 
 **New Settings Keys**:
 ```
-auth_enabled         (bool)   - Master toggle for login requirement
-auth_username        (string) - Admin username
-auth_password_hash   (string) - bcrypt hash of password
-auth_session_secret  (string) - Secret for signing session cookies
+auth_enabled            (bool)   - Master toggle for login requirement
+auth_username           (string) - Admin username
+auth_password_hash      (string) - bcrypt hash of password
+auth_session_secret     (string) - Secret for signing session cookies
+auth_reset_token        (string) - Temporary password reset token (cleared after use)
+auth_reset_token_expiry (string) - Reset token expiration timestamp
 ```
 
 ### 3. State Diagram
@@ -102,55 +114,38 @@ auth_session_secret  (string) - Secret for signing session cookies
 
 ---
 
-## Implementation Approach
-
-### Option A: Settings-First (Recommended)
+## Implementation Approach (Confirmed: Settings-First)
 
 **Flow**:
 1. Add "Security" section to Settings page
-2. Toggle "Require Login" is OFF by default
-3. When enabled, form expands to set username/password
-4. After credentials saved, auth middleware activates
-5. User must login on next page navigation
+2. Toggle "Require Login" is **OFF by default**
+3. **Prerequisite check**: SMTP must be configured before login can be enabled
+4. When user enables toggle, form expands to set username/password
+5. After credentials saved, auth middleware activates
+6. User must login on next page navigation
 
-**Pros**:
-- All configuration in one place
+**SMTP Prerequisite Requirement**:
+- Login toggle is disabled/grayed out until SMTP is configured and tested
+- Shows message: "Configure email settings above to enable password recovery"
+- This ensures users always have a "Forgot Password" recovery path
+- Prevents lockout scenarios where user has no way to reset password
+
+**Benefits**:
+- All configuration in one place (no env vars required)
 - No separate setup wizard needed
-- Easy to disable if locked out
+- Easy to disable if locked out (just toggle off)
+- Zero impact on existing installations until user opts in
+- **Password recovery always available** via email
 
-**Cons**:
-- Slight complexity in settings page
+**Optional: Environment Variable Override** (for advanced users)
 
-### Option B: Environment Variable Override
-
-**Flow**:
-1. `AUTH_ENABLED=true` env var forces auth requirement
-2. `AUTH_USERNAME` and `AUTH_PASSWORD` env vars set credentials
-3. Settings page shows status but cannot override env
-
-**Pros**:
-- Familiar for Docker deployments
-- Can't be accidentally disabled
-- Matches security best practices
-
-**Cons**:
-- Requires container restart to change
-- Password in plain text in env
-
-### Option C: Hybrid Approach (Best of Both)
-
-**Flow**:
-1. Check for `AUTH_ENABLED` env var first (highest priority)
-2. If env not set, check database setting
-3. UI shows which mode is active
-4. If env-controlled, UI is read-only
-
-**New Environment Variables**:
+For Docker deployments where UI access isn't preferred:
 ```
 AUTH_ENABLED=true|false     # Override toggle (optional)
 AUTH_USERNAME=admin         # Only used with AUTH_ENABLED=true
-AUTH_PASSWORD=securepass    # Only used with AUTH_ENABLED=true (hashed on first use)
+AUTH_PASSWORD=securepass    # Hashed on first server start
 ```
+When env vars are set, Settings UI shows read-only status.
 
 ---
 
@@ -189,9 +184,12 @@ Unprotected:
 **Problem**: User forgets password, locked out of app
 
 **Solutions** (in order of preference):
-1. **Environment override**: Set `AUTH_PASSWORD=newpassword` and restart
-2. **Database direct edit**: Delete `auth_password_hash` row from settings table
-3. **Data directory backup/restore**: Restore from backup without auth
+1. **Forgot Password email** (primary): Click "Forgot Password" on login page, receive reset link via SMTP
+2. **Environment override**: Set `AUTH_PASSWORD=newpassword` and restart
+3. **Database direct edit**: Delete `auth_password_hash` row from settings table
+4. **Data directory backup/restore**: Restore from backup without auth
+
+**Note**: SMTP is required before enabling login, ensuring option #1 is always available.
 
 ---
 
@@ -281,9 +279,31 @@ INSERT INTO settings (key, value) VALUES
 │              │ [ ] Remember me          │                   │
 │              │                          │                   │
 │              │      [  Sign In  ]       │                   │
+│              │                          │                   │
+│              │    [Forgot Password?]    │                   │
 │              └──────────────────────────┘                   │
 │                                                              │
-│         Forgot password? Check the docs for help.           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Forgot Password Page Design
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                              │
+│                      SubTrackr Logo                          │
+│                                                              │
+│              ┌──────────────────────────┐                   │
+│              │ Reset Your Password      │                   │
+│              │                          │                   │
+│              │ A reset link will be     │                   │
+│              │ sent to your configured  │                   │
+│              │ email address.           │                   │
+│              │                          │                   │
+│              │   [  Send Reset Link  ]  │                   │
+│              │                          │                   │
+│              │   [Back to Login]        │                   │
+│              └──────────────────────────┘                   │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -305,23 +325,28 @@ INSERT INTO settings (key, value) VALUES
 8. Add toggle state management
 9. Handle auth enable/disable flow
 
-### Phase 3: Login Page
+### Phase 3: Login Page & Password Reset
 10. Create login.html template
 11. Implement login form with HTMX
 12. Add error handling (wrong password, etc.)
 13. Add redirect after login
+14. Create forgot-password.html template
+15. Implement password reset email sending (uses existing EmailService)
+16. Create reset-password.html template for setting new password
+17. Handle reset token generation, validation, and expiration
 
 ### Phase 4: Route Protection
-14. Apply auth middleware conditionally
-15. Handle redirect to login for protected routes
-16. Ensure API keys still work independently
+18. Apply auth middleware conditionally
+19. Handle redirect to login for protected routes
+20. Ensure API keys still work independently
 
 ### Phase 5: Testing & Edge Cases
-17. Test existing installations (no regression)
-18. Test enable/disable flow
-19. Test lockout recovery
-20. Test session timeout
-21. Update documentation
+21. Test existing installations (no regression)
+22. Test enable/disable flow
+23. Test password reset flow via email
+24. Test lockout recovery
+25. Test session timeout
+26. Update documentation
 
 ---
 
