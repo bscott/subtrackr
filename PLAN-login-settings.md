@@ -185,11 +185,63 @@ Unprotected:
 
 **Solutions** (in order of preference):
 1. **Forgot Password email** (primary): Click "Forgot Password" on login page, receive reset link via SMTP
-2. **Environment override**: Set `AUTH_PASSWORD=newpassword` and restart
-3. **Database direct edit**: Delete `auth_password_hash` row from settings table
-4. **Data directory backup/restore**: Restore from backup without auth
+2. **CLI reset command** (Docker-friendly): Run container with `--reset-password` flag
+3. **Environment override**: Set `AUTH_PASSWORD=newpassword` and restart
+4. **Database direct edit**: Delete `auth_password_hash` row from settings table
+5. **Data directory backup/restore**: Restore from backup without auth
 
 **Note**: SMTP is required before enabling login, ensuring option #1 is always available.
+
+---
+
+## CLI Password Reset Option
+
+For Docker deployments where direct database access is inconvenient, provide a CLI flag to reset credentials.
+
+### Usage
+
+```bash
+# Reset password interactively (prompts for new password)
+docker exec -it subtrackr /app/subtrackr --reset-password
+
+# Reset password non-interactively (for scripts)
+docker exec -it subtrackr /app/subtrackr --reset-password --new-password "newsecurepass"
+
+# Disable authentication entirely (removes all auth settings)
+docker exec -it subtrackr /app/subtrackr --disable-auth
+```
+
+### Docker Compose Example
+
+```yaml
+# One-time password reset (run separately, not in main compose)
+docker compose run --rm subtrackr --reset-password
+```
+
+### Implementation Details
+
+**New CLI flags** (in `cmd/server/main.go`):
+```
+--reset-password       Resets admin password (interactive or with --new-password)
+--new-password <pass>  New password (used with --reset-password, skips prompt)
+--disable-auth         Disables authentication, removes credentials
+```
+
+**Behavior**:
+1. Parse flags before starting HTTP server
+2. If reset flag present:
+   - Connect to database
+   - Prompt for new password (or use --new-password value)
+   - Hash with bcrypt and update `auth_password_hash` setting
+   - Print success message and exit (don't start server)
+3. If disable-auth flag present:
+   - Delete all `auth_*` settings from database
+   - Print confirmation and exit
+
+**Security considerations**:
+- `--new-password` in process list is visible; recommend interactive mode when possible
+- These flags only work with direct container access (not exposed via API)
+- Log password reset events for audit trail
 
 ---
 
@@ -340,13 +392,20 @@ INSERT INTO settings (key, value) VALUES
 19. Handle redirect to login for protected routes
 20. Ensure API keys still work independently
 
-### Phase 5: Testing & Edge Cases
-21. Test existing installations (no regression)
-22. Test enable/disable flow
-23. Test password reset flow via email
-24. Test lockout recovery
-25. Test session timeout
-26. Update documentation
+### Phase 5: CLI Recovery Tools
+21. Add `--reset-password` flag to main.go
+22. Add `--new-password` flag for non-interactive reset
+23. Add `--disable-auth` flag to remove all auth settings
+24. Implement interactive password prompt (when no --new-password)
+
+### Phase 6: Testing & Edge Cases
+25. Test existing installations (no regression)
+26. Test enable/disable flow
+27. Test password reset flow via email
+28. Test CLI password reset (interactive and non-interactive)
+29. Test lockout recovery scenarios
+30. Test session timeout
+31. Update documentation
 
 ---
 
