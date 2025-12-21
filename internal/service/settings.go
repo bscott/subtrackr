@@ -1,11 +1,17 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
+	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type SettingsService struct {
@@ -107,13 +113,27 @@ func (s *SettingsService) GetFloatSetting(key string, defaultValue float64) (flo
 	if err != nil {
 		return defaultValue, err
 	}
-	
+
 	floatValue, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return defaultValue, err
 	}
-	
+
 	return floatValue, nil
+}
+
+// GetTheme retrieves the current theme setting
+func (s *SettingsService) GetTheme() (string, error) {
+	theme, err := s.repo.Get("theme")
+	if err != nil {
+		return "default", err
+	}
+	return theme, nil
+}
+
+// SetTheme saves the theme preference
+func (s *SettingsService) SetTheme(theme string) error {
+	return s.repo.Set("theme", theme)
 }
 
 // GetFloatSettingWithDefault retrieves a float setting with default
@@ -216,4 +236,158 @@ func (s *SettingsService) SetDarkMode(enabled bool) error {
 // IsDarkModeEnabled returns whether dark mode is enabled
 func (s *SettingsService) IsDarkModeEnabled() bool {
 	return s.GetBoolSettingWithDefault("dark_mode", false)
+}
+
+// Auth-related methods
+
+// IsAuthEnabled returns whether authentication is enabled
+func (s *SettingsService) IsAuthEnabled() bool {
+	return s.GetBoolSettingWithDefault("auth_enabled", false)
+}
+
+// SetAuthEnabled enables or disables authentication
+func (s *SettingsService) SetAuthEnabled(enabled bool) error {
+	return s.SetBoolSetting("auth_enabled", enabled)
+}
+
+// GetAuthUsername returns the configured admin username
+func (s *SettingsService) GetAuthUsername() (string, error) {
+	return s.repo.Get("auth_username")
+}
+
+// SetAuthUsername sets the admin username
+func (s *SettingsService) SetAuthUsername(username string) error {
+	return s.repo.Set("auth_username", username)
+}
+
+// HashPassword hashes a password using bcrypt
+func (s *SettingsService) HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+// SetAuthPassword hashes and stores the admin password
+func (s *SettingsService) SetAuthPassword(password string) error {
+	hash, err := s.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("auth_password_hash", hash)
+}
+
+// ValidatePassword checks if a password matches the stored hash
+func (s *SettingsService) ValidatePassword(password string) error {
+	hash, err := s.repo.Get("auth_password_hash")
+	if err != nil {
+		return fmt.Errorf("no password configured")
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+// GetOrGenerateSessionSecret returns the session secret, generating one if it doesn't exist
+func (s *SettingsService) GetOrGenerateSessionSecret() (string, error) {
+	secret, err := s.repo.Get("auth_session_secret")
+	if err == nil && secret != "" {
+		return secret, nil
+	}
+
+	// Generate a new 64-byte random secret
+	bytes := make([]byte, 64)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	secret = base64.URLEncoding.EncodeToString(bytes)
+
+	// Save it
+	if err := s.repo.Set("auth_session_secret", secret); err != nil {
+		return "", err
+	}
+
+	return secret, nil
+}
+
+// SetupAuth sets up authentication with username and password
+func (s *SettingsService) SetupAuth(username, password string) error {
+	// Set username
+	if err := s.SetAuthUsername(username); err != nil {
+		return err
+	}
+
+	// Set password
+	if err := s.SetAuthPassword(password); err != nil {
+		return err
+	}
+
+	// Generate session secret
+	if _, err := s.GetOrGenerateSessionSecret(); err != nil {
+		return err
+	}
+
+	// Enable auth
+	return s.SetAuthEnabled(true)
+}
+
+// DisableAuth disables authentication and removes credentials
+func (s *SettingsService) DisableAuth() error {
+	// Disable auth first
+	if err := s.SetAuthEnabled(false); err != nil {
+		return err
+	}
+
+	// Optionally clear credentials (commented out to allow re-enabling without re-entering)
+	// s.repo.Delete("auth_username")
+	// s.repo.Delete("auth_password_hash")
+
+	return nil
+}
+
+// GenerateResetToken generates a password reset token
+func (s *SettingsService) GenerateResetToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	token := base64.URLEncoding.EncodeToString(bytes)
+
+	// Store token with 1-hour expiry
+	if err := s.repo.Set("auth_reset_token", token); err != nil {
+		return "", err
+	}
+
+	expiry := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
+	if err := s.repo.Set("auth_reset_token_expiry", expiry); err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+// ValidateResetToken checks if a reset token is valid
+func (s *SettingsService) ValidateResetToken(token string) error {
+	storedToken, err := s.repo.Get("auth_reset_token")
+	if err != nil || subtle.ConstantTimeCompare([]byte(storedToken), []byte(token)) != 1 {
+		return fmt.Errorf("invalid token")
+	}
+
+	expiryStr, err := s.repo.Get("auth_reset_token_expiry")
+	if err != nil {
+		return fmt.Errorf("token expired")
+	}
+
+	expiry, err := time.Parse(time.RFC3339, expiryStr)
+	if err != nil || time.Now().After(expiry) {
+		return fmt.Errorf("token expired")
+	}
+
+	return nil
+}
+
+// ClearResetToken removes the reset token after use
+func (s *SettingsService) ClearResetToken() error {
+	s.repo.Delete("auth_reset_token")
+	s.repo.Delete("auth_reset_token_expiry")
+	return nil
 }

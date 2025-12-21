@@ -382,3 +382,143 @@ func (h *SettingsHandler) ToggleDarkMode(c *gin.Context) {
 		"dark_mode": enabled,
 	})
 }
+
+// SetupAuth enables authentication with username and password
+func (h *SettingsHandler) SetupAuth(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+	confirmPassword := c.PostForm("confirm_password")
+
+	// Validate inputs
+	if username == "" || password == "" {
+		c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+			"Error": "Username and password are required",
+			"Type":  "error",
+		})
+		return
+	}
+
+	if password != confirmPassword {
+		c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+			"Error": "Passwords do not match",
+			"Type":  "error",
+		})
+		return
+	}
+
+	if len(password) < 8 {
+		c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+			"Error": "Password must be at least 8 characters long",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Check if SMTP is configured (required for password reset)
+	_, err := h.service.GetSMTPConfig()
+	if err != nil {
+		c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+			"Error": "Please configure email settings first (required for password recovery)",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Setup authentication
+	err = h.service.SetupAuth(username, password)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "auth-message.html", gin.H{
+			"Error": err.Error(),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "auth-message.html", gin.H{
+		"Message": "Authentication enabled successfully. You will need to login on next page load.",
+		"Type":    "success",
+	})
+}
+
+// DisableAuth disables authentication
+func (h *SettingsHandler) DisableAuth(c *gin.Context) {
+	err := h.service.DisableAuth()
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "auth-message.html", gin.H{
+			"Error": err.Error(),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "auth-message.html", gin.H{
+		"Message": "Authentication disabled successfully",
+		"Type":    "success",
+	})
+}
+
+// GetAuthStatus returns the current authentication status
+func (h *SettingsHandler) GetAuthStatus(c *gin.Context) {
+	isEnabled := h.service.IsAuthEnabled()
+	username, _ := h.service.GetAuthUsername()
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":  isEnabled,
+		"username": username,
+	})
+}
+
+// GetTheme returns the current theme setting
+func (h *SettingsHandler) GetTheme(c *gin.Context) {
+	theme, err := h.service.GetTheme()
+	if err != nil {
+		// Default to 'default' theme if not set
+		theme = "default"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"theme": theme,
+	})
+}
+
+// SetTheme saves the theme preference
+func (h *SettingsHandler) SetTheme(c *gin.Context) {
+	var req struct {
+		Theme string `json:"theme" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request",
+		})
+		return
+	}
+
+	// Validate theme name
+	validThemes := map[string]bool{
+		"default":   true,
+		"dark":      true,
+		"christmas": true,
+		"midnight":  true,
+		"ocean":     true,
+	}
+
+	if !validThemes[req.Theme] {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid theme name",
+		})
+		return
+	}
+
+	if err := h.service.SetTheme(req.Theme); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to save theme",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"theme":   req.Theme,
+	})
+}
