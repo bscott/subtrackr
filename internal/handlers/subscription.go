@@ -385,12 +385,18 @@ func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
 func (h *SubscriptionHandler) Settings(c *gin.Context) {
 	// Load SMTP config if available (without password)
 	var smtpConfig *models.SMTPConfig
+	smtpConfigured := false
 	config, err := h.settingsService.GetSMTPConfig()
 	if err == nil && config != nil {
 		// Don't include password in template
 		config.Password = ""
 		smtpConfig = config
+		smtpConfigured = true
 	}
+
+	// Get auth settings
+	authEnabled := h.settingsService.IsAuthEnabled()
+	authUsername, _ := h.settingsService.GetAuthUsername()
 
 	c.HTML(http.StatusOK, "settings.html", gin.H{
 		"Title":              "Settings",
@@ -404,6 +410,9 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"DarkMode":           h.settingsService.IsDarkModeEnabled(),
 		"Version":            version.GetVersion(),
 		"SMTPConfig":         smtpConfig,
+		"SMTPConfigured":     smtpConfigured,
+		"AuthEnabled":        authEnabled,
+		"AuthUsername":       authUsername,
 	})
 }
 

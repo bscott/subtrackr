@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/subtle"
+	"flag"
+	"fmt"
 	"html/template"
 	"log"
 	"math"
@@ -12,12 +15,20 @@ import (
 	"subtrackr/internal/middleware"
 	"subtrackr/internal/repository"
 	"subtrackr/internal/service"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/term"
 )
 
 func main() {
+	// CLI flags
+	resetPassword := flag.Bool("reset-password", false, "Reset admin password (interactive or with --new-password)")
+	newPassword := flag.String("new-password", "", "New password for admin (non-interactive, use with --reset-password)")
+	disableAuth := flag.Bool("disable-auth", false, "Disable authentication and remove credentials")
+	flag.Parse()
+
 	// Load configuration
 	cfg := config.Load()
 
@@ -47,10 +58,29 @@ func main() {
 	emailService := service.NewEmailService(settingsService)
 	logoService := service.NewLogoService()
 
+	// Handle CLI commands (run before starting HTTP server)
+	if *disableAuth {
+		handleDisableAuth(settingsService)
+		return
+	}
+
+	if *resetPassword {
+		handleResetPassword(settingsService, *newPassword)
+		return
+	}
+
+	// Initialize session service (get or generate session secret)
+	sessionSecret, err := settingsService.GetOrGenerateSessionSecret()
+	if err != nil {
+		log.Fatal("Failed to initialize session secret:", err)
+	}
+	sessionService := service.NewSessionService(sessionSecret)
+
 	// Initialize handlers
 	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, logoService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
+	authHandler := handlers.NewAuthHandler(settingsService, sessionService, emailService)
 
 	// Setup Gin router
 	if cfg.Environment == "production" {
@@ -126,8 +156,11 @@ func main() {
 		})
 	})
 
+	// Apply auth middleware
+	router.Use(middleware.AuthMiddleware(settingsService, sessionService))
+
 	// Routes
-	setupRoutes(router, subscriptionHandler, settingsHandler, settingsService, categoryHandler)
+	setupRoutes(router, subscriptionHandler, settingsHandler, settingsService, categoryHandler, authHandler)
 
 	// Seed sample data if database is empty
 	// Commented out - no sample data by default
@@ -201,6 +234,15 @@ func loadTemplates() *template.Template {
 		"templates/smtp-message.html",
 		"templates/form-errors.html",
 		"templates/error.html",
+		"templates/login.html",
+		"templates/login-error.html",
+		"templates/forgot-password.html",
+		"templates/forgot-password-error.html",
+		"templates/forgot-password-success.html",
+		"templates/reset-password.html",
+		"templates/reset-password-error.html",
+		"templates/reset-password-success.html",
+		"templates/auth-message.html",
 	}
 
 	var parsedCount int
@@ -250,7 +292,12 @@ func loadTemplates() *template.Template {
 	return tmpl
 }
 
-func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, settingsHandler *handlers.SettingsHandler, settingsService *service.SettingsService, categoryHandler *handlers.CategoryHandler) {
+func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, settingsHandler *handlers.SettingsHandler, settingsService *service.SettingsService, categoryHandler *handlers.CategoryHandler, authHandler *handlers.AuthHandler) {
+	// Auth routes (public)
+	router.GET("/login", authHandler.ShowLoginPage)
+	router.GET("/forgot-password", authHandler.ShowForgotPasswordPage)
+	router.GET("/reset-password", authHandler.ShowResetPasswordPage)
+
 	// Web routes
 	router.GET("/", handler.Dashboard)
 	router.GET("/dashboard", handler.Dashboard)
@@ -306,6 +353,21 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		api.POST("/categories", categoryHandler.CreateCategory)
 		api.PUT("/categories/:id", categoryHandler.UpdateCategory)
 		api.DELETE("/categories/:id", categoryHandler.DeleteCategory)
+
+		// Auth routes
+		api.POST("/auth/login", authHandler.Login)
+		api.GET("/auth/logout", authHandler.Logout)
+		api.POST("/auth/forgot-password", authHandler.ForgotPassword)
+		api.POST("/auth/reset-password", authHandler.ResetPassword)
+
+		// Auth settings routes
+		api.POST("/settings/auth/setup", settingsHandler.SetupAuth)
+		api.POST("/settings/auth/disable", settingsHandler.DisableAuth)
+		api.GET("/settings/auth/status", settingsHandler.GetAuthStatus)
+
+		// Theme settings routes
+		api.GET("/settings/theme", settingsHandler.GetTheme)
+		api.POST("/settings/theme", settingsHandler.SetTheme)
 	}
 
 	// Public API routes (require API key authentication)
@@ -412,4 +474,60 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 	}
 
 	log.Printf("Renewal reminder check complete: %d sent, %d failed", sentCount, failedCount)
+}
+
+// handleResetPassword handles the --reset-password CLI command
+func handleResetPassword(settingsService *service.SettingsService, newPassword string) {
+	var password string
+
+	if newPassword != "" {
+		// Non-interactive mode
+		password = newPassword
+	} else {
+		// Interactive mode - prompt for password
+		fmt.Print("Enter new admin password: ")
+		passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Fatal("Failed to read password:", err)
+		}
+		fmt.Println()
+
+		fmt.Print("Confirm password: ")
+		confirmBytes, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			log.Fatal("Failed to read confirmation:", err)
+		}
+		fmt.Println()
+
+		// Use constant-time comparison to prevent timing attacks
+		if subtle.ConstantTimeCompare(passwordBytes, confirmBytes) != 1 {
+			log.Fatal("Passwords do not match")
+		}
+
+		password = string(passwordBytes)
+	}
+
+	// Validate password length
+	if len(password) < 8 {
+		log.Fatal("Password must be at least 8 characters long")
+	}
+
+	// Update password
+	if err := settingsService.SetAuthPassword(password); err != nil {
+		log.Fatal("Failed to update password:", err)
+	}
+
+	fmt.Println("✓ Admin password reset successfully")
+	os.Exit(0)
+}
+
+// handleDisableAuth handles the --disable-auth CLI command
+func handleDisableAuth(settingsService *service.SettingsService) {
+	if err := settingsService.DisableAuth(); err != nil {
+		log.Fatal("Failed to disable authentication:", err)
+	}
+
+	fmt.Println("✓ Authentication disabled successfully")
+	fmt.Println("  Note: Credentials are preserved and can be re-enabled from Settings")
+	os.Exit(0)
 }

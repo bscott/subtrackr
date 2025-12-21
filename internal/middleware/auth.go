@@ -2,73 +2,99 @@ package middleware
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"subtrackr/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-// APIKeyAuth creates a middleware that validates API keys
-func APIKeyAuth(settingsService *service.SettingsService) gin.HandlerFunc {
+// AuthMiddleware creates middleware that requires authentication
+func AuthMiddleware(settingsService *service.SettingsService, sessionService *service.SessionService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Check for API key in Authorization header
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			// Check for API key in X-API-Key header
-			authHeader = c.GetHeader("X-API-Key")
+		// Check if auth is enabled
+		if !settingsService.IsAuthEnabled() {
+			c.Next()
+			return
 		}
 
-		if authHeader == "" {
+		// Skip auth for certain routes
+		path := c.Request.URL.Path
+		if isPublicRoute(path) {
+			c.Next()
+			return
+		}
+
+		// Check if user is authenticated
+		if !sessionService.IsAuthenticated(c.Request) {
+			// Redirect to login page for HTML requests
+			if isHTMLRequest(c.Request) {
+				c.Redirect(http.StatusFound, "/login?redirect="+url.QueryEscape(c.Request.URL.Path))
+				c.Abort()
+				return
+			}
+
+			// Return 401 for API requests
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// isPublicRoute checks if a route should be accessible without authentication
+func isPublicRoute(path string) bool {
+	publicRoutes := []string{
+		"/login",
+		"/forgot-password",
+		"/reset-password",
+		"/api/auth/login",
+		"/api/auth/logout",
+		"/api/auth/forgot-password",
+		"/api/auth/reset-password",
+		"/static/",
+		"/favicon.ico",
+		"/healthz",
+	}
+
+	// API v1 routes use API keys, not session auth
+	if strings.HasPrefix(path, "/api/v1/") {
+		return true
+	}
+
+	for _, route := range publicRoutes {
+		if strings.HasPrefix(path, route) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isHTMLRequest checks if the request is for HTML content
+func isHTMLRequest(r *http.Request) bool {
+	accept := r.Header.Get("Accept")
+	return strings.Contains(accept, "text/html") || accept == ""
+}
+
+// APIKeyAuth creates middleware that requires API key authentication
+func APIKeyAuth(settingsService *service.SettingsService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKey := c.GetHeader("X-API-Key")
+		if apiKey == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "API key required"})
 			c.Abort()
 			return
 		}
 
-		// Extract the API key
-		apiKey := authHeader
-		if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-			apiKey = authHeader[7:]
-		}
-
-		// Validate the API key
-		key, err := settingsService.ValidateAPIKey(apiKey)
+		// Validate API key
+		_, err := settingsService.ValidateAPIKey(apiKey)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key"})
 			c.Abort()
 			return
-		}
-
-		// Store the API key info in context for later use
-		c.Set("api_key", key)
-		c.Next()
-	}
-}
-
-// OptionalAPIKeyAuth creates a middleware that optionally validates API keys
-// If an API key is provided, it validates it. If not, the request continues.
-func OptionalAPIKeyAuth(settingsService *service.SettingsService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Check for API key in Authorization header
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			// Check for API key in X-API-Key header
-			authHeader = c.GetHeader("X-API-Key")
-		}
-
-		if authHeader != "" {
-			// Extract the API key
-			apiKey := authHeader
-			if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-				apiKey = authHeader[7:]
-			}
-
-			// Validate the API key
-			key, err := settingsService.ValidateAPIKey(apiKey)
-			if err == nil {
-				// Store the API key info in context
-				c.Set("api_key", key)
-				c.Set("authenticated", true)
-			}
 		}
 
 		c.Next()

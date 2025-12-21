@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="en" class="{{if .DarkMode}}dark{{end}}">
+<html lang="en">
 <head>
+    <script src="/static/js/theme-init.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - SubTrackr</title>
@@ -20,9 +21,10 @@
                 }
             }
         }
-        
+
     </script>
-    <script src="/static/js/darkmode.js"></script>
+    <link rel="stylesheet" href="/static/css/themes.css">
+    <script src="/static/js/themes.js"></script>
     <script src="/static/js/mobile-menu.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
@@ -172,8 +174,92 @@
         </div>
         
         <div class="p-6 space-y-8">
-            <!-- Export Data -->
+            <!-- Appearance -->
             <div>
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Appearance</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Personalize your SubTrackr experience with beautiful themes</p>
+
+                <div class="theme-selector" id="theme-selector">
+                    <div class="theme-option" data-theme="default" onclick="selectTheme('default')">
+                        <div class="theme-name">Default</div>
+                        <div class="theme-description">Clean and professional</div>
+                        <div class="theme-preview">
+                            <div class="theme-preview-color" style="background: #3b82f6;"></div>
+                            <div class="theme-preview-color" style="background: #64748b;"></div>
+                            <div class="theme-preview-color" style="background: #10b981;"></div>
+                        </div>
+                    </div>
+
+                    <div class="theme-option" data-theme="dark" onclick="selectTheme('dark')">
+                        <div class="theme-name">Dark</div>
+                        <div class="theme-description">Easy on the eyes</div>
+                        <div class="theme-preview">
+                            <div class="theme-preview-color" style="background: #1f2937;"></div>
+                            <div class="theme-preview-color" style="background: #3b82f6;"></div>
+                            <div class="theme-preview-color" style="background: #10b981;"></div>
+                        </div>
+                    </div>
+
+                    <div class="theme-option" data-theme="christmas" onclick="selectTheme('christmas')">
+                        <div class="theme-name">Christmas 🎄</div>
+                        <div class="theme-description">Festive and jolly!</div>
+                        <div class="theme-preview">
+                            <div class="theme-preview-color" style="background: #c41e3a;"></div>
+                            <div class="theme-preview-color" style="background: #165b33;"></div>
+                            <div class="theme-preview-color" style="background: #ffd700;"></div>
+                        </div>
+                    </div>
+
+                    <div class="theme-option" data-theme="midnight" onclick="selectTheme('midnight')">
+                        <div class="theme-name">Midnight</div>
+                        <div class="theme-description">Deep and mysterious</div>
+                        <div class="theme-preview">
+                            <div class="theme-preview-color" style="background: #0f172a;"></div>
+                            <div class="theme-preview-color" style="background: #8b5cf6;"></div>
+                            <div class="theme-preview-color" style="background: #1e293b;"></div>
+                        </div>
+                    </div>
+
+                    <div class="theme-option" data-theme="ocean" onclick="selectTheme('ocean')">
+                        <div class="theme-name">Ocean</div>
+                        <div class="theme-description">Cool and refreshing</div>
+                        <div class="theme-preview">
+                            <div class="theme-preview-color" style="background: #0891b2;"></div>
+                            <div class="theme-preview-color" style="background: #f0f9ff;"></div>
+                            <div class="theme-preview-color" style="background: #06b6d4;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    function selectTheme(themeName) {
+                        // Remove active class from all options
+                        document.querySelectorAll('.theme-option').forEach(opt => {
+                            opt.classList.remove('active');
+                        });
+
+                        // Add active class to selected theme
+                        document.querySelector(`[data-theme="${themeName}"]`).classList.add('active');
+
+                        // Apply theme
+                        applyTheme(themeName);
+                    }
+
+                    // Load and mark current theme as active on page load
+                    document.addEventListener('DOMContentLoaded', () => {
+                        fetch('/api/settings/theme')
+                            .then(response => response.json())
+                            .then(data => {
+                                const themeName = data.theme || 'default';
+                                document.querySelector(`[data-theme="${themeName}"]`)?.classList.add('active');
+                            })
+                            .catch(err => console.error('Failed to load theme:', err));
+                    });
+                </script>
+            </div>
+
+            <!-- Export Data -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Export Data</h3>
                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Download your subscription data in various formats</p>
                 <div class="flex space-x-3">
@@ -356,30 +442,92 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Appearance Settings -->
+
+            <!-- Security Settings -->
             <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
-                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Appearance</h3>
-                <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg transition-colors duration-200">
-                    <div>
-                        <h4 class="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</h4>
-                        <p class="text-sm text-gray-600 dark:text-gray-300">Switch between light and dark appearance</p>
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Security</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Protect your SubTrackr instance with login authentication</p>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 transition-colors duration-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">Require Login</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Enable authentication to protect your data</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox"
+                                   id="auth-toggle"
+                                   value=""
+                                   class="sr-only peer"
+                                   {{if .AuthEnabled}}checked{{end}}
+                                   onchange="toggleAuthForm()">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" 
-                               value="" 
-                               class="sr-only peer"
-                               {{if .DarkMode}}checked{{end}}
-                               hx-post="/api/settings/dark-mode"
-                               hx-trigger="change"
-                               hx-vals='js:{"enabled": event.target.checked}'
-                               hx-swap="none"
-                               onchange="toggleDarkMode()">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
+
+                    <!-- Auth Setup Form (shown when toggle is ON) -->
+                    <div id="auth-form-container" class="{{if not .AuthEnabled}}hidden{{end}} mt-4 pt-4 border-t border-gray-300 dark:border-gray-600">
+                        {{if .AuthEnabled}}
+                        <!-- Already configured - show disable option -->
+                        <div class="space-y-3">
+                            <p class="text-sm text-green-600 dark:text-green-400">✓ Authentication is enabled</p>
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Username: <span class="font-medium">{{.AuthUsername}}</span></p>
+                            <button
+                                hx-post="/api/settings/auth/disable"
+                                hx-target="#auth-message"
+                                hx-swap="innerHTML"
+                                onclick="document.getElementById('auth-toggle').checked = false; toggleAuthForm();"
+                                class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700">
+                                Disable Authentication
+                            </button>
+                        </div>
+                        {{else}}
+                        <!-- Setup form for new auth -->
+                        <form id="auth-setup-form" hx-post="/api/settings/auth/setup" hx-target="#auth-message" hx-swap="innerHTML">
+                            <div class="space-y-4">
+                                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                    <p class="text-sm text-blue-800 dark:text-blue-200">
+                                        ⓘ Email must be configured first for password recovery. {{if not .SMTPConfigured}}<span class="font-medium text-red-600 dark:text-red-400">Please configure email settings above before enabling login.</span>{{end}}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label for="auth_username" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Username</label>
+                                    <input type="text" id="auth_username" name="username" placeholder="admin" required
+                                           {{if not .SMTPConfigured}}disabled{{end}}
+                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150 disabled:opacity-50">
+                                </div>
+
+                                <div>
+                                    <label for="auth_password" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Password</label>
+                                    <input type="password" id="auth_password" name="password" placeholder="••••••••" required minlength="8"
+                                           {{if not .SMTPConfigured}}disabled{{end}}
+                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150 disabled:opacity-50">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Minimum 8 characters</p>
+                                </div>
+
+                                <div>
+                                    <label for="auth_confirm_password" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Confirm Password</label>
+                                    <input type="password" id="auth_confirm_password" name="confirm_password" placeholder="••••••••" required minlength="8"
+                                           {{if not .SMTPConfigured}}disabled{{end}}
+                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150 disabled:opacity-50">
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    {{if not .SMTPConfigured}}disabled{{end}}
+                                    class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Enable Authentication
+                                </button>
+                            </div>
+                        </form>
+                        {{end}}
+                    </div>
+
+                    <div id="auth-message" class="mt-4"></div>
                 </div>
-                <div id="dark-mode-message" class="mt-2"></div>
             </div>
+
             
             <!-- Currency Settings -->
             <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
@@ -918,6 +1066,18 @@ function cancelEdit(id) {
 document.getElementById('add-category-form').onsubmit = addCategory;
 window.loadCategories = loadCategories;
 document.addEventListener('DOMContentLoaded', loadCategories);
+
+// Auth form toggle
+function toggleAuthForm() {
+    const toggle = document.getElementById('auth-toggle');
+    const container = document.getElementById('auth-form-container');
+
+    if (toggle.checked) {
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
+    }
+}
 </script>
 </body>
 </html>

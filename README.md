@@ -8,6 +8,38 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 
 ![SubTrackr Mobile View](mobile-screenshot.png)
 
+## 🎨 Themes
+
+Personalize your SubTrackr experience with 5 beautiful themes:
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="screenshots/christmas.png" alt="Christmas Theme" width="600"/><br/>
+      <b>Christmas 🎄</b><br/>
+      Festive and jolly! (with snowfall animation)
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/ocean.png" alt="Ocean Theme" width="600"/><br/>
+      <b>Ocean</b><br/>
+      Cool and refreshing
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/login.png" alt="Login Page" width="600"/><br/>
+      <b>Optional Authentication</b><br/>
+      Secure your data with optional login support
+    </td>
+  </tr>
+</table>
+
+**Available themes:** Default (Light), Dark, Christmas 🎄, Midnight (Purple), Ocean (Cyan)
+
+Themes persist across all pages and are saved per user. Change themes anytime from Settings → Appearance.
+
 ![Version](https://img.shields.io/github/v/release/bscott/subtrackr?logo=github&label=version)
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.21-00ADD8)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
@@ -20,6 +52,7 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 - 📈 **Analytics**: Visualize spending by category and track savings
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
 - 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
+- 🎨 **Beautiful Themes**: 5 stunning themes including a festive Christmas theme with snowfall animation
 - 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, and INR (with optional real-time conversion)
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
