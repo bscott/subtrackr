@@ -295,12 +295,12 @@
                         }
                         
                         const cost = (event.cost || 0).toFixed(2);
-                        content += `<button 
+                        content += `<button
                             hx-get="/form/subscription/${eventId}"
                             hx-target="#modal-content"
                             hx-swap="innerHTML"
                             hx-trigger="click"
-                            class="w-full text-left text-xs px-2 py-1 rounded bg-primary/20 dark:bg-primary/30 text-primary dark:text-primary-light hover:bg-primary/30 dark:hover:bg-primary/40 transition-colors cursor-pointer flex items-center justify-between" 
+                            class="w-full text-left text-xs px-2 py-1 rounded bg-blue-100 dark:bg-gray-700 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-gray-600 transition-colors cursor-pointer flex items-center justify-between" 
                             title="${eventName} - ${currencySymbol}${cost}"
                             onclick="setTimeout(function() { document.getElementById('modal').classList.remove('hidden'); }, 50);">
                             <span class="flex items-center min-w-0 flex-1">

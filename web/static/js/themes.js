@@ -36,6 +36,25 @@ const themes = {
             border: '#374151',
         }
     },
+    'dark-classic': {
+        name: 'Dark Classic',
+        description: 'Original dark mode',
+        useTailwindDark: true,  // Special flag to use Tailwind's dark mode
+        colors: {
+            primary: '#3b82f6',
+            primaryHover: '#60a5fa',
+            secondary: '#64748b',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            background: '#111827',
+            surface: '#1f2937',
+            surfaceHover: '#374151',
+            text: '#f9fafb',
+            textSecondary: '#9ca3af',
+            border: '#374151',
+        }
+    },
     christmas: {
         name: 'Christmas',
         description: 'Festive and jolly! 🎄',
@@ -100,11 +119,18 @@ const themes = {
 
 // Apply theme to document
 function applyTheme(themeName) {
-    const theme = themes[themeName] || themes.default;
+    const theme = themes[themeName] || themes['dark-classic'];
     const root = document.documentElement;
 
     // Set theme data attribute
     root.setAttribute('data-theme', themeName);
+
+    // Handle Tailwind dark mode for dark-classic theme
+    if (theme.useTailwindDark) {
+        root.classList.add('dark');
+    } else {
+        root.classList.remove('dark');
+    }
 
     // Apply CSS variables
     Object.entries(theme.colors).forEach(([key, value]) => {
@@ -153,13 +179,13 @@ function getStoredTheme() {
     return fetch('/api/settings/theme')
         .then(response => response.json())
         .then(data => {
-            const theme = data.theme || 'default';
+            const theme = data.theme || 'dark-classic';
             localStorage.setItem('subtrackr-theme', theme);
             return theme;
         })
         .catch(err => {
             console.error('Failed to load theme:', err);
-            return 'default';
+            return 'dark-classic';
         });
 }
 
