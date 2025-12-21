@@ -83,6 +83,23 @@
     background-color: #2a2a2a !important;
 }
 
+/* Dark Theme - Calendar Events */
+[data-theme="dark"] .bg-blue-50 {
+    background-color: #1e293b !important;
+}
+
+[data-theme="dark"] .bg-blue-100 {
+    background-color: #374151 !important;
+}
+
+[data-theme="dark"] .text-blue-700 {
+    color: #93c5fd !important;
+}
+
+[data-theme="dark"] .hover\:bg-blue-200:hover {
+    background-color: #4b5563 !important;
+}
+
 /* Christmas Theme */
 [data-theme="christmas"] body {
     background: linear-gradient(135deg, #fef3f3 0%, #fef2f2 100%) !important;
@@ -164,6 +181,23 @@
 [data-theme="midnight"] h2,
 [data-theme="midnight"] h3 {
     text-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+/* Midnight Theme - Calendar Events */
+[data-theme="midnight"] .bg-blue-50 {
+    background-color: #1e1e2e !important;
+}
+
+[data-theme="midnight"] .bg-blue-100 {
+    background-color: #2a2540 !important;
+}
+
+[data-theme="midnight"] .text-blue-700 {
+    color: #c4b5fd !important;
+}
+
+[data-theme="midnight"] .hover\:bg-blue-200:hover {
+    background-color: #3a3550 !important;
 }
 
 /* Ocean Theme */

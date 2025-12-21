@@ -119,7 +119,7 @@ const themes = {
 
 // Apply theme to document
 function applyTheme(themeName) {
-    const theme = themes[themeName] || themes.default;
+    const theme = themes[themeName] || themes['dark-classic'];
     const root = document.documentElement;
 
     // Set theme data attribute
@@ -179,13 +179,13 @@ function getStoredTheme() {
     return fetch('/api/settings/theme')
         .then(response => response.json())
         .then(data => {
-            const theme = data.theme || 'default';
+            const theme = data.theme || 'dark-classic';
             localStorage.setItem('subtrackr-theme', theme);
             return theme;
         })
         .catch(err => {
             console.error('Failed to load theme:', err);
-            return 'default';
+            return 'dark-classic';
         });
 }
 
