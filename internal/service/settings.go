@@ -223,6 +223,10 @@ func (s *SettingsService) GetCurrencySymbol() string {
 		return "kr"
 	case "INR":
 		return "₹"
+	case "CHF":
+		return "Fr."
+	case "BRL":
+		return "R$"
 	default:
 		return "$"
 	}

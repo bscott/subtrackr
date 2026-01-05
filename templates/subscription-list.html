@@ -141,7 +141,14 @@
                 <td class="px-6 py-4 whitespace-nowrap">
                     {{if .ShowConversion}}
                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{.DisplayCurrencySymbol}}{{printf "%.2f" .ConvertedCost}}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400">{{.OriginalCurrency}} {{printf "%.2f" .Cost}}</div>
+                    <a href="https://fixer.io" target="_blank" rel="noopener"
+                       class="text-xs text-gray-500 dark:text-gray-400 hover:text-primary flex items-center gap-1"
+                       title="Original amount before conversion (rates from Fixer.io)">
+                        {{.OriginalCurrency}} {{printf "%.2f" .Cost}}
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </a>
                     {{else}}
                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</div>
                     {{end}}
