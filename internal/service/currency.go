@@ -15,7 +15,7 @@ import (
 )
 
 // SupportedCurrencies defines the list of currencies supported for exchange rates and settings
-var SupportedCurrencies = []string{"USD", "EUR", "GBP", "JPY", "RUB", "SEK", "PLN", "INR", "CHF", "BRL"}
+var SupportedCurrencies = []string{"USD", "EUR", "GBP", "JPY", "RUB", "SEK", "PLN", "INR", "CHF", "BRL", "COP"}
 
 // supportedCurrencySymbols returns the currencies as a comma-separated string for API calls
 func supportedCurrencySymbols() string {
