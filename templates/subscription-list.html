@@ -139,7 +139,12 @@
                     <div class="text-sm text-gray-900 dark:text-white">{{.Category.Name}}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
+                    {{if .ShowConversion}}
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{.DisplayCurrencySymbol}}{{printf "%.2f" .ConvertedCost}}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">{{.OriginalCurrency}} {{printf "%.2f" .Cost}}</div>
+                    {{else}}
                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</div>
+                    {{end}}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm text-gray-900 dark:text-white">{{.Schedule}}</div>
