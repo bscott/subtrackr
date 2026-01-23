@@ -7,6 +7,8 @@
 subtrackr
 main
 
+# Beads
+.beads/beads.db
 
 # Test binary, built with `go test -c`
 *.test
