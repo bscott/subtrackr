@@ -129,6 +129,7 @@ func main() {
 	// Serve static files
 	router.Static("/static", "./web/static")
 	router.StaticFile("/favicon.ico", "./web/static/favicon.ico")
+	router.StaticFile("/manifest.json", "./web/static/manifest.json")
 
 	// Health check endpoint with database connectivity check
 	router.GET("/healthz", func(c *gin.Context) {

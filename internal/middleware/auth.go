@@ -83,6 +83,15 @@ func isHTMLRequest(r *http.Request) bool {
 func APIKeyAuth(settingsService *service.SettingsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
+
+		// Also check Authorization: Bearer header
+		if apiKey == "" {
+			authHeader := c.GetHeader("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				apiKey = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
 		if apiKey == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "API key required"})
 			c.Abort()
