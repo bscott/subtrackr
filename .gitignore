@@ -7,8 +7,13 @@
 subtrackr
 main
 
-# Beads
+# Beads (keep issues.jsonl and interactions.jsonl for syncing)
 .beads/beads.db
+.beads/config.yaml
+.beads/metadata.json
+.beads/README.md
+.beads/.gitignore
+.beads/export-state/
 
 # Test binary, built with `go test -c`
 *.test
