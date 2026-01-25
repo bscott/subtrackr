@@ -166,27 +166,39 @@ subtrackr-xyz/
 - Dark mode support via class-based switching
 - Mobile-responsive design
 
-### Recent Changes (v0.4.5)
+### Recent Changes
 
-#### PR #51 - SMTP TLS/SSL Support
-- Added STARTTLS support for standard SMTP ports
-- Added implicit TLS support for SSL ports (465, 8465, 443)
-- Improved error messages for SSL vs STARTTLS failures
-- Added loading spinner to test connection button
-- Fixed authentication failures with SMTP2Go and similar providers
+#### v0.5.3 - Sort Persistence and PWA Support
+- Remember sorting preference (#85) - localStorage persistence
+- Fix Tab and PWA icon missing (#84) - favicon, apple-touch-icon, manifest.json
+- Input validation for sort parameters
+- PWA meta tags on all HTML templates
 
-### Open Issues for v0.4.5
+#### v0.5.2 - Currency Improvements
+- Enhanced currency support and conversion display
 
-1. **#50** - bug: cannot use SMTP2GO as an SMTP server (RESOLVED by PR #51)
-2. **#52** - Add Quarterly schedule option (enhancement)
-3. **#49** - feature request: add more type of schedule (enhancement)
-4. **#48** - bug: some elements in settings are white even in dark mode (bug)
-5. **#47** - [FR] Docker Healthcheck (enhancement)
-6. **#41** - How to handle bi-annual and odd subscription renewal schedules? (enhancement)
-7. **#39** - Mobile view improvement (enhancement)
-8. **#37** - Improve date parsing in subscription handlers (enhancement)
-9. **#29** - bug/feat?: Auto update "Next renewal date" after date passes (enhancement)
-10. **#27** - feat: Sorting on /subscriptions table (enhancement)
+#### v0.5.1 - Dark Classic Theme and Calendar Fixes
+- Dark classic theme option
+- Calendar view improvements
+
+#### v0.5.0 - Optional Login Support
+- Optional authentication system
+- Beautiful theme options
+
+### Release Workflow
+
+This project uses versioned branches for releases. See `CLAUDE.md` for the complete workflow.
+
+**Quick Reference:**
+1. Create versioned branch: `git checkout -b vX.Y.Z`
+2. Track work with beads: `bd create`, `bd update`, `bd close`
+3. Create draft release: `gh release create vX.Y.Z --draft`
+4. Run code review agent before committing
+5. Commit, push, create PR: `gh pr create`
+6. Comment on GitHub issues: `gh issue comment`
+7. Monitor CI: `gh run watch`
+8. Merge PR: `gh pr merge --merge --delete-branch`
+9. Publish release: `gh release edit vX.Y.Z --draft=false`
 
 ### Common Tasks
 
