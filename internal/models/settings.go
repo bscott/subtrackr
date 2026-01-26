@@ -24,6 +24,12 @@ type SMTPConfig struct {
 	To       string `json:"smtp_to"` // Recipient email address for notifications
 }
 
+// PushoverConfig represents Pushover notification configuration
+type PushoverConfig struct {
+	UserKey  string `json:"pushover_user_key"`  // Pushover user key
+	AppToken string `json:"pushover_app_token"` // Pushover application token
+}
+
 // NotificationSettings represents notification preferences
 type NotificationSettings struct {
 	RenewalReminders  bool    `json:"renewal_reminders"`
@@ -34,12 +40,12 @@ type NotificationSettings struct {
 
 // APIKey represents an API key for external access
 type APIKey struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	Name        string    `json:"name" gorm:"not null"`
-	Key         string    `json:"key" gorm:"uniqueIndex;not null"`
-	LastUsed    *time.Time `json:"last_used"`
-	UsageCount  int       `json:"usage_count" gorm:"default:0"`
-	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
-	IsNew       bool      `json:"is_new" gorm:"-"` // Not stored in DB, just for display
+	ID         uint       `json:"id" gorm:"primaryKey"`
+	Name       string     `json:"name" gorm:"not null"`
+	Key        string     `json:"key" gorm:"uniqueIndex;not null"`
+	LastUsed   *time.Time `json:"last_used"`
+	UsageCount int        `json:"usage_count" gorm:"default:0"`
+	CreatedAt  time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt  time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+	IsNew      bool       `json:"is_new" gorm:"-"` // Not stored in DB, just for display
 }

@@ -56,6 +56,7 @@ func main() {
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
 	settingsService := service.NewSettingsService(settingsRepo)
 	emailService := service.NewEmailService(settingsService)
+	pushoverService := service.NewPushoverService(settingsService)
 	logoService := service.NewLogoService()
 
 	// Handle CLI commands (run before starting HTTP server)
@@ -77,7 +78,7 @@ func main() {
 	sessionService := service.NewSessionService(sessionSecret)
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, logoService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, pushoverService, logoService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	authHandler := handlers.NewAuthHandler(settingsService, sessionService, emailService)
@@ -170,7 +171,7 @@ func main() {
 	// }
 
 	// Start renewal reminder scheduler
-	go startRenewalReminderScheduler(subscriptionService, emailService, settingsService)
+	go startRenewalReminderScheduler(subscriptionService, emailService, pushoverService, settingsService)
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -334,6 +335,9 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		// Settings routes
 		api.POST("/settings/smtp", settingsHandler.SaveSMTPSettings)
 		api.POST("/settings/smtp/test", settingsHandler.TestSMTPConnection)
+		api.POST("/settings/pushover", settingsHandler.SavePushoverSettings)
+		api.POST("/settings/pushover/test", settingsHandler.TestPushoverConnection)
+		api.GET("/settings/pushover", settingsHandler.GetPushoverConfig)
 		api.POST("/settings/notifications/:setting", settingsHandler.UpdateNotificationSetting)
 		api.GET("/settings/notifications", settingsHandler.GetNotificationSettings)
 		api.GET("/settings/smtp", settingsHandler.GetSMTPConfig)
@@ -390,12 +394,12 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 }
 
 // startRenewalReminderScheduler starts a background goroutine that checks for
-// upcoming renewals and sends reminder emails daily
-func startRenewalReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, settingsService *service.SettingsService) {
+// upcoming renewals and sends reminder emails and Pushover notifications daily
+func startRenewalReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, settingsService *service.SettingsService) {
 	// Run immediately on startup (after a short delay to let server initialize)
 	go func() {
 		time.Sleep(30 * time.Second) // Wait 30 seconds for server to fully start
-		checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+		checkAndSendRenewalReminders(subscriptionService, emailService, pushoverService, settingsService)
 	}()
 
 	// Then run daily at midnight
@@ -412,14 +416,14 @@ func startRenewalReminderScheduler(subscriptionService *service.SubscriptionServ
 						log.Printf("Panic in renewal reminder check: %v", r)
 					}
 				}()
-				checkAndSendRenewalReminders(subscriptionService, emailService, settingsService)
+				checkAndSendRenewalReminders(subscriptionService, emailService, pushoverService, settingsService)
 			}()
 		}
 	}()
 }
 
-// checkAndSendRenewalReminders checks for subscriptions needing reminders and sends emails
-func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, settingsService *service.SettingsService) {
+// checkAndSendRenewalReminders checks for subscriptions needing reminders and sends emails and Pushover notifications
+func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, settingsService *service.SettingsService) {
 	// Check if renewal reminders are enabled
 	enabled, err := settingsService.GetBoolSetting("renewal_reminders", false)
 	if err != nil || !enabled {
@@ -446,13 +450,16 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 
 	log.Printf("Checking %d subscription(s) for renewal reminders", len(subscriptions))
 
-	// Send reminder for each subscription
+	// Send reminder for each subscription (both email and Pushover)
 	sentCount := 0
 	failedCount := 0
 	for sub, daysUntil := range subscriptions {
-		err := emailService.SendRenewalReminder(sub, daysUntil)
-		if err != nil {
-			log.Printf("Error sending renewal reminder for subscription %s (ID: %d): %v", sub.Name, sub.ID, err)
+		emailErr := emailService.SendRenewalReminder(sub, daysUntil)
+		pushoverErr := pushoverService.SendRenewalReminder(sub, daysUntil)
+
+		// If both fail, count as failed; otherwise consider it sent
+		if emailErr != nil && pushoverErr != nil {
+			log.Printf("Error sending renewal reminder for subscription %s (ID: %d): email=%v, pushover=%v", sub.Name, sub.ID, emailErr, pushoverErr)
 			failedCount++
 		} else {
 			// Mark reminder as sent for this renewal date
@@ -469,7 +476,13 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 				log.Printf("Warning: Failed to update last reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
 			}
 
-			log.Printf("Sent renewal reminder for subscription %s (renews in %d days)", sub.Name, daysUntil)
+			if emailErr != nil {
+				log.Printf("Sent Pushover renewal reminder for subscription %s (renews in %d days) - email failed: %v", sub.Name, daysUntil, emailErr)
+			} else if pushoverErr != nil {
+				log.Printf("Sent email renewal reminder for subscription %s (renews in %d days) - Pushover failed: %v", sub.Name, daysUntil, pushoverErr)
+			} else {
+				log.Printf("Sent renewal reminders (email and Pushover) for subscription %s (renews in %d days)", sub.Name, daysUntil)
+			}
 			sentCount++
 		}
 	}

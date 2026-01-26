@@ -481,6 +481,108 @@ func (h *SettingsHandler) GetTheme(c *gin.Context) {
 	})
 }
 
+// SavePushoverSettings saves Pushover configuration
+func (h *SettingsHandler) SavePushoverSettings(c *gin.Context) {
+	var config models.PushoverConfig
+
+	// Parse form data
+	config.UserKey = c.PostForm("pushover_user_key")
+	config.AppToken = c.PostForm("pushover_app_token")
+
+	// Validate required fields
+	if config.UserKey == "" || config.AppToken == "" {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "User Key and App Token are required",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Save configuration
+	err := h.service.SavePushoverConfig(&config)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "smtp-message.html", gin.H{
+			"Error": err.Error(),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
+		"Message": "Pushover settings saved successfully",
+		"Type":    "success",
+	})
+}
+
+// TestPushoverConnection tests Pushover configuration
+func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
+	var config models.PushoverConfig
+
+	// Parse form data
+	config.UserKey = c.PostForm("pushover_user_key")
+	config.AppToken = c.PostForm("pushover_app_token")
+
+	// Validate required fields
+	if config.UserKey == "" || config.AppToken == "" {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "User Key and App Token are required for testing",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Create a temporary PushoverService to test
+	pushoverService := service.NewPushoverService(h.service)
+
+	// Temporarily save config for testing
+	originalConfig, _ := h.service.GetPushoverConfig()
+	defer func() {
+		if originalConfig != nil {
+			h.service.SavePushoverConfig(originalConfig)
+		}
+	}()
+
+	// Save test config
+	if err := h.service.SavePushoverConfig(&config); err != nil {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": fmt.Sprintf("Failed to save test config: %v", err),
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Send test notification
+	err := pushoverService.SendNotification("SubTrackr Test", "This is a test notification from SubTrackr. If you received this, your Pushover configuration is working correctly!", 0)
+	if err != nil {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": fmt.Sprintf("Failed to send test notification: %v", err),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
+		"Message": "Pushover connection test successful! Check your device for the test notification.",
+		"Type":    "success",
+	})
+}
+
+// GetPushoverConfig returns current Pushover configuration (without sensitive data)
+func (h *SettingsHandler) GetPushoverConfig(c *gin.Context) {
+	config, err := h.service.GetPushoverConfig()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"configured": false})
+		return
+	}
+
+	// Don't send the full token, just indicate if configured
+	c.JSON(http.StatusOK, gin.H{
+		"configured":    true,
+		"has_user_key":  config.UserKey != "",
+		"has_app_token": config.AppToken != "",
+	})
+}
+
 // SetTheme saves the theme preference
 func (h *SettingsHandler) SetTheme(c *gin.Context) {
 	var req struct {

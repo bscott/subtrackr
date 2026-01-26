@@ -175,3 +175,116 @@ func TestCurrencyService_Integration_SupportedCurrencies(t *testing.T) {
 		})
 	}
 }
+
+func TestCurrencyService_Integration_BDTCurrency(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+	service := NewCurrencyService(repo)
+
+	// Test BDT currency support
+	t.Run("BDT same currency conversion", func(t *testing.T) {
+		result, err := service.ConvertAmount(100.0, "BDT", "BDT")
+		assert.NoError(t, err, "BDT should be supported")
+		assert.Equal(t, 100.0, result, "Same currency conversion should return same amount")
+	})
+
+	t.Run("BDT in SupportedCurrencies list", func(t *testing.T) {
+		found := false
+		for _, currency := range SupportedCurrencies {
+			if currency == "BDT" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "BDT should be in SupportedCurrencies list")
+	})
+}
+
+func TestSettingsService_GetCurrencySymbol_BDT(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+
+	err = db.AutoMigrate(&models.Settings{})
+	if err != nil {
+		t.Fatalf("Failed to migrate test database: %v", err)
+	}
+
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsService := NewSettingsService(settingsRepo)
+
+	// Set currency to BDT
+	err = settingsService.SetCurrency("BDT")
+	assert.NoError(t, err, "Should be able to set BDT currency")
+
+	// Get currency symbol
+	symbol := settingsService.GetCurrencySymbol()
+	assert.Equal(t, "৳", symbol, "BDT currency symbol should be ৳")
+
+	// Verify currency is set correctly
+	currency := settingsService.GetCurrency()
+	assert.Equal(t, "BDT", currency, "Currency should be BDT")
+}
+
+func TestSettingsService_SetCurrency_BDT(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+
+	err = db.AutoMigrate(&models.Settings{})
+	if err != nil {
+		t.Fatalf("Failed to migrate test database: %v", err)
+	}
+
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsService := NewSettingsService(settingsRepo)
+
+	tests := []struct {
+		name           string
+		currency       string
+		shouldSucceed  bool
+		expectedSymbol string
+	}{
+		{
+			name:           "Valid BDT currency",
+			currency:       "BDT",
+			shouldSucceed:  true,
+			expectedSymbol: "৳",
+		},
+		{
+			name:          "Invalid currency",
+			currency:      "XYZ",
+			shouldSucceed: false,
+		},
+		{
+			name:           "Other valid currencies",
+			currency:       "USD",
+			shouldSucceed:  true,
+			expectedSymbol: "$",
+		},
+		{
+			name:           "EUR currency",
+			currency:       "EUR",
+			shouldSucceed:  true,
+			expectedSymbol: "€",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := settingsService.SetCurrency(tt.currency)
+			if tt.shouldSucceed {
+				assert.NoError(t, err, "Should succeed for valid currency")
+				if tt.expectedSymbol != "" {
+					symbol := settingsService.GetCurrencySymbol()
+					assert.Equal(t, tt.expectedSymbol, symbol, "Currency symbol should match")
+				}
+			} else {
+				assert.Error(t, err, "Should fail for invalid currency")
+				assert.Contains(t, err.Error(), "invalid currency", "Error should mention invalid currency")
+			}
+		})
+	}
+}
