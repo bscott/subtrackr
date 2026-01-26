@@ -227,6 +227,8 @@ func (s *SettingsService) GetCurrencySymbol() string {
 		return "Fr."
 	case "BRL":
 		return "R$"
+	case "BDT":
+		return "৳"
 	default:
 		return "$"
 	}
@@ -394,4 +396,31 @@ func (s *SettingsService) ClearResetToken() error {
 	s.repo.Delete("auth_reset_token")
 	s.repo.Delete("auth_reset_token_expiry")
 	return nil
+}
+
+// SavePushoverConfig saves Pushover configuration
+func (s *SettingsService) SavePushoverConfig(config *models.PushoverConfig) error {
+	// Convert to JSON
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	
+	return s.repo.Set("pushover_config", string(data))
+}
+
+// GetPushoverConfig retrieves Pushover configuration
+func (s *SettingsService) GetPushoverConfig() (*models.PushoverConfig, error) {
+	data, err := s.repo.Get("pushover_config")
+	if err != nil {
+		return nil, err
+	}
+	
+	var config models.PushoverConfig
+	err = json.Unmarshal([]byte(data), &config)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &config, nil
 }
