@@ -28,6 +28,8 @@ type Subscription struct {
 	DateCalculationVersion int        `json:"date_calculation_version" gorm:"default:1"`
 	LastReminderSent       *time.Time `json:"last_reminder_sent" gorm:""` // Tracks when the last reminder was sent
 	LastReminderRenewalDate *time.Time `json:"last_reminder_renewal_date" gorm:""` // Tracks which renewal date the last reminder was for
+	LastCancellationReminderSent *time.Time `json:"last_cancellation_reminder_sent" gorm:""` // Tracks when the last cancellation reminder was sent
+	LastCancellationReminderDate *time.Time `json:"last_cancellation_reminder_date" gorm:""` // Tracks which cancellation date the last reminder was for
 	CreatedAt              time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt              time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }

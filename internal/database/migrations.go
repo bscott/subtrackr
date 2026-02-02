@@ -22,6 +22,7 @@ func RunMigrations(db *gorm.DB) error {
 		migrateDateCalculationVersioning,
 		migrateSubscriptionIcons,
 		migrateReminderTracking,
+		migrateCancellationReminderTracking,
 	}
 
 	for _, migration := range migrations {
@@ -207,5 +208,32 @@ func migrateReminderTracking(db *gorm.DB) error {
 	}
 
 	log.Println("Migration completed: Reminder tracking fields added")
+	return nil
+}
+
+// migrateCancellationReminderTracking adds fields to track when cancellation reminders were sent
+func migrateCancellationReminderTracking(db *gorm.DB) error {
+	// Check if last_cancellation_reminder_sent column already exists
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='last_cancellation_reminder_sent'").Scan(&count)
+
+	if count > 0 {
+		// Migration already completed
+		return nil
+	}
+
+	log.Println("Running migration: Adding cancellation reminder tracking fields...")
+
+	// Add last_cancellation_reminder_sent column
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN last_cancellation_reminder_sent DATETIME").Error; err != nil {
+		log.Printf("Note: Could not add last_cancellation_reminder_sent column: %v", err)
+	}
+
+	// Add last_cancellation_reminder_date column
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN last_cancellation_reminder_date DATETIME").Error; err != nil {
+		log.Printf("Note: Could not add last_cancellation_reminder_date column: %v", err)
+	}
+
+	log.Println("Migration completed: Cancellation reminder tracking fields added")
 	return nil
 }
