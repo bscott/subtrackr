@@ -220,6 +220,28 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid threshold value (must be between 0 and 10000)"})
 		}
 
+	case "cancellation":
+		current, _ := h.service.GetBoolSetting("cancellation_reminders", false)
+		err := h.service.SetBoolSetting("cancellation_reminders", !current)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"enabled": !current})
+
+	case "cancellation_days":
+		daysStr := c.PostForm("cancellation_reminder_days")
+		if days, err := strconv.Atoi(daysStr); err == nil && days > 0 && days <= 30 {
+			err := h.service.SetIntSetting("cancellation_reminder_days", days)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"days": days})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid days value"})
+		}
+
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown setting"})
 	}
@@ -228,10 +250,12 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 // GetNotificationSettings returns current notification settings
 func (h *SettingsHandler) GetNotificationSettings(c *gin.Context) {
 	settings := models.NotificationSettings{
-		RenewalReminders:  h.service.GetBoolSettingWithDefault("renewal_reminders", false),
-		HighCostAlerts:    h.service.GetBoolSettingWithDefault("high_cost_alerts", true),
-		HighCostThreshold: h.service.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
-		ReminderDays:      h.service.GetIntSettingWithDefault("reminder_days", 7),
+		RenewalReminders:         h.service.GetBoolSettingWithDefault("renewal_reminders", false),
+		HighCostAlerts:           h.service.GetBoolSettingWithDefault("high_cost_alerts", true),
+		HighCostThreshold:        h.service.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
+		ReminderDays:             h.service.GetIntSettingWithDefault("reminder_days", 7),
+		CancellationReminders:    h.service.GetBoolSettingWithDefault("cancellation_reminders", false),
+		CancellationReminderDays: h.service.GetIntSettingWithDefault("cancellation_reminder_days", 7),
 	}
 
 	c.JSON(http.StatusOK, settings)
@@ -478,6 +502,114 @@ func (h *SettingsHandler) GetTheme(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"theme": theme,
+	})
+}
+
+// SavePushoverSettings saves Pushover configuration
+func (h *SettingsHandler) SavePushoverSettings(c *gin.Context) {
+	var config models.PushoverConfig
+
+	// Parse form data
+	config.UserKey = c.PostForm("pushover_user_key")
+	config.AppToken = c.PostForm("pushover_app_token")
+
+	// Validate required fields
+	if config.UserKey == "" || config.AppToken == "" {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "User Key and App Token are required",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Save configuration
+	err := h.service.SavePushoverConfig(&config)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "smtp-message.html", gin.H{
+			"Error": err.Error(),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
+		"Message": "Pushover settings saved successfully",
+		"Type":    "success",
+	})
+}
+
+// TestPushoverConnection tests Pushover configuration
+func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
+	var config models.PushoverConfig
+
+	// Parse form data
+	config.UserKey = c.PostForm("pushover_user_key")
+	config.AppToken = c.PostForm("pushover_app_token")
+
+	// Validate required fields
+	if config.UserKey == "" || config.AppToken == "" {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "User Key and App Token are required for testing",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Create a temporary PushoverService to test
+	pushoverService := service.NewPushoverService(h.service)
+
+	// Temporarily save config for testing
+	originalConfig, _ := h.service.GetPushoverConfig()
+	defer func() {
+		if originalConfig != nil {
+			h.service.SavePushoverConfig(originalConfig)
+		} else {
+			// No original config existed, so delete the test config by saving empty values
+			h.service.SavePushoverConfig(&models.PushoverConfig{
+				UserKey:  "",
+				AppToken: "",
+			})
+		}
+	}()
+
+	// Save test config
+	if err := h.service.SavePushoverConfig(&config); err != nil {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": fmt.Sprintf("Failed to save test config: %v", err),
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Send test notification
+	err := pushoverService.SendNotification("SubTrackr Test", "This is a test notification from SubTrackr. If you received this, your Pushover configuration is working correctly!", 0)
+	if err != nil {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": fmt.Sprintf("Failed to send test notification: %v", err),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
+		"Message": "Pushover connection test successful! Check your device for the test notification.",
+		"Type":    "success",
+	})
+}
+
+// GetPushoverConfig returns current Pushover configuration (without sensitive data)
+func (h *SettingsHandler) GetPushoverConfig(c *gin.Context) {
+	config, err := h.service.GetPushoverConfig()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"configured": false})
+		return
+	}
+
+	// Don't send the full token, just indicate if configured
+	c.JSON(http.StatusOK, gin.H{
+		"configured":    true,
+		"has_user_key":  config.UserKey != "",
+		"has_app_token": config.AppToken != "",
 	})
 }
 

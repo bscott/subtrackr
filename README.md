@@ -51,9 +51,10 @@ Themes persist across all pages and are saved per user. Change themes anytime fr
 - 📅 **Calendar View**: Visual calendar showing all subscription renewal dates with iCal export
 - 📈 **Analytics**: Visualize spending by category and track savings
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
+- 📱 **Pushover Notifications**: Receive push notifications on your mobile device
 - 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
 - 🎨 **Beautiful Themes**: 5 stunning themes including a festive Christmas theme with snowfall animation
-- 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, and INR (with optional real-time conversion)
+- 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, and BDT (with optional real-time conversion)
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
 - 📱 **Mobile Responsive**: Optimized mobile experience with hamburger menu navigation
@@ -251,7 +252,7 @@ SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
 
 **Note:** The free Fixer.io plan only allows EUR as the base currency. SubTrackr automatically handles cross-rate calculations (e.g., USD→INR goes through EUR) so all currency conversions work correctly regardless of this limitation.
 
-**Supported currencies:** USD, EUR, GBP, JPY, RUB, SEK, PLN, INR
+**Supported currencies:** USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT
 
 ### Email Notifications (SMTP)
 
@@ -264,6 +265,27 @@ Configure SMTP settings in the web interface:
    - **Custom**: Your SMTP server details
 3. Test connection
 4. Enable renewal reminders
+
+### Pushover Notifications
+
+Receive push notifications on your mobile device via Pushover:
+
+1. **Get your Pushover credentials**:
+   - Sign up at [pushover.net](https://pushover.net/) (free account)
+   - Get your User Key from the dashboard
+   - Create an application at [pushover.net/apps/build](https://pushover.net/apps/build) to get an Application Token
+
+2. **Configure in SubTrackr**:
+   - Navigate to Settings → Pushover Notifications
+   - Enter your User Key and Application Token
+   - Click "Test Connection" to verify configuration
+   - Save settings
+
+3. **Notification Types**:
+   - **Renewal Reminders**: Get notified before subscriptions renew (uses the same reminder days setting as email)
+   - **High Cost Alerts**: Receive alerts when adding expensive subscriptions (uses the same threshold as email alerts)
+
+**Note**: Pushover notifications work alongside email notifications. Both will be sent when enabled, giving you multiple ways to stay informed about your subscriptions.
 
 ### Data Persistence
 

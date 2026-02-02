@@ -44,7 +44,7 @@ subtrackr-xyz/
 
 #### 2. Handlers (`internal/handlers/`)
 - **subscription.go**: CRUD operations for subscriptions
-- **settings.go**: SMTP config, notifications, API keys, currency, dark mode
+- **settings.go**: SMTP config, Pushover config, notifications, API keys, currency, dark mode
 - **category.go**: Category management
 
 #### 3. Services (`internal/service/`)
@@ -53,6 +53,8 @@ subtrackr-xyz/
 - **settings.go**: Settings management
 - **category.go**: Category operations
 - **currency.go**: Currency conversion (Fixer.io integration)
+- **email.go**: Email notification service (SMTP)
+- **pushover.go**: Pushover notification service
 
 #### 4. Models (`internal/models/`)
 - GORM models:
@@ -60,6 +62,7 @@ subtrackr-xyz/
   - `Category`: Subscription categories
   - `Settings`: Application settings (key-value store)
   - `SMTPConfig`: Email configuration
+  - `PushoverConfig`: Pushover notification configuration
   - `APIKey`: API authentication keys
   - `ExchangeRate`: Currency exchange rates
 
@@ -122,12 +125,20 @@ subtrackr-xyz/
    - Renewal reminders
    - High cost alerts
 
-3. **Currency Support**
-   - USD, EUR, GBP, JPY, RUB, SEK, PLN, INR
+3. **Pushover Notifications**
+   - Pushover API integration for mobile push notifications
+   - User Key and Application Token configuration
+   - Renewal reminders (same settings as email)
+   - High cost alerts (same threshold as email)
+   - Works alongside email notifications
+
+4. **Currency Support**
+   - USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT
    - Optional Fixer.io integration for real-time rates
    - Automatic conversion display
+   - BDT (Bangladeshi Taka) with ৳ symbol
 
-4. **API Access**
+5. **API Access**
    - API key authentication
    - RESTful endpoints
    - JSON responses
@@ -218,9 +229,19 @@ This project uses versioned branches for releases. See `CLAUDE.md` for the compl
 4. Update date calculation logic if needed
 
 #### Adding a New Currency
-1. Update currency service with new symbol
-2. Add to currency selection in settings template
-3. Update exchange rate handling if using Fixer.io
+1. Add currency code to `SupportedCurrencies` in `internal/service/currency.go`
+2. Add currency symbol mapping in `GetCurrencySymbol()` in `internal/service/settings.go`
+3. Add currency option to currency selection in `templates/settings.html`
+4. Update exchange rate handling if using Fixer.io
+
+#### Adding a New Notification Method
+1. Create notification config model in `internal/models/settings.go`
+2. Create notification service in `internal/service/` (e.g., `pushover.go`)
+3. Add config save/get methods to `SettingsService`
+4. Add handlers in `internal/handlers/settings.go`
+5. Add UI in `templates/settings.html`
+6. Update subscription handler to send notifications
+7. Update renewal reminder scheduler in `cmd/server/main.go`
 
 ### Environment Variables
 

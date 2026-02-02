@@ -32,15 +32,17 @@ type SubscriptionHandler struct {
 	settingsService *service.SettingsService
 	currencyService *service.CurrencyService
 	emailService    *service.EmailService
+	pushoverService *service.PushoverService
 	logoService     *service.LogoService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, logoService *service.LogoService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, logoService *service.LogoService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
 		currencyService: currencyService,
 		emailService:    emailService,
+		pushoverService: pushoverService,
 		logoService:     logoService,
 	}
 }
@@ -394,25 +396,38 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		smtpConfigured = true
 	}
 
+	// Load Pushover config if available
+	var pushoverConfig *models.PushoverConfig
+	pushoverConfigured := false
+	pushoverCfg, err := h.settingsService.GetPushoverConfig()
+	if err == nil && pushoverCfg != nil {
+		pushoverConfig = pushoverCfg
+		pushoverConfigured = true
+	}
+
 	// Get auth settings
 	authEnabled := h.settingsService.IsAuthEnabled()
 	authUsername, _ := h.settingsService.GetAuthUsername()
 
 	c.HTML(http.StatusOK, "settings.html", gin.H{
-		"Title":              "Settings",
-		"CurrentPage":        "settings",
-		"Currency":           h.settingsService.GetCurrency(),
-		"CurrencySymbol":     h.settingsService.GetCurrencySymbol(),
-		"RenewalReminders":   h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
-		"HighCostAlerts":     h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
-		"HighCostThreshold":  h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
-		"ReminderDays":       h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
-		"DarkMode":           h.settingsService.IsDarkModeEnabled(),
-		"Version":            version.GetVersion(),
-		"SMTPConfig":         smtpConfig,
-		"SMTPConfigured":     smtpConfigured,
-		"AuthEnabled":        authEnabled,
-		"AuthUsername":       authUsername,
+		"Title":                     "Settings",
+		"CurrentPage":               "settings",
+		"Currency":                  h.settingsService.GetCurrency(),
+		"CurrencySymbol":            h.settingsService.GetCurrencySymbol(),
+		"RenewalReminders":          h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
+		"HighCostAlerts":            h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
+		"PushoverConfig":            pushoverConfig,
+		"PushoverConfigured":        pushoverConfigured,
+		"HighCostThreshold":         h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
+		"ReminderDays":              h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
+		"CancellationReminders":     h.settingsService.GetBoolSettingWithDefault("cancellation_reminders", false),
+		"CancellationReminderDays":  h.settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7),
+		"DarkMode":                  h.settingsService.IsDarkModeEnabled(),
+		"Version":                   version.GetVersion(),
+		"SMTPConfig":                smtpConfig,
+		"SMTPConfigured":            smtpConfigured,
+		"AuthEnabled":               authEnabled,
+		"AuthUsername":              authUsername,
 	})
 }
 
@@ -512,14 +527,20 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		return
 	}
 
-	// Send high-cost alert email if applicable
+	// Send high-cost alert email and Pushover notification if applicable
 	if h.isHighCostWithCurrency(created) {
 		// Reload subscription with category for email template
 		subscriptionWithCategory, err := h.service.GetByID(created.ID)
 		if err == nil && subscriptionWithCategory != nil {
+			// Send email notification
 			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
 				// Log error but don't fail the request
 				log.Printf("Failed to send high-cost alert email: %v", err)
+			}
+			// Send Pushover notification
+			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				// Log error but don't fail the request
+				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
 			}
 		}
 	}
@@ -618,14 +639,20 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		return
 	}
 
-	// Send high-cost alert email if subscription became high-cost (wasn't before, but is now)
+	// Send high-cost alert email and Pushover notification if subscription became high-cost (wasn't before, but is now)
 	if updated != nil && !wasHighCost && h.isHighCostWithCurrency(updated) {
 		// Reload subscription with category for email template
 		subscriptionWithCategory, err := h.service.GetByID(updated.ID)
 		if err == nil && subscriptionWithCategory != nil {
+			// Send email notification
 			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
 				// Log error but don't fail the request
 				log.Printf("Failed to send high-cost alert email: %v", err)
+			}
+			// Send Pushover notification
+			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				// Log error but don't fail the request
+				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
 			}
 		}
 	}

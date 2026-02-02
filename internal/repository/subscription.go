@@ -248,6 +248,17 @@ func (r *SubscriptionRepository) GetUpcomingRenewals(days int) ([]models.Subscri
 	return subscriptions, nil
 }
 
+func (r *SubscriptionRepository) GetUpcomingCancellations(days int) ([]models.Subscription, error) {
+	var subscriptions []models.Subscription
+	endDate := time.Now().AddDate(0, 0, days)
+
+	if err := r.db.Where("status = ? AND cancellation_date IS NOT NULL AND cancellation_date BETWEEN ? AND ?",
+		"Cancelled", time.Now(), endDate).Find(&subscriptions).Error; err != nil {
+		return nil, err
+	}
+	return subscriptions, nil
+}
+
 func (r *SubscriptionRepository) GetCategoryStats() ([]models.CategoryStat, error) {
 	var stats []models.CategoryStat
 	if err := r.db.Table("subscriptions").
