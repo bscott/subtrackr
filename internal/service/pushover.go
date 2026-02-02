@@ -154,3 +154,39 @@ func (p *PushoverService) SendRenewalReminder(subscription *models.Subscription,
 	return p.SendNotification(title, message, 0)
 }
 
+// SendCancellationReminder sends a Pushover reminder for an upcoming subscription cancellation
+func (p *PushoverService) SendCancellationReminder(subscription *models.Subscription, daysUntilCancellation int) error {
+	// Check if cancellation reminders are enabled
+	enabled, err := p.settingsService.GetBoolSetting("cancellation_reminders", false)
+	if err != nil || !enabled {
+		return nil // Silently skip if disabled
+	}
+
+	// Get currency symbol
+	currencySymbol := p.settingsService.GetCurrencySymbol()
+
+	// Build message
+	daysText := "days"
+	if daysUntilCancellation == 1 {
+		daysText = "day"
+	}
+	message := "⚠️ Cancellation Reminder\n\n"
+	message += fmt.Sprintf("Your subscription %s will end in %d %s.\n\n", subscription.Name, daysUntilCancellation, daysText)
+	message += "Subscription Details:\n"
+	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.Schedule)
+	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, subscription.MonthlyCost())
+	if subscription.Category.Name != "" {
+		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
+	}
+	if subscription.CancellationDate != nil {
+		message += fmt.Sprintf("Cancellation Date: %s\n", subscription.CancellationDate.Format("January 2, 2006"))
+	}
+	if subscription.URL != "" {
+		message += fmt.Sprintf("URL: %s", subscription.URL)
+	}
+
+	title := fmt.Sprintf("Cancellation Reminder: %s", subscription.Name)
+	// Priority 0 = normal priority
+	return p.SendNotification(title, message, 0)
+}
+

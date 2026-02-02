@@ -220,6 +220,28 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid threshold value (must be between 0 and 10000)"})
 		}
 
+	case "cancellation":
+		current, _ := h.service.GetBoolSetting("cancellation_reminders", false)
+		err := h.service.SetBoolSetting("cancellation_reminders", !current)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"enabled": !current})
+
+	case "cancellation_days":
+		daysStr := c.PostForm("cancellation_reminder_days")
+		if days, err := strconv.Atoi(daysStr); err == nil && days > 0 && days <= 30 {
+			err := h.service.SetIntSetting("cancellation_reminder_days", days)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"days": days})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid days value"})
+		}
+
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown setting"})
 	}
@@ -228,10 +250,12 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 // GetNotificationSettings returns current notification settings
 func (h *SettingsHandler) GetNotificationSettings(c *gin.Context) {
 	settings := models.NotificationSettings{
-		RenewalReminders:  h.service.GetBoolSettingWithDefault("renewal_reminders", false),
-		HighCostAlerts:    h.service.GetBoolSettingWithDefault("high_cost_alerts", true),
-		HighCostThreshold: h.service.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
-		ReminderDays:      h.service.GetIntSettingWithDefault("reminder_days", 7),
+		RenewalReminders:         h.service.GetBoolSettingWithDefault("renewal_reminders", false),
+		HighCostAlerts:           h.service.GetBoolSettingWithDefault("high_cost_alerts", true),
+		HighCostThreshold:        h.service.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
+		ReminderDays:             h.service.GetIntSettingWithDefault("reminder_days", 7),
+		CancellationReminders:    h.service.GetBoolSettingWithDefault("cancellation_reminders", false),
+		CancellationReminderDays: h.service.GetIntSettingWithDefault("cancellation_reminder_days", 7),
 	}
 
 	c.JSON(http.StatusOK, settings)

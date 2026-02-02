@@ -137,3 +137,44 @@ func (s *SubscriptionService) GetSubscriptionsNeedingReminders(reminderDays int)
 
 	return result, nil
 }
+
+// GetSubscriptionsNeedingCancellationReminders returns subscriptions that need cancellation reminders
+// based on the cancellation_reminder_days setting. It returns a map of subscription to days until cancellation.
+func (s *SubscriptionService) GetSubscriptionsNeedingCancellationReminders(reminderDays int) (map[*models.Subscription]int, error) {
+	if reminderDays <= 0 {
+		return make(map[*models.Subscription]int), nil
+	}
+
+	// Get all subscriptions with cancellations in the next reminderDays
+	subscriptions, err := s.repo.GetUpcomingCancellations(reminderDays)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[*models.Subscription]int)
+
+	for i := range subscriptions {
+		sub := &subscriptions[i]
+		if sub.CancellationDate == nil {
+			continue
+		}
+
+		// Calculate days until cancellation
+		daysUntil := int(time.Until(*sub.CancellationDate).Hours() / 24)
+
+		// Only include if within the reminder window and not past due
+		if daysUntil >= 0 && daysUntil <= reminderDays {
+			// Check if we've already sent a reminder for this cancellation date
+			if sub.LastCancellationReminderDate != nil &&
+				sub.CancellationDate != nil &&
+				sub.LastCancellationReminderDate.Equal(*sub.CancellationDate) {
+				// Already sent reminder for this cancellation date, skip
+				continue
+			}
+
+			result[sub] = daysUntil
+		}
+	}
+
+	return result, nil
+}

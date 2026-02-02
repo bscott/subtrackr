@@ -173,6 +173,9 @@ func main() {
 	// Start renewal reminder scheduler
 	go startRenewalReminderScheduler(subscriptionService, emailService, pushoverService, settingsService)
 
+	// Start cancellation reminder scheduler
+	go startCancellationReminderScheduler(subscriptionService, emailService, pushoverService, settingsService)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -488,6 +491,103 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 	}
 
 	log.Printf("Renewal reminder check complete: %d sent, %d failed", sentCount, failedCount)
+}
+
+// startCancellationReminderScheduler starts a background goroutine that checks for
+// upcoming cancellations and sends reminder emails and Pushover notifications daily
+func startCancellationReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, settingsService *service.SettingsService) {
+	// Run immediately on startup (after a short delay to let server initialize)
+	go func() {
+		time.Sleep(30 * time.Second) // Wait 30 seconds for server to fully start
+		checkAndSendCancellationReminders(subscriptionService, emailService, pushoverService, settingsService)
+	}()
+
+	// Then run daily at midnight
+	// Note: Ticker is intentionally not stopped as this is a long-running server process.
+	// The ticker will run for the lifetime of the application, which is the desired behavior.
+	ticker := time.NewTicker(24 * time.Hour)
+	go func() {
+		defer ticker.Stop() // Clean up ticker if goroutine exits (defensive programming)
+		for range ticker.C {
+			// Recover from any panics in the reminder check to keep the scheduler running
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("Panic in cancellation reminder check: %v", r)
+					}
+				}()
+				checkAndSendCancellationReminders(subscriptionService, emailService, pushoverService, settingsService)
+			}()
+		}
+	}()
+}
+
+// checkAndSendCancellationReminders checks for subscriptions needing cancellation reminders and sends emails and Pushover notifications
+func checkAndSendCancellationReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, settingsService *service.SettingsService) {
+	// Check if cancellation reminders are enabled
+	enabled, err := settingsService.GetBoolSetting("cancellation_reminders", false)
+	if err != nil || !enabled {
+		return // Silently skip if disabled or error
+	}
+
+	// Get reminder days setting
+	reminderDays := settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7)
+	if reminderDays <= 0 {
+		return // No reminders if days is 0 or negative
+	}
+
+	// Get subscriptions needing cancellation reminders
+	subscriptions, err := subscriptionService.GetSubscriptionsNeedingCancellationReminders(reminderDays)
+	if err != nil {
+		log.Printf("Error getting subscriptions for cancellation reminders: %v", err)
+		return
+	}
+
+	if len(subscriptions) == 0 {
+		log.Printf("No subscriptions need cancellation reminders today")
+		return
+	}
+
+	log.Printf("Checking %d subscription(s) for cancellation reminders", len(subscriptions))
+
+	// Send reminder for each subscription (both email and Pushover)
+	sentCount := 0
+	failedCount := 0
+	for sub, daysUntil := range subscriptions {
+		emailErr := emailService.SendCancellationReminder(sub, daysUntil)
+		pushoverErr := pushoverService.SendCancellationReminder(sub, daysUntil)
+
+		// If both fail, count as failed; otherwise consider it sent
+		if emailErr != nil && pushoverErr != nil {
+			log.Printf("Error sending cancellation reminder for subscription %s (ID: %d): email=%v, pushover=%v", sub.Name, sub.ID, emailErr, pushoverErr)
+			failedCount++
+		} else {
+			// Mark reminder as sent for this cancellation date
+			now := time.Now()
+			sub.LastCancellationReminderSent = &now
+			if sub.CancellationDate != nil {
+				cancellationDateCopy := *sub.CancellationDate
+				sub.LastCancellationReminderDate = &cancellationDateCopy
+			}
+
+			// Update the subscription in the database
+			_, updateErr := subscriptionService.Update(sub.ID, sub)
+			if updateErr != nil {
+				log.Printf("Warning: Failed to update last cancellation reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
+			}
+
+			if emailErr != nil {
+				log.Printf("Sent Pushover cancellation reminder for subscription %s (ends in %d days) - email failed: %v", sub.Name, daysUntil, emailErr)
+			} else if pushoverErr != nil {
+				log.Printf("Sent email cancellation reminder for subscription %s (ends in %d days) - Pushover failed: %v", sub.Name, daysUntil, pushoverErr)
+			} else {
+				log.Printf("Sent cancellation reminders (email and Pushover) for subscription %s (ends in %d days)", sub.Name, daysUntil)
+			}
+			sentCount++
+		}
+	}
+
+	log.Printf("Cancellation reminder check complete: %d sent, %d failed", sentCount, failedCount)
 }
 
 // handleResetPassword handles the --reset-password CLI command
