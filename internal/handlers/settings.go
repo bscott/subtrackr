@@ -563,6 +563,12 @@ func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
 	defer func() {
 		if originalConfig != nil {
 			h.service.SavePushoverConfig(originalConfig)
+		} else {
+			// No original config existed, so delete the test config by saving empty values
+			h.service.SavePushoverConfig(&models.PushoverConfig{
+				UserKey:  "",
+				AppToken: "",
+			})
 		}
 	}()
 
