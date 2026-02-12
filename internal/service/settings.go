@@ -229,6 +229,8 @@ func (s *SettingsService) GetCurrencySymbol() string {
 		return "R$"
 	case "BDT":
 		return "৳"
+	case "CNY":
+		return "¥"
 	default:
 		return "$"
 	}
@@ -396,6 +398,77 @@ func (s *SettingsService) ClearResetToken() error {
 	s.repo.Delete("auth_reset_token")
 	s.repo.Delete("auth_reset_token_expiry")
 	return nil
+}
+
+// GetBaseURL returns the configured base URL for external links, or empty string if not set
+func (s *SettingsService) GetBaseURL() string {
+	baseURL, err := s.repo.Get("base_url")
+	if err != nil {
+		return ""
+	}
+	return baseURL
+}
+
+// SetBaseURL saves the base URL setting
+func (s *SettingsService) SetBaseURL(baseURL string) error {
+	return s.repo.Set("base_url", baseURL)
+}
+
+// iCal Subscription methods
+
+// IsICalSubscriptionEnabled returns whether iCal subscription is enabled
+func (s *SettingsService) IsICalSubscriptionEnabled() bool {
+	return s.GetBoolSettingWithDefault("ical_subscription_enabled", false)
+}
+
+// SetICalSubscriptionEnabled enables or disables iCal subscription
+func (s *SettingsService) SetICalSubscriptionEnabled(enabled bool) error {
+	return s.SetBoolSetting("ical_subscription_enabled", enabled)
+}
+
+// GetOrGenerateICalToken returns the iCal token, generating one if it doesn't exist
+func (s *SettingsService) GetOrGenerateICalToken() (string, error) {
+	token, err := s.repo.Get("ical_subscription_token")
+	if err == nil && token != "" {
+		return token, nil
+	}
+
+	// Generate a new 32-byte random token
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	token = base64.URLEncoding.EncodeToString(bytes)
+
+	if err := s.repo.Set("ical_subscription_token", token); err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+// RegenerateICalToken replaces the iCal token with a new one
+func (s *SettingsService) RegenerateICalToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	token := base64.URLEncoding.EncodeToString(bytes)
+
+	if err := s.repo.Set("ical_subscription_token", token); err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+// ValidateICalToken checks if a given token matches the stored iCal token
+func (s *SettingsService) ValidateICalToken(token string) bool {
+	storedToken, err := s.repo.Get("ical_subscription_token")
+	if err != nil || storedToken == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(storedToken), []byte(token)) == 1
 }
 
 // SavePushoverConfig saves Pushover configuration

@@ -301,46 +301,61 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
 
+	// Build iCal subscription URL if enabled
+	icalSubscriptionEnabled := h.settingsService.IsICalSubscriptionEnabled()
+	var icalSubscriptionURL string
+	if icalSubscriptionEnabled {
+		token, err := h.settingsService.GetOrGenerateICalToken()
+		if err == nil {
+			icalSubscriptionURL = buildBaseURL(c, h.settingsService.GetBaseURL()) + "/ical/" + token
+		}
+	}
+
 	c.HTML(http.StatusOK, "calendar.html", gin.H{
-		"Title":          "Calendar",
-		"CurrentPage":    "calendar",
-		"Year":           year,
-		"Month":          month,
-		"MonthName":      firstOfMonth.Format("January 2006"),
-		"EventsByDate":   template.JS(string(eventsJSON)),
-		"FirstOfMonth":   firstOfMonth,
-		"PrevMonth":      prevMonth,
-		"NextMonth":      nextMonth,
-		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
-		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
+		"Title":                    "Calendar",
+		"CurrentPage":              "calendar",
+		"Year":                     year,
+		"Month":                    month,
+		"MonthName":                firstOfMonth.Format("January 2006"),
+		"EventsByDate":             template.JS(string(eventsJSON)),
+		"FirstOfMonth":             firstOfMonth,
+		"PrevMonth":                prevMonth,
+		"NextMonth":                nextMonth,
+		"CurrencySymbol":           h.settingsService.GetCurrencySymbol(),
+		"DarkMode":                 h.settingsService.IsDarkModeEnabled(),
+		"ICalSubscriptionEnabled":  icalSubscriptionEnabled,
+		"ICalSubscriptionURL":      icalSubscriptionURL,
 	})
 }
 
-// ExportICal generates and downloads an iCal file with all subscription renewal dates
-func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
+// generateICalContent generates iCal content for all active subscriptions
+// If forSubscription is true, adds subscription-friendly properties for calendar polling
+func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string, error) {
 	subscriptions, err := h.service.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return "", err
 	}
 
-	// Generate iCal content
 	icalContent := "BEGIN:VCALENDAR\r\n"
 	icalContent += "VERSION:2.0\r\n"
 	icalContent += "PRODID:-//SubTrackr//Subscription Renewals//EN\r\n"
 	icalContent += "CALSCALE:GREGORIAN\r\n"
 	icalContent += "METHOD:PUBLISH\r\n"
 
+	if forSubscription {
+		icalContent += "X-WR-CALNAME:SubTrackr Renewals\r\n"
+		icalContent += "REFRESH-INTERVAL;VALUE=DURATION:PT1H\r\n"
+		icalContent += "X-PUBLISHED-TTL:PT1H\r\n"
+	}
+
 	now := time.Now()
 	for _, sub := range subscriptions {
 		if sub.RenewalDate != nil && sub.Status == "Active" {
-			// Format dates in iCal format (YYYYMMDDTHHMMSSZ)
 			dtStart := sub.RenewalDate.Format("20060102T150000Z")
 			dtEnd := sub.RenewalDate.Add(1 * time.Hour).Format("20060102T150000Z")
 			dtStamp := now.Format("20060102T150000Z")
 			uid := fmt.Sprintf("subtrackr-%d-%d@subtrackr", sub.ID, sub.RenewalDate.Unix())
 
-			// Escape text for iCal (simplified - should escape commas, semicolons, etc.)
 			summary := fmt.Sprintf("%s Renewal", sub.Name)
 			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, h.settingsService.GetCurrencySymbol(), sub.Cost, sub.Schedule)
 			if sub.URL != "" {
@@ -357,7 +372,6 @@ func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
 			icalContent += "STATUS:CONFIRMED\r\n"
 			icalContent += "SEQUENCE:0\r\n"
 
-			// Add recurrence rule based on schedule
 			switch sub.Schedule {
 			case "Daily":
 				icalContent += "RRULE:FREQ=DAILY;INTERVAL=1\r\n"
@@ -376,10 +390,43 @@ func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
 	}
 
 	icalContent += "END:VCALENDAR\r\n"
+	return icalContent, nil
+}
 
-	// Set headers for file download
+// ExportICal generates and downloads an iCal file with all subscription renewal dates
+func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
+	icalContent, err := h.generateICalContent(false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.Header("Content-Type", "text/calendar; charset=utf-8")
 	c.Header("Content-Disposition", `attachment; filename="subtrackr-renewals.ics"`)
+	c.Data(http.StatusOK, "text/calendar; charset=utf-8", []byte(icalContent))
+}
+
+// ServeICalSubscription serves iCal content for calendar subscription (public, token-validated)
+func (h *SubscriptionHandler) ServeICalSubscription(c *gin.Context) {
+	token := c.Param("token")
+
+	if !h.settingsService.IsICalSubscriptionEnabled() {
+		c.String(http.StatusNotFound, "iCal subscription is not enabled")
+		return
+	}
+
+	if !h.settingsService.ValidateICalToken(token) {
+		c.String(http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	icalContent, err := h.generateICalContent(true)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to generate calendar")
+		return
+	}
+
+	c.Header("Content-Type", "text/calendar; charset=utf-8")
 	c.Data(http.StatusOK, "text/calendar; charset=utf-8", []byte(icalContent))
 }
 
@@ -409,6 +456,16 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 	authEnabled := h.settingsService.IsAuthEnabled()
 	authUsername, _ := h.settingsService.GetAuthUsername()
 
+	// Build iCal subscription URL if enabled
+	icalSubscriptionEnabled := h.settingsService.IsICalSubscriptionEnabled()
+	var icalSubscriptionURL string
+	if icalSubscriptionEnabled {
+		token, err := h.settingsService.GetOrGenerateICalToken()
+		if err == nil {
+			icalSubscriptionURL = buildBaseURL(c, h.settingsService.GetBaseURL()) + "/ical/" + token
+		}
+	}
+
 	c.HTML(http.StatusOK, "settings.html", gin.H{
 		"Title":                     "Settings",
 		"CurrentPage":               "settings",
@@ -428,6 +485,9 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"SMTPConfigured":            smtpConfigured,
 		"AuthEnabled":               authEnabled,
 		"AuthUsername":              authUsername,
+		"ICalSubscriptionEnabled":   icalSubscriptionEnabled,
+		"ICalSubscriptionURL":       icalSubscriptionURL,
+		"BaseURL":                   h.settingsService.GetBaseURL(),
 	})
 }
 

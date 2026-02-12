@@ -144,11 +144,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	}
 
 	// Build reset URL
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
-	}
-	resetURL := fmt.Sprintf("%s://%s/reset-password?token=%s", scheme, c.Request.Host, url.QueryEscape(token))
+	resetURL := buildBaseURL(c, h.settingsService.GetBaseURL()) + "/reset-password?token=" + url.QueryEscape(token)
 
 	// Send reset email
 	subject := "SubTrackr Password Reset"
