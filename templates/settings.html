@@ -286,6 +286,129 @@
                 </div>
             </div>
             
+            <!-- Base URL -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Base URL</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Set the external URL for your SubTrackr instance. Used for iCal subscription links and password reset emails. Leave blank to auto-detect from request headers.</p>
+                <form hx-post="/api/settings/base-url" hx-swap="none" class="flex items-center space-x-2">
+                    <input type="url" name="base_url" id="base-url-input"
+                        value="{{.BaseURL}}"
+                        placeholder="https://subtrackr.example.com"
+                        class="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
+                    <button type="submit"
+                        class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors duration-150">
+                        Save
+                    </button>
+                </form>
+                <script>
+                    document.body.addEventListener('htmx:afterRequest', function(event) {
+                        if (event.detail.pathInfo.requestPath === '/api/settings/base-url' && event.detail.successful) {
+                            var btn = event.detail.elt.querySelector('button[type="submit"]');
+                            if (btn) {
+                                var original = btn.textContent;
+                                btn.textContent = 'Saved!';
+                                setTimeout(function() { btn.textContent = original; }, 2000);
+                            }
+                        }
+                    });
+                </script>
+            </div>
+
+            <!-- Calendar Subscription -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Calendar Subscription</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Enable a subscribable iCal URL that calendar apps can poll for live updates</p>
+
+                <div class="space-y-4">
+                    <!-- Toggle -->
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900 dark:text-white">iCal Subscription</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Allow calendar apps to subscribe to your renewal dates</p>
+                        </div>
+                        <button id="ical-toggle-btn"
+                            hx-post="/api/settings/ical/toggle"
+                            hx-swap="none"
+                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 {{if .ICalSubscriptionEnabled}}bg-primary{{else}}bg-gray-200 dark:bg-gray-600{{end}}"
+                            role="switch"
+                            aria-checked="{{if .ICalSubscriptionEnabled}}true{{else}}false{{end}}">
+                            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{if .ICalSubscriptionEnabled}}translate-x-5{{else}}translate-x-0{{end}}"></span>
+                        </button>
+                    </div>
+
+                    <!-- URL Display (shown when enabled) -->
+                    <div id="ical-url-section" class="{{if not .ICalSubscriptionEnabled}}hidden{{end}}">
+                        <div class="flex items-center space-x-2">
+                            <input type="text" id="ical-url-input" readonly
+                                value="{{.ICalSubscriptionURL}}"
+                                class="flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono">
+                            <button onclick="copyICalURL()" type="button"
+                                class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors duration-150">
+                                Copy
+                            </button>
+                            <button
+                                hx-post="/api/settings/ical/regenerate"
+                                hx-swap="none"
+                                hx-confirm="Are you sure? Your old subscription URL will stop working and calendar apps will need the new URL."
+                                type="button"
+                                class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-150">
+                                Regenerate
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Add this URL as a "Subscribe to Calendar" in your calendar app (Google Calendar, Apple Calendar, Outlook, etc.)</p>
+                    </div>
+                </div>
+
+                <script>
+                    document.body.addEventListener('htmx:afterRequest', function(event) {
+                        if (event.detail.pathInfo.requestPath === '/api/settings/ical/toggle') {
+                            try {
+                                var data = JSON.parse(event.detail.xhr.responseText);
+                                var btn = document.getElementById('ical-toggle-btn');
+                                var section = document.getElementById('ical-url-section');
+                                var input = document.getElementById('ical-url-input');
+                                var knob = btn.querySelector('span');
+
+                                if (data.enabled) {
+                                    btn.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+                                    btn.classList.add('bg-primary');
+                                    btn.setAttribute('aria-checked', 'true');
+                                    knob.classList.remove('translate-x-0');
+                                    knob.classList.add('translate-x-5');
+                                    section.classList.remove('hidden');
+                                    if (data.url) input.value = data.url;
+                                } else {
+                                    btn.classList.remove('bg-primary');
+                                    btn.classList.add('bg-gray-200', 'dark:bg-gray-600');
+                                    btn.setAttribute('aria-checked', 'false');
+                                    knob.classList.remove('translate-x-5');
+                                    knob.classList.add('translate-x-0');
+                                    section.classList.add('hidden');
+                                }
+                            } catch(e) {}
+                        }
+                        if (event.detail.pathInfo.requestPath === '/api/settings/ical/regenerate') {
+                            try {
+                                var data = JSON.parse(event.detail.xhr.responseText);
+                                if (data.url) {
+                                    document.getElementById('ical-url-input').value = data.url;
+                                }
+                            } catch(e) {}
+                        }
+                    });
+
+                    function copyICalURL() {
+                        var input = document.getElementById('ical-url-input');
+                        navigator.clipboard.writeText(input.value).then(function() {
+                            var btn = input.nextElementSibling;
+                            var original = btn.textContent;
+                            btn.textContent = 'Copied!';
+                            setTimeout(function() { btn.textContent = original; }, 2000);
+                        });
+                    }
+                </script>
+            </div>
+
             <!-- Data Management -->
             <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Data Management</h3>
@@ -772,6 +895,18 @@
                                class="mr-2 text-primary focus:ring-primary">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-200">৳ BDT (Bangladeshi Taka)</span>
                     </label>
+
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio"
+                               name="currency"
+                               value="CNY"
+                               {{if eq .Currency "CNY"}}checked{{end}}
+                               hx-post="/api/settings/currency"
+                               hx-trigger="change"
+                               hx-vals='{"currency": "CNY"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">¥ CNY (Chinese Yuan)</span>
+                    </label>
                 </div>
 
                 <div id="currency-message" class="mt-2"></div>
@@ -962,6 +1097,86 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- iCal Subscription -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">iCal Subscription</h4>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200">
+                            <table class="min-w-full">
+                                <thead class="bg-gray-100 dark:bg-gray-600">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Method</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Endpoint</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm"><span class="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">GET</span></td>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">/ical/:token</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Subscribe to iCal feed (public, token-authenticated)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- MCP Server -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">MCP Server (AI Integration)</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">SubTrackr includes a Model Context Protocol (MCP) server that allows AI assistants like Claude to read and manage your subscriptions via natural language.</p>
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200 mb-3">
+                            <table class="min-w-full">
+                                <thead class="bg-gray-100 dark:bg-gray-600">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Tool</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-200">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">list_subscriptions</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">List all subscriptions</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">get_subscription</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Get subscription by ID</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">create_subscription</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Create a new subscription</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">update_subscription</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Update an existing subscription</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">delete_subscription</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Delete a subscription</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900 dark:text-gray-100">get_stats</td>
+                                        <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">Get subscription statistics</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <h5 class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-2">Configuration</h5>
+                        <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">Add this to your Claude Desktop or Claude Code MCP config:</p>
+                        <div class="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-xs overflow-x-auto">
+<pre>{
+  "mcpServers": {
+    "subtrackr": {
+      "command": "subtrackr-mcp",
+      "args": [],
+      "env": {
+        "DATABASE_PATH": "/path/to/subtrackr.db"
+      }
+    }
+  }
+}</pre>
                         </div>
                     </div>
                 </div>

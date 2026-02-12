@@ -613,6 +613,78 @@ func (h *SettingsHandler) GetPushoverConfig(c *gin.Context) {
 	})
 }
 
+// ToggleICalSubscription toggles iCal subscription on/off
+func (h *SettingsHandler) ToggleICalSubscription(c *gin.Context) {
+	current := h.service.IsICalSubscriptionEnabled()
+	newState := !current
+
+	if err := h.service.SetICalSubscriptionEnabled(newState); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var url string
+	if newState {
+		token, err := h.service.GetOrGenerateICalToken()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		url = buildBaseURL(c, h.service.GetBaseURL()) + "/ical/" + token
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled": newState,
+		"url":     url,
+	})
+}
+
+// GetICalSubscriptionURL returns the current iCal subscription status and URL
+func (h *SettingsHandler) GetICalSubscriptionURL(c *gin.Context) {
+	enabled := h.service.IsICalSubscriptionEnabled()
+	var url string
+	if enabled {
+		token, err := h.service.GetOrGenerateICalToken()
+		if err == nil {
+			url = buildBaseURL(c, h.service.GetBaseURL()) + "/ical/" + token
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled": enabled,
+		"url":     url,
+	})
+}
+
+// RegenerateICalToken generates a new iCal subscription token
+func (h *SettingsHandler) RegenerateICalToken(c *gin.Context) {
+	token, err := h.service.RegenerateICalToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	url := buildBaseURL(c, h.service.GetBaseURL()) + "/ical/" + token
+
+	c.JSON(http.StatusOK, gin.H{
+		"url": url,
+	})
+}
+
+// UpdateBaseURL saves the base URL setting
+func (h *SettingsHandler) UpdateBaseURL(c *gin.Context) {
+	baseURL := c.PostForm("base_url")
+
+	if err := h.service.SetBaseURL(baseURL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"base_url": baseURL,
+	})
+}
+
 // SetTheme saves the theme preference
 func (h *SettingsHandler) SetTheme(c *gin.Context) {
 	var req struct {

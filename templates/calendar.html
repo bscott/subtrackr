@@ -188,13 +188,35 @@
                             Today
                         </a>
                     </div>
-                    <a href="/api/export/ical" 
-                       class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 flex items-center transition-colors duration-150">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Export to iCal
-                    </a>
+                    <div class="flex items-center space-x-2">
+                        {{if .ICalSubscriptionEnabled}}
+                        <button onclick="copyCalSubscriptionURL()" type="button"
+                            class="bg-success text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-success/90 flex items-center transition-colors duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                            </svg>
+                            <span id="subscribe-btn-text">Subscribe</span>
+                        </button>
+                        <input type="hidden" id="cal-subscription-url" value="{{.ICalSubscriptionURL}}">
+                        <script>
+                            function copyCalSubscriptionURL() {
+                                var url = document.getElementById('cal-subscription-url').value;
+                                navigator.clipboard.writeText(url).then(function() {
+                                    var span = document.getElementById('subscribe-btn-text');
+                                    span.textContent = 'Copied!';
+                                    setTimeout(function() { span.textContent = 'Subscribe'; }, 2000);
+                                });
+                            }
+                        </script>
+                        {{end}}
+                        <a href="/api/export/ical"
+                           class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 flex items-center transition-colors duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Export to iCal
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Calendar Grid -->
