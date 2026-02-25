@@ -836,7 +836,7 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 	defer writer.Flush()
 
 	// Write CSV header
-	header := []string{"ID", "Name", "Category", "Cost", "Schedule", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
+	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
 	writer.Write(header)
 
 	// Write subscription data
@@ -845,11 +845,16 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 		if sub.Category.Name != "" {
 			categoryName = sub.Category.Name
 		}
+		currency := sub.OriginalCurrency
+		if currency == "" {
+			currency = h.settingsService.GetCurrency()
+		}
 		record := []string{
 			fmt.Sprintf("%d", sub.ID),
 			sub.Name,
 			categoryName,
 			fmt.Sprintf("%.2f", sub.Cost),
+			currency,
 			sub.Schedule,
 			sub.Status,
 			sub.PaymentMethod,

@@ -46,7 +46,7 @@ var BuiltinCurrencies = []CurrencyInfo{
 	{Code: "ZAR", Symbol: "R", Name: "South African Rand"},
 	{Code: "TRY", Symbol: "₺", Name: "Turkish Lira"},
 	{Code: "THB", Symbol: "฿", Name: "Thai Baht"},
-	{Code: "COP", Symbol: "$", Name: "Colombian Peso"},
+	{Code: "COP", Symbol: "COL$", Name: "Colombian Peso"},
 	{Code: "BDT", Symbol: "৳", Name: "Bangladeshi Taka"},
 	{Code: "IDR", Symbol: "Rp", Name: "Indonesian Rupiah"},
 	{Code: "PHP", Symbol: "₱", Name: "Philippine Peso"},
