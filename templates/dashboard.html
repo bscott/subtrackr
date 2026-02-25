@@ -297,7 +297,7 @@
                     </svg>
                 </a>
                 {{else}}
-                <p class="text-sm font-medium text-gray-900 dark:text-white">{{$.CurrencySymbol}}{{printf "%.2f" .Cost}}</p>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{.DisplayCurrencySymbol}}{{printf "%.2f" .Cost}}</p>
                 {{end}}
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{.Schedule}}</p>
             </div>

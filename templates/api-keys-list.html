@@ -25,8 +25,8 @@
             </div>
             {{else}}
             <div class="text-xs text-gray-500 mt-1">
-                Created: {{.CreatedAt.Format "Jan 2, 2006"}} • 
-                {{if .LastUsed}}Last used: {{.LastUsed.Format "Jan 2, 2006"}}{{else}}Never used{{end}} • 
+                Created: {{fmtTime .CreatedAt $.GoDateFormat}} •
+                {{if .LastUsed}}Last used: {{fmtTime .LastUsed $.GoDateFormat}}{{else}}Never used{{end}} •
                 Usage: {{.UsageCount}} requests
             </div>
             {{end}}

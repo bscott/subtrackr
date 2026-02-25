@@ -33,16 +33,18 @@ type SubscriptionHandler struct {
 	currencyService *service.CurrencyService
 	emailService    *service.EmailService
 	pushoverService *service.PushoverService
+	webhookService  *service.WebhookService
 	logoService     *service.LogoService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, logoService *service.LogoService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, logoService *service.LogoService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
 		currencyService: currencyService,
 		emailService:    emailService,
 		pushoverService: pushoverService,
+		webhookService:  webhookService,
 		logoService:     logoService,
 	}
 }
@@ -72,6 +74,13 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 				enriched.ConvertedMonthlyCost = enriched.ConvertedAnnualCost / 12
 				enriched.ShowConversion = true
 			}
+		} else if sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
+			// Different currency but conversion not available - show original currency
+			enriched.ConvertedCost = sub.Cost
+			enriched.ConvertedAnnualCost = sub.AnnualCost()
+			enriched.ConvertedMonthlyCost = sub.MonthlyCost()
+			enriched.DisplayCurrency = sub.OriginalCurrency
+			enriched.DisplayCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 		} else {
 			// Same currency or no conversion needed
 			enriched.ConvertedCost = sub.Cost
@@ -214,6 +223,7 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 		"SortBy":         sortBy,
 		"Order":          order,
+		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 	})
 }
 
@@ -357,7 +367,11 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 			uid := fmt.Sprintf("subtrackr-%d-%d@subtrackr", sub.ID, sub.RenewalDate.Unix())
 
 			summary := fmt.Sprintf("%s Renewal", sub.Name)
-			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, h.settingsService.GetCurrencySymbol(), sub.Cost, sub.Schedule)
+			subCurrencySymbol := h.settingsService.GetCurrencySymbol()
+			if sub.OriginalCurrency != "" && sub.OriginalCurrency != h.settingsService.GetCurrency() {
+				subCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
+			}
+			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, subCurrencySymbol, sub.Cost, sub.Schedule)
 			if sub.URL != "" {
 				description += fmt.Sprintf("\\nURL: %s", sub.URL)
 			}
@@ -452,6 +466,15 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		pushoverConfigured = true
 	}
 
+	// Load Webhook config if available
+	var webhookConfig *models.WebhookConfig
+	webhookConfigured := false
+	webhookCfg, err := h.settingsService.GetWebhookConfig()
+	if err == nil && webhookCfg != nil && webhookCfg.URL != "" {
+		webhookConfig = webhookCfg
+		webhookConfigured = true
+	}
+
 	// Get auth settings
 	authEnabled := h.settingsService.IsAuthEnabled()
 	authUsername, _ := h.settingsService.GetAuthUsername()
@@ -488,6 +511,10 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"ICalSubscriptionEnabled":   icalSubscriptionEnabled,
 		"ICalSubscriptionURL":       icalSubscriptionURL,
 		"BaseURL":                   h.settingsService.GetBaseURL(),
+		"Currencies":                service.GetAvailableCurrencies(),
+		"DateFormat":                h.settingsService.GetDateFormat(),
+		"WebhookConfig":             webhookConfig,
+		"WebhookConfigured":         webhookConfigured,
 	})
 }
 
@@ -514,6 +541,7 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"SortBy":         sortBy,
 		"Order":          order,
+		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 	})
 }
 
@@ -602,6 +630,10 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 				// Log error but don't fail the request
 				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
 			}
+			// Send Webhook notification
+			if err := h.webhookService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				log.Printf("Failed to send high-cost alert webhook: %v", err)
+			}
 		}
 	}
 
@@ -678,13 +710,15 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	original, _ := h.service.GetByID(uint(id))
 	wasHighCost := original != nil && h.isHighCostWithCurrency(original)
 
-	// Preserve existing IconURL if not explicitly set in form
-	if subscription.IconURL == "" && original != nil {
+	// Check if URL changed - if so, we should fetch a new logo
+	urlChanged := original != nil && original.URL != subscription.URL
+
+	// Preserve existing IconURL if not explicitly set in form,
+	// but only when the URL has NOT changed (so we re-fetch on URL change)
+	if subscription.IconURL == "" && original != nil && !urlChanged {
 		subscription.IconURL = original.IconURL
 	}
 
-	// Check if URL changed - if so, we should fetch a new logo
-	urlChanged := original != nil && original.URL != subscription.URL
 	if urlChanged || (subscription.URL != "" && subscription.IconURL == "") {
 		h.fetchAndSetLogo(&subscription)
 	}
@@ -713,6 +747,10 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
 				// Log error but don't fail the request
 				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
+			}
+			// Send Webhook notification
+			if err := h.webhookService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				log.Printf("Failed to send high-cost alert webhook: %v", err)
 			}
 		}
 	}
@@ -779,6 +817,7 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 		"IsEdit":         isEdit,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"Categories":     categories,
+		"Currencies":     service.GetAvailableCurrencies(),
 	})
 }
 
@@ -797,7 +836,7 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 	defer writer.Flush()
 
 	// Write CSV header
-	header := []string{"ID", "Name", "Category", "Cost", "Schedule", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
+	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
 	writer.Write(header)
 
 	// Write subscription data
@@ -806,11 +845,16 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 		if sub.Category.Name != "" {
 			categoryName = sub.Category.Name
 		}
+		currency := sub.OriginalCurrency
+		if currency == "" {
+			currency = h.settingsService.GetCurrency()
+		}
 		record := []string{
 			fmt.Sprintf("%d", sub.ID),
 			sub.Name,
 			categoryName,
 			fmt.Sprintf("%.2f", sub.Cost),
+			currency,
 			sub.Schedule,
 			sub.Status,
 			sub.PaymentMethod,

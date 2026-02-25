@@ -95,8 +95,8 @@ func (p *PushoverService) SendHighCostAlert(subscription *models.Subscription) e
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol
-	currencySymbol := p.settingsService.GetCurrencySymbol()
+	// Get currency symbol - use subscription's own currency if it differs from preferred
+	currencySymbol := currencySymbolForSubscription(subscription, p.settingsService)
 
 	// Build message
 	message := "⚠️ High Cost Alert\n\n"
@@ -107,7 +107,7 @@ func (p *PushoverService) SendHighCostAlert(subscription *models.Subscription) e
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
 	}
 	if subscription.RenewalDate != nil {
-		message += fmt.Sprintf("Next Renewal: %s\n", subscription.RenewalDate.Format("January 2, 2006"))
+		message += fmt.Sprintf("Next Renewal: %s\n", subscription.RenewalDate.Format(p.settingsService.GetGoDateFormatLong()))
 	}
 	if subscription.URL != "" {
 		message += fmt.Sprintf("URL: %s", subscription.URL)
@@ -126,8 +126,8 @@ func (p *PushoverService) SendRenewalReminder(subscription *models.Subscription,
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol
-	currencySymbol := p.settingsService.GetCurrencySymbol()
+	// Get currency symbol - use subscription's own currency if it differs from preferred
+	currencySymbol := currencySymbolForSubscription(subscription, p.settingsService)
 
 	// Build message
 	daysText := "days"
@@ -143,7 +143,7 @@ func (p *PushoverService) SendRenewalReminder(subscription *models.Subscription,
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
 	}
 	if subscription.RenewalDate != nil {
-		message += fmt.Sprintf("Renewal Date: %s\n", subscription.RenewalDate.Format("January 2, 2006"))
+		message += fmt.Sprintf("Renewal Date: %s\n", subscription.RenewalDate.Format(p.settingsService.GetGoDateFormatLong()))
 	}
 	if subscription.URL != "" {
 		message += fmt.Sprintf("URL: %s", subscription.URL)
@@ -162,8 +162,8 @@ func (p *PushoverService) SendCancellationReminder(subscription *models.Subscrip
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol
-	currencySymbol := p.settingsService.GetCurrencySymbol()
+	// Get currency symbol - use subscription's own currency if it differs from preferred
+	currencySymbol := currencySymbolForSubscription(subscription, p.settingsService)
 
 	// Build message
 	daysText := "days"
@@ -179,7 +179,7 @@ func (p *PushoverService) SendCancellationReminder(subscription *models.Subscrip
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
 	}
 	if subscription.CancellationDate != nil {
-		message += fmt.Sprintf("Cancellation Date: %s\n", subscription.CancellationDate.Format("January 2, 2006"))
+		message += fmt.Sprintf("Cancellation Date: %s\n", subscription.CancellationDate.Format(p.settingsService.GetGoDateFormatLong()))
 	}
 	if subscription.URL != "" {
 		message += fmt.Sprintf("URL: %s", subscription.URL)

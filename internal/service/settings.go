@@ -182,15 +182,8 @@ func (s *SettingsService) ValidateAPIKey(key string) (*models.APIKey, error) {
 
 // SetCurrency saves the currency preference
 func (s *SettingsService) SetCurrency(currency string) error {
-	// Validate currency using shared constant
-	isValid := false
-	for _, c := range SupportedCurrencies {
-		if currency == c {
-			isValid = true
-			break
-		}
-	}
-	if !isValid {
+	// Validate against known currencies
+	if _, ok := currencyInfoMap[currency]; !ok {
 		return fmt.Errorf("invalid currency: %s", currency)
 	}
 	return s.repo.Set("currency", currency)
@@ -205,34 +198,66 @@ func (s *SettingsService) GetCurrency() string {
 	return currency
 }
 
+// CurrencySymbolForCode returns the symbol for a given currency code
+func CurrencySymbolForCode(currency string) string {
+	return GetCurrencyInfo(currency).Symbol
+}
+
 // GetCurrencySymbol returns the symbol for the current currency
 func (s *SettingsService) GetCurrencySymbol() string {
-	currency := s.GetCurrency()
-	switch currency {
-	case "EUR":
-		return "€"
-	case "PLN":
-		return "zł"
-	case "GBP":
-		return "£"
-	case "RUB":
-		return "₽"
-	case "JPY":
-		return "¥"
-	case "SEK":
-		return "kr"
-	case "INR":
-		return "₹"
-	case "CHF":
-		return "Fr."
-	case "BRL":
-		return "R$"
-	case "BDT":
-		return "৳"
-	case "CNY":
-		return "¥"
+	return CurrencySymbolForCode(s.GetCurrency())
+}
+
+// SetDateFormat saves the date format preference
+func (s *SettingsService) SetDateFormat(format string) error {
+	switch format {
+	case "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD":
+		return s.repo.Set("date_format", format)
 	default:
-		return "$"
+		return fmt.Errorf("invalid date format: %s", format)
+	}
+}
+
+// GetDateFormat retrieves the date format preference
+func (s *SettingsService) GetDateFormat() string {
+	format, err := s.repo.Get("date_format")
+	if err != nil || format == "" {
+		return "MM/DD/YYYY"
+	}
+	return format
+}
+
+// GetGoDateFormat returns the Go time format string for the current date format
+func (s *SettingsService) GetGoDateFormat() string {
+	return DateFormatToGo(s.GetDateFormat())
+}
+
+// GetGoDateFormatLong returns the long Go time format string for emails/notifications
+func (s *SettingsService) GetGoDateFormatLong() string {
+	return DateFormatToGoLong(s.GetDateFormat())
+}
+
+// DateFormatToGo converts a date format key to a short Go time format string
+func DateFormatToGo(format string) string {
+	switch format {
+	case "DD/MM/YYYY":
+		return "02/01/2006"
+	case "YYYY-MM-DD":
+		return "2006-01-02"
+	default:
+		return "01/02/2006"
+	}
+}
+
+// DateFormatToGoLong converts a date format key to a long Go time format string
+func DateFormatToGoLong(format string) string {
+	switch format {
+	case "DD/MM/YYYY":
+		return "2 January 2006"
+	case "YYYY-MM-DD":
+		return "2006-01-02"
+	default:
+		return "January 2, 2006"
 	}
 }
 
@@ -488,12 +513,35 @@ func (s *SettingsService) GetPushoverConfig() (*models.PushoverConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var config models.PushoverConfig
 	err = json.Unmarshal([]byte(data), &config)
 	if err != nil {
 		return nil, err
 	}
-	
+
+	return &config, nil
+}
+
+// SaveWebhookConfig saves Webhook configuration
+func (s *SettingsService) SaveWebhookConfig(config *models.WebhookConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("webhook_config", string(data))
+}
+
+// GetWebhookConfig retrieves Webhook configuration
+func (s *SettingsService) GetWebhookConfig() (*models.WebhookConfig, error) {
+	data, err := s.repo.Get("webhook_config")
+	if err != nil {
+		return nil, err
+	}
+	var config models.WebhookConfig
+	err = json.Unmarshal([]byte(data), &config)
+	if err != nil {
+		return nil, err
+	}
 	return &config, nil
 }

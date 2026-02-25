@@ -14,8 +14,79 @@ import (
 	"time"
 )
 
-// SupportedCurrencies defines the list of currencies supported for exchange rates and settings
-var SupportedCurrencies = []string{"USD", "EUR", "GBP", "JPY", "RUB", "SEK", "PLN", "INR", "CHF", "BRL", "COP", "BDT", "CNY"}
+// CurrencyInfo holds metadata for a supported currency
+type CurrencyInfo struct {
+	Code   string `json:"code"`
+	Symbol string `json:"symbol"`
+	Name   string `json:"name"`
+}
+
+// BuiltinCurrencies is the comprehensive list of supported currencies
+var BuiltinCurrencies = []CurrencyInfo{
+	{Code: "USD", Symbol: "$", Name: "US Dollar"},
+	{Code: "EUR", Symbol: "€", Name: "Euro"},
+	{Code: "GBP", Symbol: "£", Name: "British Pound"},
+	{Code: "AUD", Symbol: "A$", Name: "Australian Dollar"},
+	{Code: "CAD", Symbol: "C$", Name: "Canadian Dollar"},
+	{Code: "NZD", Symbol: "NZ$", Name: "New Zealand Dollar"},
+	{Code: "JPY", Symbol: "¥", Name: "Japanese Yen"},
+	{Code: "CHF", Symbol: "Fr.", Name: "Swiss Franc"},
+	{Code: "CNY", Symbol: "¥", Name: "Chinese Yuan"},
+	{Code: "SEK", Symbol: "kr", Name: "Swedish Krona"},
+	{Code: "NOK", Symbol: "kr", Name: "Norwegian Krone"},
+	{Code: "DKK", Symbol: "kr", Name: "Danish Krone"},
+	{Code: "INR", Symbol: "₹", Name: "Indian Rupee"},
+	{Code: "RUB", Symbol: "₽", Name: "Russian Ruble"},
+	{Code: "BRL", Symbol: "R$", Name: "Brazilian Real"},
+	{Code: "PLN", Symbol: "zł", Name: "Polish Zloty"},
+	{Code: "KRW", Symbol: "₩", Name: "South Korean Won"},
+	{Code: "SGD", Symbol: "S$", Name: "Singapore Dollar"},
+	{Code: "HKD", Symbol: "HK$", Name: "Hong Kong Dollar"},
+	{Code: "MXN", Symbol: "Mex$", Name: "Mexican Peso"},
+	{Code: "ZAR", Symbol: "R", Name: "South African Rand"},
+	{Code: "TRY", Symbol: "₺", Name: "Turkish Lira"},
+	{Code: "THB", Symbol: "฿", Name: "Thai Baht"},
+	{Code: "COP", Symbol: "COL$", Name: "Colombian Peso"},
+	{Code: "BDT", Symbol: "৳", Name: "Bangladeshi Taka"},
+	{Code: "IDR", Symbol: "Rp", Name: "Indonesian Rupiah"},
+	{Code: "PHP", Symbol: "₱", Name: "Philippine Peso"},
+	{Code: "TWD", Symbol: "NT$", Name: "New Taiwan Dollar"},
+	{Code: "MYR", Symbol: "RM", Name: "Malaysian Ringgit"},
+	{Code: "AED", Symbol: "د.إ", Name: "UAE Dirham"},
+	{Code: "SAR", Symbol: "﷼", Name: "Saudi Riyal"},
+	{Code: "ILS", Symbol: "₪", Name: "Israeli Shekel"},
+	{Code: "CZK", Symbol: "Kč", Name: "Czech Koruna"},
+	{Code: "HUF", Symbol: "Ft", Name: "Hungarian Forint"},
+	{Code: "RON", Symbol: "lei", Name: "Romanian Leu"},
+}
+
+// currencyInfoMap provides O(1) lookup by code
+var currencyInfoMap map[string]CurrencyInfo
+
+// SupportedCurrencies is derived from BuiltinCurrencies for backward compatibility
+var SupportedCurrencies []string
+
+func init() {
+	currencyInfoMap = make(map[string]CurrencyInfo, len(BuiltinCurrencies))
+	SupportedCurrencies = make([]string, len(BuiltinCurrencies))
+	for i, c := range BuiltinCurrencies {
+		currencyInfoMap[c.Code] = c
+		SupportedCurrencies[i] = c.Code
+	}
+}
+
+// GetCurrencyInfo returns metadata for a currency code, with a fallback for unknown codes
+func GetCurrencyInfo(code string) CurrencyInfo {
+	if info, ok := currencyInfoMap[code]; ok {
+		return info
+	}
+	return CurrencyInfo{Code: code, Symbol: code, Name: code}
+}
+
+// GetAvailableCurrencies returns all supported currencies
+func GetAvailableCurrencies() []CurrencyInfo {
+	return BuiltinCurrencies
+}
 
 // supportedCurrencySymbols returns the currencies as a comma-separated string for API calls
 func supportedCurrencySymbols() string {
@@ -193,14 +264,11 @@ func (s *CurrencyService) RefreshRates() error {
 		return fmt.Errorf("currency service not enabled")
 	}
 
-	// Fetch rates for major base currencies
-	baseCurrencies := []string{"USD", "EUR"}
-
-	for _, base := range baseCurrencies {
-		_, err := s.fetchAndCacheRates(base, "USD") // Fetch all supported currencies (EUR base only due to free plan)
-		if err != nil {
-			return fmt.Errorf("failed to refresh rates for %s: %w", base, err)
-		}
+	// Fetch rates once with EUR base (free Fixer.io plan only supports EUR base)
+	// All cross-rates are calculated from this single API call
+	_, err := s.fetchAndCacheRates("EUR", "USD")
+	if err != nil {
+		return fmt.Errorf("failed to refresh rates: %w", err)
 	}
 
 	// Clean up old rates (keep last 7 days)

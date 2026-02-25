@@ -660,6 +660,51 @@
                 </div>
             </div>
 
+            <!-- Webhook Notifications -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Webhook Notifications</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Send notifications to any webhook endpoint (Slack, Discord, n8n, Home Assistant, etc.)</p>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 transition-colors duration-200">
+                    <form id="webhook-form" hx-post="/api/settings/webhook" hx-trigger="submit" hx-target="#webhook-message" hx-swap="innerHTML">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="webhook_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook URL</label>
+                                <input type="url" id="webhook_url" name="webhook_url"
+                                       value="{{if .WebhookConfig}}{{.WebhookConfig.URL}}{{end}}"
+                                       placeholder="https://example.com/webhook"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-150">
+                            </div>
+                            <div>
+                                <label for="webhook_headers" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Custom Headers <span class="text-gray-400 font-normal">(optional, one per line)</span></label>
+                                <textarea id="webhook_headers" name="webhook_headers" rows="3"
+                                          placeholder="Authorization: Bearer your-token-here&#10;X-Custom-Header: value"
+                                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-primary focus:border-primary font-mono transition-colors duration-150">{{if .WebhookConfig}}{{range $key, $value := .WebhookConfig.Headers}}{{$key}}: {{$value}}
+{{end}}{{end}}</textarea>
+                            </div>
+                            <div id="webhook-message"></div>
+                            <div class="flex justify-end space-x-3">
+                                <button type="button"
+                                        hx-post="/api/settings/webhook/test"
+                                        hx-include="#webhook-form"
+                                        hx-target="#webhook-message"
+                                        hx-indicator="#webhook-spinner"
+                                        class="bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center transition-colors duration-150">
+                                    <svg id="webhook-spinner" class="htmx-indicator animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Test Connection
+                                </button>
+                                <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
+                                    Save Webhook Settings
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- Security Settings -->
             <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Security</h3>
@@ -752,164 +797,68 @@
                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Choose your preferred currency for displaying subscription costs</p>
                 
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
-                               value="USD" 
-                               {{if or (eq .Currency "USD") (eq .Currency "")}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "USD"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">$ USD (US Dollar)</span>
-                    </label>
-                    
-                    <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
-                               value="EUR"
-                               {{if eq .Currency "EUR"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "EUR"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">€ EUR (Euro)</span>
-                    </label>
-
-                    <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
-                               value="GBP"
-                               {{if eq .Currency "GBP"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "GBP"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">£ GBP (British Pound)</span>
-                    </label>
-
-                    <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
-                               value="JPY"
-                               {{if eq .Currency "JPY"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "JPY"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">¥ JPY (Japanese Yen)</span>
-                    </label>
-
-                    <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
-                               value="RUB"
-                               {{if eq .Currency "RUB"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "RUB"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">₽ RUB (Russian Ruble)</span>
-                    </label>
-
-                    <label class="flex items-center">
-                        <input type="radio" 
-                               name="currency" 
-                               value="SEK"
-                               {{if eq .Currency "SEK"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "SEK"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">kr SEK (Swedish Krona)</span>
-                    </label>
-
-                    <label class="flex items-center">
+                    {{range .Currencies}}
+                    <label class="flex items-center cursor-pointer">
                         <input type="radio"
                                name="currency"
-                               value="PLN"
-                               {{if eq .Currency "PLN"}}checked{{end}}
+                               value="{{.Code}}"
+                               {{if eq .Code $.Currency}}checked{{end}}
                                hx-post="/api/settings/currency"
                                hx-trigger="change"
-                               hx-vals='{"currency": "PLN"}'
+                               hx-vals='{"currency": "{{.Code}}"}'
                                class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">zł PLN (Polish Zloty)</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{.Symbol}} {{.Code}} ({{.Name}})</span>
                     </label>
+                    {{end}}
+                </div>
 
-                    <label class="flex items-center">
-                        <input type="radio"
-                               name="currency"
-                               value="INR"
-                               {{if eq .Currency "INR"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "INR"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">₹ INR (Indian Rupee)</span>
-                    </label>
+                <div id="currency-message" class="mt-2"></div>
+            </div>
 
-                    <label class="flex items-center">
-                        <input type="radio"
-                               name="currency"
-                               value="CHF"
-                               {{if eq .Currency "CHF"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "CHF"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">Fr. CHF (Swiss Franc)</span>
-                    </label>
+            <!-- Date Format Settings -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Date Format</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Choose how dates are displayed throughout the application</p>
 
-                    <label class="flex items-center">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label class="flex items-center cursor-pointer">
                         <input type="radio"
-                               name="currency"
-                               value="BRL"
-                               {{if eq .Currency "BRL"}}checked{{end}}
-                               hx-post="/api/settings/currency"
+                               name="date_format"
+                               value="MM/DD/YYYY"
+                               {{if or (eq .DateFormat "MM/DD/YYYY") (eq .DateFormat "")}}checked{{end}}
+                               hx-post="/api/settings/date-format"
                                hx-trigger="change"
-                               hx-vals='{"currency": "BRL"}'
+                               hx-vals='{"date_format": "MM/DD/YYYY"}'
                                class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">R$ BRL (Brazilian Real)</span>
-                    </label>
-
-                    <label class="flex items-center">
-                        <input type="radio"
-                               name="currency"
-                               value="COP"
-                               {{if eq .Currency "COP"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "COP"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">$ COP (Colombian Peso)</span>
-                    </label>
-
-                    <label class="flex items-center">
-                        <input type="radio"
-                               name="currency"
-                               value="BDT"
-                               {{if eq .Currency "BDT"}}checked{{end}}
-                               hx-post="/api/settings/currency"
-                               hx-trigger="change"
-                               hx-vals='{"currency": "BDT"}'
-                               class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">৳ BDT (Bangladeshi Taka)</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">MM/DD/YYYY (02/24/2026)</span>
                     </label>
 
                     <label class="flex items-center cursor-pointer">
                         <input type="radio"
-                               name="currency"
-                               value="CNY"
-                               {{if eq .Currency "CNY"}}checked{{end}}
-                               hx-post="/api/settings/currency"
+                               name="date_format"
+                               value="DD/MM/YYYY"
+                               {{if eq .DateFormat "DD/MM/YYYY"}}checked{{end}}
+                               hx-post="/api/settings/date-format"
                                hx-trigger="change"
-                               hx-vals='{"currency": "CNY"}'
+                               hx-vals='{"date_format": "DD/MM/YYYY"}'
                                class="mr-2 text-primary focus:ring-primary">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">¥ CNY (Chinese Yuan)</span>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">DD/MM/YYYY (24/02/2026)</span>
+                    </label>
+
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio"
+                               name="date_format"
+                               value="YYYY-MM-DD"
+                               {{if eq .DateFormat "YYYY-MM-DD"}}checked{{end}}
+                               hx-post="/api/settings/date-format"
+                               hx-trigger="change"
+                               hx-vals='{"date_format": "YYYY-MM-DD"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">YYYY-MM-DD (2026-02-24)</span>
                     </label>
                 </div>
 
-                <div id="currency-message" class="mt-2"></div>
+                <div id="date-format-message" class="mt-2"></div>
             </div>
 
             <!-- Category Management -->

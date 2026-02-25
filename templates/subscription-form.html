@@ -80,18 +80,9 @@
                 <label for="original_currency" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Currency *</label>
                 <select id="original_currency" name="original_currency" required
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
-                    <option value="USD" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "USD"}}selected{{end}}{{else}}selected{{end}}>$ USD</option>
-                    <option value="EUR" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "EUR"}}selected{{end}}{{end}}>€ EUR</option>
-                    <option value="GBP" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "GBP"}}selected{{end}}{{end}}>£ GBP</option>
-                    <option value="JPY" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "JPY"}}selected{{end}}{{end}}>¥ JPY</option>
-                    <option value="RUB" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "RUB"}}selected{{end}}{{end}}>₽ RUB</option>
-                    <option value="SEK" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "SEK"}}selected{{end}}{{end}}>kr SEK</option>
-                    <option value="PLN" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "PLN"}}selected{{end}}{{end}}>zł PLN</option>
-                    <option value="INR" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "INR"}}selected{{end}}{{end}}>₹ INR</option>
-                    <option value="CHF" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "CHF"}}selected{{end}}{{end}}>Fr. CHF</option>
-                    <option value="BRL" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "BRL"}}selected{{end}}{{end}}>R$ BRL</option>
-                    <option value="COP" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "COP"}}selected{{end}}{{end}}>$ COP</option>
-                    <option value="BDT" {{if .Subscription}}{{if eq .Subscription.OriginalCurrency "BDT"}}selected{{end}}{{end}}>৳ BDT</option>
+                    {{range .Currencies}}
+                    <option value="{{.Code}}" {{if $.Subscription}}{{if eq $.Subscription.OriginalCurrency .Code}}selected{{end}}{{else}}{{if eq .Code "USD"}}selected{{end}}{{end}}>{{.Symbol}} {{.Code}}</option>
+                    {{end}}
                 </select>
             </div>
 
