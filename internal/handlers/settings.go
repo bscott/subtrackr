@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/http"
 	"net/smtp"
 	"strconv"
@@ -582,14 +583,18 @@ func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
 	// Temporarily save config for testing
 	originalConfig, _ := h.service.GetPushoverConfig()
 	defer func() {
+		var restoreErr error
 		if originalConfig != nil {
-			h.service.SavePushoverConfig(originalConfig)
+			restoreErr = h.service.SavePushoverConfig(originalConfig)
 		} else {
 			// No original config existed, so delete the test config by saving empty values
-			h.service.SavePushoverConfig(&models.PushoverConfig{
+			restoreErr = h.service.SavePushoverConfig(&models.PushoverConfig{
 				UserKey:  "",
 				AppToken: "",
 			})
+		}
+		if restoreErr != nil {
+			log.Printf("Warning: failed to restore Pushover config after test: %v", restoreErr)
 		}
 	}()
 
@@ -626,6 +631,15 @@ func (h *SettingsHandler) SaveWebhookSettings(c *gin.Context) {
 	if config.URL == "" {
 		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
 			"Error": "Webhook URL is required",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Validate URL scheme to prevent SSRF
+	if !strings.HasPrefix(config.URL, "http://") && !strings.HasPrefix(config.URL, "https://") {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "Webhook URL must use http:// or https:// scheme",
 			"Type":  "error",
 		})
 		return
@@ -672,6 +686,15 @@ func (h *SettingsHandler) TestWebhookConnection(c *gin.Context) {
 		return
 	}
 
+	// Validate URL scheme to prevent SSRF
+	if !strings.HasPrefix(webhookURL, "http://") && !strings.HasPrefix(webhookURL, "https://") {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "Webhook URL must use http:// or https:// scheme",
+			"Type":  "error",
+		})
+		return
+	}
+
 	// Parse headers
 	headersRaw := c.PostForm("webhook_headers")
 	headers := make(map[string]string)
@@ -691,10 +714,14 @@ func (h *SettingsHandler) TestWebhookConnection(c *gin.Context) {
 	// Temporarily save config for testing
 	originalConfig, _ := h.service.GetWebhookConfig()
 	defer func() {
+		var restoreErr error
 		if originalConfig != nil {
-			h.service.SaveWebhookConfig(originalConfig)
+			restoreErr = h.service.SaveWebhookConfig(originalConfig)
 		} else {
-			h.service.SaveWebhookConfig(&models.WebhookConfig{})
+			restoreErr = h.service.SaveWebhookConfig(&models.WebhookConfig{})
+		}
+		if restoreErr != nil {
+			log.Printf("Warning: failed to restore webhook config after test: %v", restoreErr)
 		}
 	}()
 

@@ -264,14 +264,11 @@ func (s *CurrencyService) RefreshRates() error {
 		return fmt.Errorf("currency service not enabled")
 	}
 
-	// Fetch rates for major base currencies
-	baseCurrencies := []string{"USD", "EUR"}
-
-	for _, base := range baseCurrencies {
-		_, err := s.fetchAndCacheRates(base, "USD") // Fetch all supported currencies (EUR base only due to free plan)
-		if err != nil {
-			return fmt.Errorf("failed to refresh rates for %s: %w", base, err)
-		}
+	// Fetch rates once with EUR base (free Fixer.io plan only supports EUR base)
+	// All cross-rates are calculated from this single API call
+	_, err := s.fetchAndCacheRates("EUR", "USD")
+	if err != nil {
+		return fmt.Errorf("failed to refresh rates: %w", err)
 	}
 
 	// Clean up old rates (keep last 7 days)

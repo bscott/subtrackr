@@ -37,8 +37,7 @@ func TestWebhookService_SendWebhook_NoConfig(t *testing.T) {
 	}
 
 	err := ws.SendWebhook(payload)
-	assert.Error(t, err, "Should error when webhook is not configured")
-	assert.Contains(t, err.Error(), "webhook")
+	assert.NoError(t, err, "Should silently skip when webhook is not configured")
 }
 
 func TestWebhookService_SendWebhook_EmptyURL(t *testing.T) {
@@ -56,8 +55,7 @@ func TestWebhookService_SendWebhook_EmptyURL(t *testing.T) {
 	}
 
 	err := ws.SendWebhook(payload)
-	assert.Error(t, err, "Should error when webhook URL is empty")
-	assert.Contains(t, err.Error(), "URL required")
+	assert.NoError(t, err, "Should silently skip when webhook URL is empty")
 }
 
 func TestWebhookService_SendHighCostAlert_Disabled(t *testing.T) {
@@ -90,7 +88,7 @@ func TestWebhookService_SendHighCostAlert_EnabledNoConfig(t *testing.T) {
 	}
 
 	err := ws.SendHighCostAlert(sub)
-	assert.Error(t, err, "Should error when webhook is not configured")
+	assert.NoError(t, err, "Should silently skip when webhook is not configured")
 }
 
 func TestWebhookService_SendRenewalReminder_Disabled(t *testing.T) {
@@ -125,7 +123,7 @@ func TestWebhookService_SendRenewalReminder_EnabledNoConfig(t *testing.T) {
 	}
 
 	err := ws.SendRenewalReminder(sub, 3)
-	assert.Error(t, err, "Should error when webhook is not configured")
+	assert.NoError(t, err, "Should silently skip when webhook is not configured")
 }
 
 func TestWebhookService_SendCancellationReminder_Disabled(t *testing.T) {
@@ -160,7 +158,7 @@ func TestWebhookService_SendCancellationReminder_EnabledNoConfig(t *testing.T) {
 	}
 
 	err := ws.SendCancellationReminder(sub, 5)
-	assert.Error(t, err, "Should error when webhook is not configured")
+	assert.NoError(t, err, "Should silently skip when webhook is not configured")
 }
 
 func TestSubscriptionToWebhook(t *testing.T) {
@@ -261,11 +259,8 @@ func TestWebhookService_SendRenewalReminder_DaysText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// This will fail at the webhook send level (no config), not at the days text level
 			err := ws.SendRenewalReminder(sub, tt.daysUntil)
-			assert.Error(t, err, "Should error when webhook is not configured")
-			// Verify it got past the enabled check
-			assert.NotContains(t, err.Error(), "disabled")
+			assert.NoError(t, err, "Should silently skip when webhook is not configured")
 		})
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"subtrackr/internal/config"
 	"subtrackr/internal/database"
 	"subtrackr/internal/handlers"
@@ -515,12 +516,20 @@ func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionServi
 				log.Printf("Warning: Failed to update last reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
 			}
 
+			var failed []string
 			if emailErr != nil {
-				log.Printf("Sent Pushover renewal reminder for subscription %s (renews in %d days) - email failed: %v", sub.Name, daysUntil, emailErr)
-			} else if pushoverErr != nil {
-				log.Printf("Sent email renewal reminder for subscription %s (renews in %d days) - Pushover failed: %v", sub.Name, daysUntil, pushoverErr)
+				failed = append(failed, fmt.Sprintf("email=%v", emailErr))
+			}
+			if pushoverErr != nil {
+				failed = append(failed, fmt.Sprintf("pushover=%v", pushoverErr))
+			}
+			if webhookErr != nil {
+				failed = append(failed, fmt.Sprintf("webhook=%v", webhookErr))
+			}
+			if len(failed) > 0 {
+				log.Printf("Sent renewal reminder for subscription %s (renews in %d days) - some channels failed: %s", sub.Name, daysUntil, strings.Join(failed, ", "))
 			} else {
-				log.Printf("Sent renewal reminders (email and Pushover) for subscription %s (renews in %d days)", sub.Name, daysUntil)
+				log.Printf("Sent renewal reminders for subscription %s (renews in %d days)", sub.Name, daysUntil)
 			}
 			sentCount++
 		}
@@ -613,12 +622,20 @@ func checkAndSendCancellationReminders(subscriptionService *service.Subscription
 				log.Printf("Warning: Failed to update last cancellation reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
 			}
 
+			var failed []string
 			if emailErr != nil {
-				log.Printf("Sent Pushover cancellation reminder for subscription %s (ends in %d days) - email failed: %v", sub.Name, daysUntil, emailErr)
-			} else if pushoverErr != nil {
-				log.Printf("Sent email cancellation reminder for subscription %s (ends in %d days) - Pushover failed: %v", sub.Name, daysUntil, pushoverErr)
+				failed = append(failed, fmt.Sprintf("email=%v", emailErr))
+			}
+			if pushoverErr != nil {
+				failed = append(failed, fmt.Sprintf("pushover=%v", pushoverErr))
+			}
+			if webhookErr != nil {
+				failed = append(failed, fmt.Sprintf("webhook=%v", webhookErr))
+			}
+			if len(failed) > 0 {
+				log.Printf("Sent cancellation reminder for subscription %s (ends in %d days) - some channels failed: %s", sub.Name, daysUntil, strings.Join(failed, ", "))
 			} else {
-				log.Printf("Sent cancellation reminders (email and Pushover) for subscription %s (ends in %d days)", sub.Name, daysUntil)
+				log.Printf("Sent cancellation reminders for subscription %s (ends in %d days)", sub.Name, daysUntil)
 			}
 			sentCount++
 		}

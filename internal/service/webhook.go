@@ -75,11 +75,8 @@ func subscriptionToWebhook(sub *models.Subscription, settings *SettingsService) 
 // SendWebhook sends a payload to the configured webhook endpoint
 func (w *WebhookService) SendWebhook(payload *WebhookPayload) error {
 	config, err := w.settingsService.GetWebhookConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get webhook config: %w", err)
-	}
-	if config.URL == "" {
-		return fmt.Errorf("webhook not configured: URL required")
+	if err != nil || config.URL == "" {
+		return nil // Not configured, silently skip (matches email/pushover behavior)
 	}
 
 	jsonData, err := json.Marshal(payload)
