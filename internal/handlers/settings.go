@@ -8,11 +8,17 @@ import (
 	"net/http"
 	"net/smtp"
 	"strconv"
+	"strings"
 	"subtrackr/internal/models"
 	"subtrackr/internal/service"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+func splitLines(s string) []string { return strings.Split(s, "\n") }
+func trimSpace(s string) string    { return strings.TrimSpace(s) }
+func splitN(s, sep string, n int) []string { return strings.SplitN(s, sep, n) }
 
 type SettingsHandler struct {
 	service *service.SettingsService
@@ -295,7 +301,8 @@ func (h *SettingsHandler) ListAPIKeys(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "api-keys-list.html", gin.H{
-		"Keys": keys,
+		"Keys":         keys,
+		"GoDateFormat": h.service.GetGoDateFormat(),
 	})
 }
 
@@ -349,7 +356,8 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "api-keys-list.html", gin.H{
-		"Keys": keys,
+		"Keys":         keys,
+		"GoDateFormat": h.service.GetGoDateFormat(),
 	})
 }
 
@@ -390,6 +398,19 @@ func (h *SettingsHandler) UpdateCurrency(c *gin.Context) {
 		"currency": currency,
 		"symbol":   h.service.GetCurrencySymbol(),
 	})
+}
+
+// UpdateDateFormat updates the date format preference
+func (h *SettingsHandler) UpdateDateFormat(c *gin.Context) {
+	format := c.PostForm("date_format")
+
+	err := h.service.SetDateFormat(format)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"date_format": format})
 }
 
 // ToggleDarkMode toggles dark mode preference
@@ -593,6 +614,117 @@ func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
 
 	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
 		"Message": "Pushover connection test successful! Check your device for the test notification.",
+		"Type":    "success",
+	})
+}
+
+// SaveWebhookSettings saves Webhook configuration
+func (h *SettingsHandler) SaveWebhookSettings(c *gin.Context) {
+	var config models.WebhookConfig
+	config.URL = c.PostForm("webhook_url")
+
+	if config.URL == "" {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "Webhook URL is required",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Parse headers from textarea (Key: Value format, one per line)
+	headersRaw := c.PostForm("webhook_headers")
+	headers := make(map[string]string)
+	for _, line := range splitLines(headersRaw) {
+		line = trimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := splitN(line, ":", 2)
+		if len(parts) == 2 {
+			headers[trimSpace(parts[0])] = trimSpace(parts[1])
+		}
+	}
+	config.Headers = headers
+
+	err := h.service.SaveWebhookConfig(&config)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "smtp-message.html", gin.H{
+			"Error": err.Error(),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
+		"Message": "Webhook settings saved successfully",
+		"Type":    "success",
+	})
+}
+
+// TestWebhookConnection tests Webhook configuration
+func (h *SettingsHandler) TestWebhookConnection(c *gin.Context) {
+	webhookURL := c.PostForm("webhook_url")
+	if webhookURL == "" {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": "Webhook URL is required for testing",
+			"Type":  "error",
+		})
+		return
+	}
+
+	// Parse headers
+	headersRaw := c.PostForm("webhook_headers")
+	headers := make(map[string]string)
+	for _, line := range splitLines(headersRaw) {
+		line = trimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := splitN(line, ":", 2)
+		if len(parts) == 2 {
+			headers[trimSpace(parts[0])] = trimSpace(parts[1])
+		}
+	}
+
+	testConfig := &models.WebhookConfig{URL: webhookURL, Headers: headers}
+
+	// Temporarily save config for testing
+	originalConfig, _ := h.service.GetWebhookConfig()
+	defer func() {
+		if originalConfig != nil {
+			h.service.SaveWebhookConfig(originalConfig)
+		} else {
+			h.service.SaveWebhookConfig(&models.WebhookConfig{})
+		}
+	}()
+
+	if err := h.service.SaveWebhookConfig(testConfig); err != nil {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": fmt.Sprintf("Failed to save test config: %v", err),
+			"Type":  "error",
+		})
+		return
+	}
+
+	webhookService := service.NewWebhookService(h.service)
+	payload := &service.WebhookPayload{
+		Event:     "test",
+		Title:     "SubTrackr Test",
+		Message:   "This is a test notification from SubTrackr. If you received this, your webhook configuration is working correctly!",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	err := webhookService.SendWebhook(payload)
+	if err != nil {
+		c.HTML(http.StatusBadRequest, "smtp-message.html", gin.H{
+			"Error": fmt.Sprintf("Webhook test failed: %v", err),
+			"Type":  "error",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "smtp-message.html", gin.H{
+		"Message": "Webhook test successful! Check your endpoint for the test payload.",
 		"Type":    "success",
 	})
 }
