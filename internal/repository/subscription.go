@@ -9,7 +9,7 @@ import (
 )
 
 type SubscriptionRepository struct {
-	db *gorm.DB
+	db              *gorm.DB
 	hasLegacyColumn *bool
 }
 
@@ -21,7 +21,7 @@ func (r *SubscriptionRepository) checkLegacyColumn() bool {
 	if r.hasLegacyColumn != nil {
 		return *r.hasLegacyColumn
 	}
-	
+
 	var exists bool
 	r.db.Raw("SELECT COUNT(*) > 0 FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&exists)
 	r.hasLegacyColumn = &exists
@@ -31,7 +31,7 @@ func (r *SubscriptionRepository) checkLegacyColumn() bool {
 func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*models.Subscription, error) {
 	// Check if the old category column exists (for legacy schema support)
 	columnExists := r.checkLegacyColumn()
-	
+
 	if columnExists && subscription.CategoryID > 0 {
 		// For legacy schema, we need to populate the old category column
 		var category models.Category
@@ -51,11 +51,11 @@ func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*mod
 					subscription.CancellationDate, subscription.URL,
 					subscription.Notes, subscription.Usage, subscription.DateCalculationVersion,
 					time.Now(), time.Now())
-				
+
 				if result.Error != nil {
 					return result.Error
 				}
-				
+
 				// Get the last inserted ID within the transaction
 				var lastID int64
 				if err := tx.Raw("SELECT last_insert_rowid()").Scan(&lastID).Error; err != nil {
@@ -64,15 +64,15 @@ func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*mod
 				subscription.ID = uint(lastID)
 				return nil
 			})
-			
+
 			if err != nil {
 				return nil, err
 			}
-			
+
 			return subscription, nil
 		}
 	}
-	
+
 	// Normal creation for migrated schema
 	if err := r.db.Create(subscription).Error; err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (r *SubscriptionRepository) GetAllSorted(sortBy, order string) ([]models.Su
 
 	// Build order clause
 	orderClause := sortColumn + " " + strings.ToUpper(order)
-	
+
 	// Special handling for category (requires join)
 	if sortBy == "category" {
 		query = query.Joins("LEFT JOIN categories ON subscriptions.category_id = categories.id")
@@ -166,6 +166,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.IconURL = subscription.IconURL
 	existing.Notes = subscription.Notes
 	existing.Usage = subscription.Usage
+	existing.ReminderEnabled = subscription.ReminderEnabled
 
 	if columnExists && subscription.CategoryID > 0 {
 		// For legacy schema, we need to update the old category column too
@@ -173,25 +174,26 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 		if err := r.db.First(&category, subscription.CategoryID).Error; err == nil {
 			// We need to manually set the category name for legacy schema
 			updates := map[string]interface{}{
-				"name":               existing.Name,
-				"cost":               existing.Cost,
-				"schedule":           existing.Schedule,
-				"status":             existing.Status,
-				"category_id":        existing.CategoryID,
-				"category":           category.Name,
-				"original_currency":  existing.OriginalCurrency,
-				"payment_method":     existing.PaymentMethod,
-				"account":            existing.Account,
-				"start_date":         existing.StartDate,
-				"renewal_date":                existing.RenewalDate,
-				"cancellation_date":           existing.CancellationDate,
-				"url":                         existing.URL,
-				"icon_url":                    existing.IconURL,
-				"notes":                       existing.Notes,
-				"usage":                       existing.Usage,
-				"last_reminder_sent":          existing.LastReminderSent,
-				"last_reminder_renewal_date":  existing.LastReminderRenewalDate,
-				"updated_at":         time.Now(),
+				"name":                       existing.Name,
+				"cost":                       existing.Cost,
+				"schedule":                   existing.Schedule,
+				"status":                     existing.Status,
+				"category_id":                existing.CategoryID,
+				"category":                   category.Name,
+				"original_currency":          existing.OriginalCurrency,
+				"payment_method":             existing.PaymentMethod,
+				"account":                    existing.Account,
+				"start_date":                 existing.StartDate,
+				"renewal_date":               existing.RenewalDate,
+				"cancellation_date":          existing.CancellationDate,
+				"url":                        existing.URL,
+				"icon_url":                   existing.IconURL,
+				"notes":                      existing.Notes,
+				"usage":                      existing.Usage,
+				"last_reminder_sent":         existing.LastReminderSent,
+				"last_reminder_renewal_date": existing.LastReminderRenewalDate,
+				"reminder_enabled":           existing.ReminderEnabled,
+				"updated_at":                 time.Now(),
 			}
 			if err := r.db.Model(&existing).Where("id = ?", id).Updates(updates).Error; err != nil {
 				return nil, err
