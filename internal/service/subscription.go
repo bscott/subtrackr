@@ -115,6 +115,9 @@ func (s *SubscriptionService) GetSubscriptionsNeedingReminders(reminderDays int)
 		if sub.RenewalDate == nil {
 			continue
 		}
+		if !sub.ReminderEnabled {
+			continue
+		}
 
 		// Calculate days until renewal using proper date arithmetic
 		// Use time.Until for more accurate calculation (handles timezone differences better)
@@ -156,6 +159,9 @@ func (s *SubscriptionService) GetSubscriptionsNeedingCancellationReminders(remin
 	for i := range subscriptions {
 		sub := &subscriptions[i]
 		if sub.CancellationDate == nil {
+			continue
+		}
+		if !sub.ReminderEnabled {
 			continue
 		}
 

@@ -100,15 +100,15 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscription) bool {
 	threshold := h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0)
 	displayCurrency := h.settingsService.GetCurrency()
-	
+
 	// Get monthly cost in subscription's original currency
 	monthlyCost := subscription.MonthlyCost()
-	
+
 	// If currencies match or conversion is disabled, compare directly
 	if subscription.OriginalCurrency == displayCurrency || !h.currencyService.IsEnabled() {
 		return monthlyCost > threshold
 	}
-	
+
 	// Convert monthly cost to display currency
 	convertedMonthlyCost, err := h.currencyService.ConvertAmount(monthlyCost, subscription.OriginalCurrency, displayCurrency)
 	if err != nil {
@@ -118,7 +118,7 @@ func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscr
 		log.Printf("Warning: Failed to convert currency for high-cost check (%s to %s): %v. Using direct comparison.", subscription.OriginalCurrency, displayCurrency, err)
 		return monthlyCost > threshold
 	}
-	
+
 	// Compare converted monthly cost against threshold
 	return convertedMonthlyCost > threshold
 }
@@ -322,19 +322,19 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "calendar.html", gin.H{
-		"Title":                    "Calendar",
-		"CurrentPage":              "calendar",
-		"Year":                     year,
-		"Month":                    month,
-		"MonthName":                firstOfMonth.Format("January 2006"),
-		"EventsByDate":             template.JS(string(eventsJSON)),
-		"FirstOfMonth":             firstOfMonth,
-		"PrevMonth":                prevMonth,
-		"NextMonth":                nextMonth,
-		"CurrencySymbol":           h.settingsService.GetCurrencySymbol(),
-		"DarkMode":                 h.settingsService.IsDarkModeEnabled(),
-		"ICalSubscriptionEnabled":  icalSubscriptionEnabled,
-		"ICalSubscriptionURL":      icalSubscriptionURL,
+		"Title":                   "Calendar",
+		"CurrentPage":             "calendar",
+		"Year":                    year,
+		"Month":                   month,
+		"MonthName":               firstOfMonth.Format("January 2006"),
+		"EventsByDate":            template.JS(string(eventsJSON)),
+		"FirstOfMonth":            firstOfMonth,
+		"PrevMonth":               prevMonth,
+		"NextMonth":               nextMonth,
+		"CurrencySymbol":          h.settingsService.GetCurrencySymbol(),
+		"DarkMode":                h.settingsService.IsDarkModeEnabled(),
+		"ICalSubscriptionEnabled": icalSubscriptionEnabled,
+		"ICalSubscriptionURL":     icalSubscriptionURL,
 	})
 }
 
@@ -490,31 +490,31 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "settings.html", gin.H{
-		"Title":                     "Settings",
-		"CurrentPage":               "settings",
-		"Currency":                  h.settingsService.GetCurrency(),
-		"CurrencySymbol":            h.settingsService.GetCurrencySymbol(),
-		"RenewalReminders":          h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
-		"HighCostAlerts":            h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
-		"PushoverConfig":            pushoverConfig,
-		"PushoverConfigured":        pushoverConfigured,
-		"HighCostThreshold":         h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
-		"ReminderDays":              h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
-		"CancellationReminders":     h.settingsService.GetBoolSettingWithDefault("cancellation_reminders", false),
-		"CancellationReminderDays":  h.settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7),
-		"DarkMode":                  h.settingsService.IsDarkModeEnabled(),
-		"Version":                   version.GetVersion(),
-		"SMTPConfig":                smtpConfig,
-		"SMTPConfigured":            smtpConfigured,
-		"AuthEnabled":               authEnabled,
-		"AuthUsername":              authUsername,
-		"ICalSubscriptionEnabled":   icalSubscriptionEnabled,
-		"ICalSubscriptionURL":       icalSubscriptionURL,
-		"BaseURL":                   h.settingsService.GetBaseURL(),
-		"Currencies":                service.GetAvailableCurrencies(),
-		"DateFormat":                h.settingsService.GetDateFormat(),
-		"WebhookConfig":             webhookConfig,
-		"WebhookConfigured":         webhookConfigured,
+		"Title":                    "Settings",
+		"CurrentPage":              "settings",
+		"Currency":                 h.settingsService.GetCurrency(),
+		"CurrencySymbol":           h.settingsService.GetCurrencySymbol(),
+		"RenewalReminders":         h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
+		"HighCostAlerts":           h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
+		"PushoverConfig":           pushoverConfig,
+		"PushoverConfigured":       pushoverConfigured,
+		"HighCostThreshold":        h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
+		"ReminderDays":             h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
+		"CancellationReminders":    h.settingsService.GetBoolSettingWithDefault("cancellation_reminders", false),
+		"CancellationReminderDays": h.settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7),
+		"DarkMode":                 h.settingsService.IsDarkModeEnabled(),
+		"Version":                  version.GetVersion(),
+		"SMTPConfig":               smtpConfig,
+		"SMTPConfigured":           smtpConfigured,
+		"AuthEnabled":              authEnabled,
+		"AuthUsername":             authUsername,
+		"ICalSubscriptionEnabled":  icalSubscriptionEnabled,
+		"ICalSubscriptionURL":      icalSubscriptionURL,
+		"BaseURL":                  h.settingsService.GetBaseURL(),
+		"Currencies":               service.GetAvailableCurrencies(),
+		"DateFormat":               h.settingsService.GetDateFormat(),
+		"WebhookConfig":            webhookConfig,
+		"WebhookConfigured":        webhookConfigured,
 	})
 }
 
@@ -581,6 +581,14 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
+	// Default reminders to enabled unless explicitly set to false
+	reminderVal := c.PostForm("reminder_enabled")
+	if reminderVal == "" {
+		subscription.ReminderEnabled = true
+	} else {
+		subscription.ReminderEnabled = reminderVal == "true"
+	}
+
 	// Parse cost
 	if costStr := c.PostForm("cost"); costStr != "" {
 		if cost, err := strconv.ParseFloat(costStr, 64); err == nil {
@@ -601,9 +609,9 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	if err != nil {
 		// Log the error for debugging
 		log.Printf("Failed to create subscription: %v", err)
-		log.Printf("Subscription data: Name=%s, CategoryID=%d, Status=%s, Schedule=%s", 
+		log.Printf("Subscription data: Name=%s, CategoryID=%d, Status=%s, Schedule=%s",
 			subscription.Name, subscription.CategoryID, subscription.Status, subscription.Schedule)
-		
+
 		if c.GetHeader("HX-Request") != "" {
 			c.Header("HX-Retarget", "#form-errors")
 			c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
@@ -670,61 +678,91 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		return
 	}
 
-	var subscription models.Subscription
+	// Fetch existing subscription first — only overwrite fields actually sent in the request
+	existing, err := h.service.GetByID(uint(id))
+	if err != nil || existing == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Subscription not found"})
+		return
+	}
 
-	// Parse form data (similar to CreateSubscription)
-	subscription.Name = c.PostForm("name")
-	// Parse category_id as uint
-	if categoryIDStr := c.PostForm("category_id"); categoryIDStr != "" {
-		if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
-			subscription.CategoryID = uint(categoryID)
+	wasHighCost := h.isHighCostWithCurrency(existing)
+
+	// Merge form data: only update fields that were actually submitted
+	if val, ok := c.GetPostForm("name"); ok {
+		existing.Name = val
+	}
+	if val, ok := c.GetPostForm("category_id"); ok && val != "" {
+		if categoryID, err := strconv.ParseUint(val, 10, 32); err == nil {
+			existing.CategoryID = uint(categoryID)
 		}
 	}
-	subscription.Schedule = c.PostForm("schedule")
-	subscription.Status = c.PostForm("status")
-	subscription.OriginalCurrency = c.PostForm("original_currency")
-	if subscription.OriginalCurrency == "" {
-		subscription.OriginalCurrency = "USD" // Default to USD
+	if val, ok := c.GetPostForm("schedule"); ok {
+		existing.Schedule = val
 	}
-	subscription.PaymentMethod = c.PostForm("payment_method")
-	subscription.Account = c.PostForm("account")
-	subscription.URL = c.PostForm("url")
-	subscription.IconURL = c.PostForm("icon_url") // Allow manual icon URL override
-	subscription.Notes = c.PostForm("notes")
-	subscription.Usage = c.PostForm("usage")
+	if val, ok := c.GetPostForm("status"); ok {
+		existing.Status = val
+	}
+	if val, ok := c.GetPostForm("original_currency"); ok {
+		if val == "" {
+			existing.OriginalCurrency = "USD"
+		} else {
+			existing.OriginalCurrency = val
+		}
+	}
+	if val, ok := c.GetPostForm("payment_method"); ok {
+		existing.PaymentMethod = val
+	}
+	if val, ok := c.GetPostForm("account"); ok {
+		existing.Account = val
+	}
 
-	// Parse cost
-	if costStr := c.PostForm("cost"); costStr != "" {
-		if cost, err := strconv.ParseFloat(costStr, 64); err == nil {
-			subscription.Cost = cost
+	// Track URL changes for logo refresh
+	oldURL := existing.URL
+	if val, ok := c.GetPostForm("url"); ok {
+		existing.URL = val
+	}
+	urlChanged := existing.URL != oldURL
+
+	if val, ok := c.GetPostForm("icon_url"); ok && val != "" {
+		existing.IconURL = val
+	} else if urlChanged {
+		// URL changed but no explicit icon — re-fetch
+		existing.IconURL = ""
+	}
+
+	if val, ok := c.GetPostForm("notes"); ok {
+		existing.Notes = val
+	}
+	if val, ok := c.GetPostForm("usage"); ok {
+		existing.Usage = val
+	}
+	if val, ok := c.GetPostForm("reminder_enabled"); ok {
+		existing.ReminderEnabled = val == "true"
+	}
+	if val, ok := c.GetPostForm("cost"); ok && val != "" {
+		if cost, err := strconv.ParseFloat(val, 64); err == nil {
+			existing.Cost = cost
 		}
 	}
 
-	// Parse dates using helper function
-	// Always parse renewal date if provided; let service/model layer handle schedule change logic
-	subscription.StartDate = parseDatePtr(c.PostForm("start_date"))
-	subscription.RenewalDate = parseDatePtr(c.PostForm("renewal_date"))
-	subscription.CancellationDate = parseDatePtr(c.PostForm("cancellation_date"))
-
-	// Get the original subscription to check if it was high-cost before update
-	original, _ := h.service.GetByID(uint(id))
-	wasHighCost := original != nil && h.isHighCostWithCurrency(original)
-
-	// Check if URL changed - if so, we should fetch a new logo
-	urlChanged := original != nil && original.URL != subscription.URL
-
-	// Preserve existing IconURL if not explicitly set in form,
-	// but only when the URL has NOT changed (so we re-fetch on URL change)
-	if subscription.IconURL == "" && original != nil && !urlChanged {
-		subscription.IconURL = original.IconURL
+	// Parse dates — only update if the field was submitted
+	if val, ok := c.GetPostForm("start_date"); ok {
+		existing.StartDate = parseDatePtr(val)
+	}
+	if val, ok := c.GetPostForm("renewal_date"); ok {
+		existing.RenewalDate = parseDatePtr(val)
+	}
+	if val, ok := c.GetPostForm("cancellation_date"); ok {
+		existing.CancellationDate = parseDatePtr(val)
 	}
 
-	if urlChanged || (subscription.URL != "" && subscription.IconURL == "") {
-		h.fetchAndSetLogo(&subscription)
+	// Fetch new logo if URL changed or URL is set but no icon
+	if urlChanged || (existing.URL != "" && existing.IconURL == "") {
+		h.fetchAndSetLogo(existing)
 	}
 
 	// Update subscription
-	updated, err := h.service.Update(uint(id), &subscription)
+	updated, err := h.service.Update(uint(id), existing)
 	if err != nil {
 		c.Header("HX-Retarget", "#form-errors")
 		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{

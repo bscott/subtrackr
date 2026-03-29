@@ -40,8 +40,8 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name         string
-		reminderDays int
+		name          string
+		reminderDays  int
 		subscriptions []models.Subscription
 		expectedCount int
 		description   string
@@ -406,17 +406,17 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_DuplicatePreventio
 	subscriptionService := NewSubscriptionService(subscriptionRepo, categoryService)
 
 	now := time.Now()
-	renewalDate := now.AddDate(0, 0, 5) // 5 days from now
+	renewalDate := now.AddDate(0, 0, 5)       // 5 days from now
 	lastReminderDate := now.AddDate(0, 0, -1) // 1 day ago
 
 	// Create subscription with reminder already sent for this renewal date
 	sub := &models.Subscription{
-		Name:                   "Test Subscription",
-		Cost:                   10.00,
-		Schedule:               "Monthly",
-		Status:                 "Active",
-		RenewalDate:            &renewalDate,
-		LastReminderSent:       &lastReminderDate,
+		Name:                    "Test Subscription",
+		Cost:                    10.00,
+		Schedule:                "Monthly",
+		Status:                  "Active",
+		RenewalDate:             &renewalDate,
+		LastReminderSent:        &lastReminderDate,
 		LastReminderRenewalDate: &renewalDate, // Same as current renewal date
 	}
 	err := db.Create(sub).Error
@@ -450,8 +450,54 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_DuplicatePreventio
 	assert.Equal(t, 1, len(result), "Should find subscription when renewal date changes")
 }
 
+func TestSubscriptionService_GetSubscriptionsNeedingReminders_ReminderDisabled(t *testing.T) {
+	db := setupRenewalReminderTestDB(t)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
+	categoryService := NewCategoryService(categoryRepo)
+	subscriptionService := NewSubscriptionService(subscriptionRepo, categoryService)
+
+	now := time.Now()
+	renewalDate := now.AddDate(0, 0, 5)
+
+	// Create subscription with reminders disabled
+	sub := &models.Subscription{
+		Name:            "No Reminders Sub",
+		Cost:            10.00,
+		Schedule:        "Monthly",
+		Status:          "Active",
+		RenewalDate:     &renewalDate,
+		ReminderEnabled: true,
+	}
+	err := db.Create(sub).Error
+	assert.NoError(t, err)
+	// Explicitly disable after create (GORM skips false for default:true fields)
+	db.Model(sub).Update("reminder_enabled", false)
+
+	// Should not be included in reminders
+	result, err := subscriptionService.GetSubscriptionsNeedingReminders(7)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(result), "Should not find subscription with reminders disabled")
+
+	// Create subscription with reminders enabled
+	sub2 := &models.Subscription{
+		Name:            "With Reminders Sub",
+		Cost:            20.00,
+		Schedule:        "Monthly",
+		Status:          "Active",
+		RenewalDate:     &renewalDate,
+		ReminderEnabled: true,
+	}
+	err = db.Create(sub2).Error
+	assert.NoError(t, err)
+
+	// Should find only the enabled one
+	result, err = subscriptionService.GetSubscriptionsNeedingReminders(7)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result), "Should only find subscription with reminders enabled")
+}
+
 // Helper function to create time pointer
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
-
