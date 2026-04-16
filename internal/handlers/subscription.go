@@ -33,17 +33,19 @@ type SubscriptionHandler struct {
 	currencyService *service.CurrencyService
 	emailService    *service.EmailService
 	pushoverService *service.PushoverService
+	webhookService  *service.WebhookService
 	logoService     *service.LogoService
 	categoryService *service.CategoryService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, logoService *service.LogoService, categoryService *service.CategoryService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, logoService *service.LogoService, categoryService *service.CategoryService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
 		currencyService: currencyService,
 		emailService:    emailService,
 		pushoverService: pushoverService,
+		webhookService:  webhookService,
 		logoService:     logoService,
 		categoryService: categoryService,
 	}
@@ -74,6 +76,13 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 				enriched.ConvertedMonthlyCost = sub.MonthlyCost() * ratio
 				enriched.ShowConversion = true
 			}
+		} else if sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
+			// Different currency but conversion not available - show original currency
+			enriched.ConvertedCost = sub.Cost
+			enriched.ConvertedAnnualCost = sub.AnnualCost()
+			enriched.ConvertedMonthlyCost = sub.MonthlyCost()
+			enriched.DisplayCurrency = sub.OriginalCurrency
+			enriched.DisplayCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 		} else {
 			// Same currency or no conversion needed
 			enriched.ConvertedCost = sub.Cost
@@ -93,15 +102,15 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscription) bool {
 	threshold := h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0)
 	displayCurrency := h.settingsService.GetCurrency()
-	
+
 	// Get monthly cost in subscription's original currency
 	monthlyCost := subscription.MonthlyCost()
-	
+
 	// If currencies match or conversion is disabled, compare directly
 	if subscription.OriginalCurrency == displayCurrency || !h.currencyService.IsEnabled() {
 		return monthlyCost > threshold
 	}
-	
+
 	// Convert monthly cost to display currency
 	convertedMonthlyCost, err := h.currencyService.ConvertAmount(monthlyCost, subscription.OriginalCurrency, displayCurrency)
 	if err != nil {
@@ -111,7 +120,7 @@ func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscr
 		log.Printf("Warning: Failed to convert currency for high-cost check (%s to %s): %v. Using direct comparison.", subscription.OriginalCurrency, displayCurrency, err)
 		return monthlyCost > threshold
 	}
-	
+
 	// Compare converted monthly cost against threshold
 	return convertedMonthlyCost > threshold
 }
@@ -209,6 +218,7 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 		"SortBy":         sortBy,
 		"Order":          order,
+		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 	})
 }
 
@@ -296,48 +306,67 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
 
+	// Build iCal subscription URL if enabled
+	icalSubscriptionEnabled := h.settingsService.IsICalSubscriptionEnabled()
+	var icalSubscriptionURL string
+	if icalSubscriptionEnabled {
+		token, err := h.settingsService.GetOrGenerateICalToken()
+		if err == nil {
+			icalSubscriptionURL = buildBaseURL(c, h.settingsService.GetBaseURL()) + "/ical/" + token
+		}
+	}
+
 	c.HTML(http.StatusOK, "calendar.html", gin.H{
-		"Title":          "Calendar",
-		"CurrentPage":    "calendar",
-		"Year":           year,
-		"Month":          month,
-		"MonthName":      firstOfMonth.Format("January 2006"),
-		"EventsByDate":   template.JS(string(eventsJSON)),
-		"FirstOfMonth":   firstOfMonth,
-		"PrevMonth":      prevMonth,
-		"NextMonth":      nextMonth,
-		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
-		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
+		"Title":                   "Calendar",
+		"CurrentPage":             "calendar",
+		"Year":                    year,
+		"Month":                   month,
+		"MonthName":               firstOfMonth.Format("January 2006"),
+		"EventsByDate":            template.JS(string(eventsJSON)),
+		"FirstOfMonth":            firstOfMonth,
+		"PrevMonth":               prevMonth,
+		"NextMonth":               nextMonth,
+		"CurrencySymbol":          h.settingsService.GetCurrencySymbol(),
+		"DarkMode":                h.settingsService.IsDarkModeEnabled(),
+		"ICalSubscriptionEnabled": icalSubscriptionEnabled,
+		"ICalSubscriptionURL":     icalSubscriptionURL,
 	})
 }
 
-// ExportICal generates and downloads an iCal file with all subscription renewal dates
-func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
+// generateICalContent generates iCal content for all active subscriptions
+// If forSubscription is true, adds subscription-friendly properties for calendar polling
+func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string, error) {
 	subscriptions, err := h.service.GetAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return "", err
 	}
 
-	// Generate iCal content
 	icalContent := "BEGIN:VCALENDAR\r\n"
 	icalContent += "VERSION:2.0\r\n"
 	icalContent += "PRODID:-//SubTrackr//Subscription Renewals//EN\r\n"
 	icalContent += "CALSCALE:GREGORIAN\r\n"
 	icalContent += "METHOD:PUBLISH\r\n"
 
+	if forSubscription {
+		icalContent += "X-WR-CALNAME:SubTrackr Renewals\r\n"
+		icalContent += "REFRESH-INTERVAL;VALUE=DURATION:PT1H\r\n"
+		icalContent += "X-PUBLISHED-TTL:PT1H\r\n"
+	}
+
 	now := time.Now()
 	for _, sub := range subscriptions {
 		if sub.RenewalDate != nil && sub.Status == "Active" {
-			// Format dates in iCal format (YYYYMMDDTHHMMSSZ)
 			dtStart := sub.RenewalDate.Format("20060102T150000Z")
 			dtEnd := sub.RenewalDate.Add(1 * time.Hour).Format("20060102T150000Z")
 			dtStamp := now.Format("20060102T150000Z")
 			uid := fmt.Sprintf("subtrackr-%d-%d@subtrackr", sub.ID, sub.RenewalDate.Unix())
 
-			// Escape text for iCal (simplified - should escape commas, semicolons, etc.)
 			summary := fmt.Sprintf("%s Renewal", sub.Name)
-			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, h.settingsService.GetCurrencySymbol(), sub.Cost, sub.DisplaySchedule())
+			subCurrencySymbol := h.settingsService.GetCurrencySymbol()
+			if sub.OriginalCurrency != "" && sub.OriginalCurrency != h.settingsService.GetCurrency() {
+				subCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
+			}
+			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, subCurrencySymbol, sub.Cost, sub.DisplaySchedule())
 			if sub.URL != "" {
 				description += fmt.Sprintf("\\nURL: %s", sub.URL)
 			}
@@ -374,10 +403,43 @@ func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
 	}
 
 	icalContent += "END:VCALENDAR\r\n"
+	return icalContent, nil
+}
 
-	// Set headers for file download
+// ExportICal generates and downloads an iCal file with all subscription renewal dates
+func (h *SubscriptionHandler) ExportICal(c *gin.Context) {
+	icalContent, err := h.generateICalContent(false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.Header("Content-Type", "text/calendar; charset=utf-8")
 	c.Header("Content-Disposition", `attachment; filename="subtrackr-renewals.ics"`)
+	c.Data(http.StatusOK, "text/calendar; charset=utf-8", []byte(icalContent))
+}
+
+// ServeICalSubscription serves iCal content for calendar subscription (public, token-validated)
+func (h *SubscriptionHandler) ServeICalSubscription(c *gin.Context) {
+	token := c.Param("token")
+
+	if !h.settingsService.IsICalSubscriptionEnabled() {
+		c.String(http.StatusNotFound, "iCal subscription is not enabled")
+		return
+	}
+
+	if !h.settingsService.ValidateICalToken(token) {
+		c.String(http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	icalContent, err := h.generateICalContent(true)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to generate calendar")
+		return
+	}
+
+	c.Header("Content-Type", "text/calendar; charset=utf-8")
 	c.Data(http.StatusOK, "text/calendar; charset=utf-8", []byte(icalContent))
 }
 
@@ -403,29 +465,55 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		pushoverConfigured = true
 	}
 
+	// Load Webhook config if available
+	var webhookConfig *models.WebhookConfig
+	webhookConfigured := false
+	webhookCfg, err := h.settingsService.GetWebhookConfig()
+	if err == nil && webhookCfg != nil && webhookCfg.URL != "" {
+		webhookConfig = webhookCfg
+		webhookConfigured = true
+	}
+
 	// Get auth settings
 	authEnabled := h.settingsService.IsAuthEnabled()
 	authUsername, _ := h.settingsService.GetAuthUsername()
 
+	// Build iCal subscription URL if enabled
+	icalSubscriptionEnabled := h.settingsService.IsICalSubscriptionEnabled()
+	var icalSubscriptionURL string
+	if icalSubscriptionEnabled {
+		token, err := h.settingsService.GetOrGenerateICalToken()
+		if err == nil {
+			icalSubscriptionURL = buildBaseURL(c, h.settingsService.GetBaseURL()) + "/ical/" + token
+		}
+	}
+
 	c.HTML(http.StatusOK, "settings.html", gin.H{
-		"Title":                     "Settings",
-		"CurrentPage":               "settings",
-		"Currency":                  h.settingsService.GetCurrency(),
-		"CurrencySymbol":            h.settingsService.GetCurrencySymbol(),
-		"RenewalReminders":          h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
-		"HighCostAlerts":            h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
-		"PushoverConfig":            pushoverConfig,
-		"PushoverConfigured":        pushoverConfigured,
-		"HighCostThreshold":         h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
-		"ReminderDays":              h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
-		"CancellationReminders":     h.settingsService.GetBoolSettingWithDefault("cancellation_reminders", false),
-		"CancellationReminderDays":  h.settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7),
-		"DarkMode":                  h.settingsService.IsDarkModeEnabled(),
-		"Version":                   version.GetVersion(),
-		"SMTPConfig":                smtpConfig,
-		"SMTPConfigured":            smtpConfigured,
-		"AuthEnabled":               authEnabled,
-		"AuthUsername":              authUsername,
+		"Title":                    "Settings",
+		"CurrentPage":              "settings",
+		"Currency":                 h.settingsService.GetCurrency(),
+		"CurrencySymbol":           h.settingsService.GetCurrencySymbol(),
+		"RenewalReminders":         h.settingsService.GetBoolSettingWithDefault("renewal_reminders", false),
+		"HighCostAlerts":           h.settingsService.GetBoolSettingWithDefault("high_cost_alerts", true),
+		"PushoverConfig":           pushoverConfig,
+		"PushoverConfigured":       pushoverConfigured,
+		"HighCostThreshold":        h.settingsService.GetFloatSettingWithDefault("high_cost_threshold", 50.0),
+		"ReminderDays":             h.settingsService.GetIntSettingWithDefault("reminder_days", 7),
+		"CancellationReminders":    h.settingsService.GetBoolSettingWithDefault("cancellation_reminders", false),
+		"CancellationReminderDays": h.settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7),
+		"DarkMode":                 h.settingsService.IsDarkModeEnabled(),
+		"Version":                  version.GetVersion(),
+		"SMTPConfig":               smtpConfig,
+		"SMTPConfigured":           smtpConfigured,
+		"AuthEnabled":              authEnabled,
+		"AuthUsername":             authUsername,
+		"ICalSubscriptionEnabled":  icalSubscriptionEnabled,
+		"ICalSubscriptionURL":      icalSubscriptionURL,
+		"BaseURL":                  h.settingsService.GetBaseURL(),
+		"Currencies":               service.GetAvailableCurrencies(),
+		"DateFormat":               h.settingsService.GetDateFormat(),
+		"WebhookConfig":            webhookConfig,
+		"WebhookConfigured":        webhookConfigured,
 	})
 }
 
@@ -452,6 +540,7 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"SortBy":         sortBy,
 		"Order":          order,
+		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 	})
 }
 
@@ -492,6 +581,14 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
+	// Default reminders to enabled unless explicitly set to false
+	reminderVal := c.PostForm("reminder_enabled")
+	if reminderVal == "" {
+		subscription.ReminderEnabled = true
+	} else {
+		subscription.ReminderEnabled = reminderVal == "true"
+	}
+
 	// Parse cost
 	if costStr := c.PostForm("cost"); costStr != "" {
 		if cost, err := strconv.ParseFloat(costStr, 64); err == nil {
@@ -514,7 +611,7 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		log.Printf("Failed to create subscription: %v", err)
 		log.Printf("Subscription data: Name=%s, CategoryID=%d, Status=%s, Schedule=%s",
 			subscription.Name, subscription.CategoryID, subscription.Status, subscription.Schedule)
-		
+
 		if c.GetHeader("HX-Request") != "" {
 			c.Header("HX-Retarget", "#form-errors")
 			c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
@@ -540,6 +637,10 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
 				// Log error but don't fail the request
 				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
+			}
+			// Send Webhook notification
+			if err := h.webhookService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				log.Printf("Failed to send high-cost alert webhook: %v", err)
 			}
 		}
 	}
@@ -577,59 +678,94 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		return
 	}
 
-	var subscription models.Subscription
+	// Fetch existing subscription first — only overwrite fields actually sent in the request
+	existing, err := h.service.GetByID(uint(id))
+	if err != nil || existing == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Subscription not found"})
+		return
+	}
 
-	// Parse form data (similar to CreateSubscription)
-	subscription.Name = c.PostForm("name")
-	// Parse category_id as uint
-	if categoryIDStr := c.PostForm("category_id"); categoryIDStr != "" {
-		if categoryID, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
-			subscription.CategoryID = uint(categoryID)
+	wasHighCost := h.isHighCostWithCurrency(existing)
+
+	// Merge form data: only update fields that were actually submitted
+	if val, ok := c.GetPostForm("name"); ok {
+		existing.Name = val
+	}
+	if val, ok := c.GetPostForm("category_id"); ok && val != "" {
+		if categoryID, err := strconv.ParseUint(val, 10, 32); err == nil {
+			existing.CategoryID = uint(categoryID)
 		}
 	}
-	subscription.Schedule = c.PostForm("schedule")
-	subscription.ScheduleInterval = parseScheduleInterval(c.PostForm("schedule_interval"))
-	subscription.Status = c.PostForm("status")
-	subscription.OriginalCurrency = c.PostForm("original_currency")
-	if subscription.OriginalCurrency == "" {
-		subscription.OriginalCurrency = "USD"
+	if val, ok := c.GetPostForm("schedule"); ok {
+		existing.Schedule = val
 	}
-	subscription.PaymentMethod = c.PostForm("payment_method")
-	subscription.Account = c.PostForm("account")
-	subscription.URL = c.PostForm("url")
-	subscription.IconURL = c.PostForm("icon_url")
-	subscription.Notes = c.PostForm("notes")
-	subscription.Usage = c.PostForm("usage")
+	if val, ok := c.GetPostForm("schedule_interval"); ok {
+		existing.ScheduleInterval = parseScheduleInterval(val)
+	}
+	if val, ok := c.GetPostForm("status"); ok {
+		existing.Status = val
+	}
+	if val, ok := c.GetPostForm("original_currency"); ok {
+		if val == "" {
+			existing.OriginalCurrency = "USD"
+		} else {
+			existing.OriginalCurrency = val
+		}
+	}
+	if val, ok := c.GetPostForm("payment_method"); ok {
+		existing.PaymentMethod = val
+	}
+	if val, ok := c.GetPostForm("account"); ok {
+		existing.Account = val
+	}
 
-	// Parse cost
-	if costStr := c.PostForm("cost"); costStr != "" {
-		if cost, err := strconv.ParseFloat(costStr, 64); err == nil {
-			subscription.Cost = cost
+	// Track URL changes for logo refresh
+	oldURL := existing.URL
+	if val, ok := c.GetPostForm("url"); ok {
+		existing.URL = val
+	}
+	urlChanged := existing.URL != oldURL
+
+	if val, ok := c.GetPostForm("icon_url"); ok && val != "" {
+		existing.IconURL = val
+	} else if urlChanged {
+		// URL changed but no explicit icon — re-fetch
+		existing.IconURL = ""
+	}
+
+	if val, ok := c.GetPostForm("notes"); ok {
+		existing.Notes = val
+	}
+	if val, ok := c.GetPostForm("usage"); ok {
+		existing.Usage = val
+	}
+	if val, ok := c.GetPostForm("reminder_enabled"); ok {
+		existing.ReminderEnabled = val == "true"
+	}
+	if val, ok := c.GetPostForm("cost"); ok && val != "" {
+		if cost, err := strconv.ParseFloat(val, 64); err == nil {
+			existing.Cost = cost
 		}
 	}
 
-	// Parse dates using helper function
-	subscription.StartDate = parseDatePtr(c.PostForm("start_date"))
-	subscription.RenewalDate = parseDatePtr(c.PostForm("renewal_date"))
-	subscription.CancellationDate = parseDatePtr(c.PostForm("cancellation_date"))
-
-	// Get the original subscription to check if it was high-cost before update
-	original, _ := h.service.GetByID(uint(id))
-	wasHighCost := original != nil && h.isHighCostWithCurrency(original)
-
-	// Preserve existing IconURL if not explicitly set in form
-	if subscription.IconURL == "" && original != nil {
-		subscription.IconURL = original.IconURL
+	// Parse dates — only update if the field was submitted
+	if val, ok := c.GetPostForm("start_date"); ok {
+		existing.StartDate = parseDatePtr(val)
+	}
+	if val, ok := c.GetPostForm("renewal_date"); ok {
+		existing.RenewalDate = parseDatePtr(val)
+	}
+	if val, ok := c.GetPostForm("cancellation_date"); ok {
+		existing.CancellationDate = parseDatePtr(val)
 	}
 
-	// Check if URL changed - if so, we should fetch a new logo
-	urlChanged := original != nil && original.URL != subscription.URL
-	if urlChanged || (subscription.URL != "" && subscription.IconURL == "") {
-		h.fetchAndSetLogo(&subscription)
+	// Fetch new logo if URL changed or URL is set but no icon
+	if urlChanged || (existing.URL != "" && existing.IconURL == "") {
+		h.fetchAndSetLogo(existing)
 	}
 
 	// Update subscription
-	updated, err := h.service.Update(uint(id), &subscription)
+	updated, err := h.service.Update(uint(id), existing)
 	if err != nil {
 		c.Header("HX-Retarget", "#form-errors")
 		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
@@ -652,6 +788,10 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
 				// Log error but don't fail the request
 				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
+			}
+			// Send Webhook notification
+			if err := h.webhookService.SendHighCostAlert(subscriptionWithCategory); err != nil {
+				log.Printf("Failed to send high-cost alert webhook: %v", err)
 			}
 		}
 	}
@@ -718,6 +858,7 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 		"IsEdit":         isEdit,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"Categories":     categories,
+		"Currencies":     service.GetAvailableCurrencies(),
 	})
 }
 
@@ -736,7 +877,7 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 	defer writer.Flush()
 
 	// Write CSV header
-	header := []string{"ID", "Name", "Category", "Cost", "Schedule", "Schedule Interval", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
+	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Schedule Interval", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
 	writer.Write(header)
 
 	// Write subscription data
@@ -745,11 +886,16 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 		if sub.Category.Name != "" {
 			categoryName = sub.Category.Name
 		}
+		currency := sub.OriginalCurrency
+		if currency == "" {
+			currency = h.settingsService.GetCurrency()
+		}
 		record := []string{
 			fmt.Sprintf("%d", sub.ID),
 			sub.Name,
 			categoryName,
 			fmt.Sprintf("%.2f", sub.Cost),
+			currency,
 			sub.DisplaySchedule(),
 			fmt.Sprintf("%d", sub.ScheduleInterval),
 			sub.Status,

@@ -48,13 +48,14 @@ Themes persist across all pages and are saved per user. Change themes anytime fr
 
 - 📊 **Dashboard Overview**: Real-time stats showing monthly/annual spending
 - 💰 **Subscription Management**: Track all your subscriptions in one place with logos
-- 📅 **Calendar View**: Visual calendar showing all subscription renewal dates with iCal export
+- 📅 **Calendar View**: Visual calendar showing all subscription renewal dates with iCal export and subscription URL
 - 📈 **Analytics**: Visualize spending by category and track savings
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
 - 📱 **Pushover Notifications**: Receive push notifications on your mobile device
 - 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
 - 🎨 **Beautiful Themes**: 5 stunning themes including a festive Christmas theme with snowfall animation
-- 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, and BDT (with optional real-time conversion)
+- 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT, and CNY (with optional real-time conversion)
+- 🤖 **MCP Server**: AI integration via Model Context Protocol for Claude and other AI assistants
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
 - 📱 **Mobile Responsive**: Optimized mobile experience with hamburger menu navigation
@@ -252,7 +253,7 @@ SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
 
 **Note:** The free Fixer.io plan only allows EUR as the base currency. SubTrackr automatically handles cross-rate calculations (e.g., USD→INR goes through EUR) so all currency conversions work correctly regardless of this limitation.
 
-**Supported currencies:** USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT
+**Supported currencies:** USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT, CNY
 
 ### Email Notifications (SMTP)
 
@@ -421,6 +422,63 @@ Response:
   }
 }
 ```
+
+## 🤖 MCP Server (AI Integration)
+
+SubTrackr includes a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that allows AI assistants like Claude to read and manage your subscriptions via natural language.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_subscriptions` | List all subscriptions |
+| `get_subscription` | Get a subscription by ID |
+| `create_subscription` | Create a new subscription |
+| `update_subscription` | Update an existing subscription |
+| `delete_subscription` | Delete a subscription |
+| `get_stats` | Get subscription statistics |
+
+### Setup
+
+#### Local Install
+
+Build the MCP server binary:
+
+```bash
+go build -o subtrackr-mcp ./cmd/mcp
+```
+
+Add to your Claude Desktop (`claude_desktop_config.json`) or Claude Code (`.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "subtrackr": {
+      "command": "/path/to/subtrackr-mcp",
+      "env": {
+        "DATABASE_PATH": "/path/to/subtrackr.db"
+      }
+    }
+  }
+}
+```
+
+#### Docker
+
+The MCP binary is included in the Docker image. Configure your MCP client to exec into the container:
+
+```json
+{
+  "mcpServers": {
+    "subtrackr": {
+      "command": "docker",
+      "args": ["exec", "-i", "subtrackr", "/app/subtrackr-mcp"]
+    }
+  }
+}
+```
+
+The MCP server shares the same SQLite database as the web server, so changes made through either interface are immediately visible in the other.
 
 ## 🛠️ Development
 

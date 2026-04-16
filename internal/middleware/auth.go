@@ -57,6 +57,7 @@ func isPublicRoute(path string) bool {
 		"/static/",
 		"/favicon.ico",
 		"/healthz",
+		"/ical/",
 	}
 
 	// API v1 routes use API keys, not session auth

@@ -28,6 +28,11 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
     -ldflags="-w -s -X 'subtrackr/internal/version.Version=${GIT_TAG}' -X 'subtrackr/internal/version.GitCommit=${GIT_COMMIT}'" \
     -o subtrackr ./cmd/server
 
+# Build the MCP server binary
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags="-w -s -X 'subtrackr/internal/version.Version=${GIT_TAG}' -X 'subtrackr/internal/version.GitCommit=${GIT_COMMIT}'" \
+    -o subtrackr-mcp ./cmd/mcp
+
 # Final stage
 FROM debian:bookworm-slim
 
@@ -42,8 +47,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy the binary from builder
+# Copy the binaries from builder
 COPY --from=builder /app/subtrackr .
+COPY --from=builder /app/subtrackr-mcp .
 
 # Copy templates and static assets
 COPY templates/ ./templates/

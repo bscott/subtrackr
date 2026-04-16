@@ -30,6 +30,12 @@ type PushoverConfig struct {
 	AppToken string `json:"pushover_app_token"` // Pushover application token
 }
 
+// WebhookConfig represents generic webhook notification configuration
+type WebhookConfig struct {
+	URL     string            `json:"webhook_url"`
+	Headers map[string]string `json:"webhook_headers"`
+}
+
 // NotificationSettings represents notification preferences
 type NotificationSettings struct {
 	RenewalReminders         bool    `json:"renewal_reminders"`

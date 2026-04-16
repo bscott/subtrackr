@@ -24,6 +24,7 @@ func RunMigrations(db *gorm.DB) error {
 		migrateReminderTracking,
 		migrateCancellationReminderTracking,
 		migrateScheduleInterval,
+		migrateReminderEnabled,
 	}
 
 	for _, migration := range migrations {
@@ -44,7 +45,7 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 	// Check if migration is needed by looking for the old category column
 	var count int64
 	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='category'").Scan(&count)
-	
+
 	if count == 0 {
 		// Migration already completed
 		return nil
@@ -56,7 +57,7 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 	defaultCategories := []string{"Entertainment", "Productivity", "Storage", "Software", "Fitness", "Education", "Food", "Travel", "Business", "Other"}
 	var categories []models.Category
 	db.Find(&categories)
-	
+
 	if len(categories) == 0 {
 		for _, name := range defaultCategories {
 			db.Create(&models.Category{Name: name})
@@ -75,7 +76,7 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 		ID       uint
 		Category string
 	}
-	
+
 	var oldSubs []OldSubscription
 	db.Table("subscriptions").Select("id, category").Scan(&oldSubs)
 
@@ -96,7 +97,7 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 	// SQLite limitation: we can't drop the old category column
 	// The repository layer now handles both old and new schemas transparently
 	// This ensures backward compatibility without data loss
-	
+
 	log.Println("Migration completed: Categories converted to dynamic system")
 	return nil
 }
@@ -258,5 +259,28 @@ func migrateScheduleInterval(db *gorm.DB) error {
 	}
 
 	log.Println("Migration completed: Schedule interval field added")
+	return nil
+}
+
+// migrateReminderEnabled adds per-subscription reminder toggle field
+func migrateReminderEnabled(db *gorm.DB) error {
+	// Check if column already exists
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name = 'reminder_enabled'").Count(&count)
+
+	if count > 0 {
+		return nil
+	}
+
+	log.Println("Running migration: Adding per-subscription reminder_enabled field...")
+
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN reminder_enabled INTEGER DEFAULT 1").Error; err != nil {
+		log.Printf("Note: Could not add reminder_enabled column: %v", err)
+	}
+
+	// Set all existing subscriptions to enabled
+	db.Exec("UPDATE subscriptions SET reminder_enabled = 1 WHERE reminder_enabled IS NULL")
+
+	log.Println("Migration completed: reminder_enabled field added")
 	return nil
 }

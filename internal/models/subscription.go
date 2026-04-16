@@ -9,31 +9,32 @@ import (
 )
 
 type Subscription struct {
-	ID                     uint       `json:"id" gorm:"primaryKey"`
-	Name                   string     `json:"name" gorm:"not null" validate:"required"`
-	Cost                   float64    `json:"cost" gorm:"not null" validate:"required,gt=0"`
-	OriginalCurrency       string     `json:"original_currency" gorm:"size:3;default:'USD'"`
-	Schedule               string     `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual Weekly Daily Quarterly"`
-	Status                 string     `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused Trial"`
-	CategoryID             uint       `json:"category_id"`
-	Category               Category   `json:"category" gorm:"foreignKey:CategoryID"`
-	PaymentMethod          string     `json:"payment_method" gorm:""`
-	Account                string     `json:"account" gorm:""`
-	StartDate              *time.Time `json:"start_date" gorm:""`
-	RenewalDate            *time.Time `json:"renewal_date" gorm:""`
-	CancellationDate       *time.Time `json:"cancellation_date" gorm:""`
-	URL                    string     `json:"url" gorm:""`
-	IconURL                string     `json:"icon_url" gorm:""` // URL to subscription icon/logo
-	Notes                  string     `json:"notes" gorm:""`
-	Usage                  string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low None"`
-	ScheduleInterval       int        `json:"schedule_interval" gorm:"default:1"`
-	DateCalculationVersion int        `json:"date_calculation_version" gorm:"default:1"`
-	LastReminderSent       *time.Time `json:"last_reminder_sent" gorm:""` // Tracks when the last reminder was sent
-	LastReminderRenewalDate *time.Time `json:"last_reminder_renewal_date" gorm:""` // Tracks which renewal date the last reminder was for
+	ID                           uint       `json:"id" gorm:"primaryKey"`
+	Name                         string     `json:"name" gorm:"not null" validate:"required"`
+	Cost                         float64    `json:"cost" gorm:"not null" validate:"required,gt=0"`
+	OriginalCurrency             string     `json:"original_currency" gorm:"size:3;default:'USD'"`
+	Schedule                     string     `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual Weekly Daily Quarterly"`
+	Status                       string     `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused Trial"`
+	CategoryID                   uint       `json:"category_id"`
+	Category                     Category   `json:"category" gorm:"foreignKey:CategoryID"`
+	PaymentMethod                string     `json:"payment_method" gorm:""`
+	Account                      string     `json:"account" gorm:""`
+	StartDate                    *time.Time `json:"start_date" gorm:""`
+	RenewalDate                  *time.Time `json:"renewal_date" gorm:""`
+	CancellationDate             *time.Time `json:"cancellation_date" gorm:""`
+	URL                          string     `json:"url" gorm:""`
+	IconURL                      string     `json:"icon_url" gorm:""` // URL to subscription icon/logo
+	Notes                        string     `json:"notes" gorm:""`
+	Usage                        string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low None"`
+	ScheduleInterval             int        `json:"schedule_interval" gorm:"default:1"`
+	ReminderEnabled              bool       `json:"reminder_enabled" gorm:"default:true"`
+	DateCalculationVersion       int        `json:"date_calculation_version" gorm:"default:1"`
+	LastReminderSent             *time.Time `json:"last_reminder_sent" gorm:""`              // Tracks when the last reminder was sent
+	LastReminderRenewalDate      *time.Time `json:"last_reminder_renewal_date" gorm:""`      // Tracks which renewal date the last reminder was for
 	LastCancellationReminderSent *time.Time `json:"last_cancellation_reminder_sent" gorm:""` // Tracks when the last cancellation reminder was sent
 	LastCancellationReminderDate *time.Time `json:"last_cancellation_reminder_date" gorm:""` // Tracks which cancellation date the last reminder was for
-	CreatedAt              time.Time  `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt              time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+	CreatedAt                    time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt                    time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 func (s *Subscription) effectiveInterval() int {
@@ -126,7 +127,7 @@ func (s *Subscription) AfterFind(tx *gorm.DB) error {
 			// Renewal date has passed, calculate the next one
 			oldRenewalDate := s.RenewalDate
 			s.calculateNextRenewalDate()
-			
+
 			// Only update if the date actually changed to avoid unnecessary writes
 			if s.RenewalDate != nil && !s.RenewalDate.Equal(*oldRenewalDate) {
 				// Update only the renewal_date field using UpdateColumn to avoid triggering hooks
@@ -196,6 +197,7 @@ func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 //   - All existing subscriptions use V1 unless explicitly migrated
 //   - Uses standard Go time.AddDate() which may cause edge cases
 //   - Example: Jan 31 + 1 month = Mar 3 (due to Feb having 28 days)
+//
 // - V2: Enhanced calculation using Carbon library for robust date arithmetic
 //   - Must be explicitly set via DateCalculationVersion = 2
 //   - Uses Carbon's AddMonthsNoOverflow/AddYearsNoOverflow for better handling
