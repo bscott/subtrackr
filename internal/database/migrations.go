@@ -23,6 +23,7 @@ func RunMigrations(db *gorm.DB) error {
 		migrateSubscriptionIcons,
 		migrateReminderTracking,
 		migrateCancellationReminderTracking,
+		migrateScheduleInterval,
 	}
 
 	for _, migration := range migrations {
@@ -235,5 +236,27 @@ func migrateCancellationReminderTracking(db *gorm.DB) error {
 	}
 
 	log.Println("Migration completed: Cancellation reminder tracking fields added")
+	return nil
+}
+
+func migrateScheduleInterval(db *gorm.DB) error {
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name='schedule_interval'").Scan(&count)
+
+	if count > 0 {
+		return nil
+	}
+
+	log.Println("Running migration: Adding schedule interval field...")
+
+	if err := db.Exec("ALTER TABLE subscriptions ADD COLUMN schedule_interval INTEGER DEFAULT 1").Error; err != nil {
+		log.Printf("Note: Could not add schedule_interval column: %v", err)
+	}
+
+	if err := db.Exec("UPDATE subscriptions SET schedule_interval = 1 WHERE schedule_interval IS NULL").Error; err != nil {
+		log.Printf("Warning: Could not update existing subscriptions with default schedule_interval: %v", err)
+	}
+
+	log.Println("Migration completed: Schedule interval field added")
 	return nil
 }

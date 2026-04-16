@@ -101,7 +101,7 @@ func (p *PushoverService) SendHighCostAlert(subscription *models.Subscription) e
 	// Build message
 	message := "⚠️ High Cost Alert\n\n"
 	message += fmt.Sprintf("Subscription: %s\n", subscription.Name)
-	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.Schedule)
+	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.DisplaySchedule())
 	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, subscription.MonthlyCost())
 	if subscription.Category.Name != "" {
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
@@ -137,7 +137,7 @@ func (p *PushoverService) SendRenewalReminder(subscription *models.Subscription,
 	message := "🔔 Renewal Reminder\n\n"
 	message += fmt.Sprintf("Your subscription %s will renew in %d %s.\n\n", subscription.Name, daysUntilRenewal, daysText)
 	message += "Subscription Details:\n"
-	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.Schedule)
+	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.DisplaySchedule())
 	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, subscription.MonthlyCost())
 	if subscription.Category.Name != "" {
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
@@ -173,7 +173,7 @@ func (p *PushoverService) SendCancellationReminder(subscription *models.Subscrip
 	message := "⚠️ Cancellation Reminder\n\n"
 	message += fmt.Sprintf("Your subscription %s will end in %d %s.\n\n", subscription.Name, daysUntilCancellation, daysText)
 	message += "Subscription Details:\n"
-	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.Schedule)
+	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.DisplaySchedule())
 	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, subscription.MonthlyCost())
 	if subscription.Category.Name != "" {
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)

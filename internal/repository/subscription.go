@@ -152,6 +152,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.Name = subscription.Name
 	existing.Cost = subscription.Cost
 	existing.Schedule = subscription.Schedule
+	existing.ScheduleInterval = subscription.ScheduleInterval
 	existing.Status = subscription.Status
 	existing.CategoryID = subscription.CategoryID
 	existing.OriginalCurrency = subscription.OriginalCurrency
@@ -176,6 +177,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 				"name":               existing.Name,
 				"cost":               existing.Cost,
 				"schedule":           existing.Schedule,
+				"schedule_interval":  existing.ScheduleInterval,
 				"status":             existing.Status,
 				"category_id":        existing.CategoryID,
 				"category":           category.Name,

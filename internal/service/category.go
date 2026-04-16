@@ -31,6 +31,10 @@ func (s *CategoryService) Update(id uint, category *models.Category) (*models.Ca
 	return s.repo.Update(id, category)
 }
 
+func (s *CategoryService) GetByName(name string) (*models.Category, error) {
+	return s.repo.GetByName(name)
+}
+
 func (s *CategoryService) Delete(id uint) error {
 	// Check if category has any subscriptions
 	hasSubscriptions, err := s.repo.HasSubscriptions(id)

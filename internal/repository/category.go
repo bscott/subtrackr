@@ -48,6 +48,14 @@ func (r *CategoryRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Category{}, id).Error
 }
 
+func (r *CategoryRepository) GetByName(name string) (*models.Category, error) {
+	var category models.Category
+	if err := r.db.Where("name = ?", name).First(&category).Error; err != nil {
+		return nil, err
+	}
+	return &category, nil
+}
+
 func (r *CategoryRepository) HasSubscriptions(id uint) (bool, error) {
 	var count int64
 	err := r.db.Model(&models.Subscription{}).Where("category_id = ?", id).Count(&count).Error

@@ -290,22 +290,45 @@
             <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">Data Management</h3>
                 <div class="space-y-4">
-                    <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div class="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                         <div>
-                            <h4 class="text-sm font-medium text-yellow-900">Backup Data</h4>
-                            <p class="text-sm text-yellow-800">Create a backup of all your subscription data</p>
+                            <h4 class="text-sm font-medium text-yellow-900 dark:text-yellow-200">Backup Data</h4>
+                            <p class="text-sm text-yellow-800 dark:text-yellow-300">Create a backup of all your subscription data</p>
                         </div>
                         <a href="/api/backup" class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-yellow-700 inline-block">
                             Create Backup
                         </a>
                     </div>
                     
-                    <div class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <div>
-                            <h4 class="text-sm font-medium text-red-800">Clear All Data</h4>
-                            <p class="text-sm text-red-700">Permanently delete all subscription data</p>
+                    <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="text-sm font-medium text-blue-900 dark:text-blue-200">Restore Backup</h4>
+                                <p class="text-sm text-blue-800 dark:text-blue-300">Import subscriptions from a backup file</p>
+                            </div>
                         </div>
-                        <button 
+                        <form id="restore-form" enctype="multipart/form-data" onsubmit="submitRestore(event)">
+                            <div class="flex items-center gap-3">
+                                <input type="file" name="backup_file" id="backup_file" accept=".json" required
+                                    class="text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-100 file:text-blue-700 dark:file:bg-blue-800 dark:file:text-blue-200 hover:file:bg-blue-200 dark:hover:file:bg-blue-700">
+                                <select name="mode" class="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2">
+                                    <option value="replace">Replace existing data</option>
+                                    <option value="merge">Merge with existing data</option>
+                                </select>
+                                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">
+                                    Restore
+                                </button>
+                            </div>
+                        </form>
+                        <div id="restore-message" class="mt-2 text-sm"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                        <div>
+                            <h4 class="text-sm font-medium text-red-800 dark:text-red-200">Clear All Data</h4>
+                            <p class="text-sm text-red-700 dark:text-red-300">Permanently delete all subscription data</p>
+                        </div>
+                        <button
                             hx-delete="/api/clear-all"
                             hx-confirm="Are you sure you want to delete all subscription data? This action cannot be undone."
                             hx-target="body"
@@ -1105,6 +1128,46 @@
                 }
             }
         });
+        function submitRestore(event) {
+            event.preventDefault();
+            const form = document.getElementById('restore-form');
+            const formData = new FormData(form);
+            const msgDiv = document.getElementById('restore-message');
+            const mode = formData.get('mode');
+
+            if (mode === 'replace') {
+                if (!confirm('This will replace all existing subscription data with the backup. Continue?')) {
+                    return;
+                }
+            }
+
+            msgDiv.textContent = 'Restoring backup...';
+            msgDiv.className = 'mt-2 text-sm text-blue-600 dark:text-blue-400';
+
+            fetch('/api/restore', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(r => r.json().then(data => ({ok: r.ok, data})))
+            .then(({ok, data}) => {
+                if (ok) {
+                    let msg = data.message;
+                    if (data.errors && data.errors.length > 0) {
+                        msg += ` (${data.errors.length} errors)`;
+                    }
+                    msgDiv.textContent = msg;
+                    msgDiv.className = 'mt-2 text-sm text-green-600 dark:text-green-400';
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    msgDiv.textContent = data.error;
+                    msgDiv.className = 'mt-2 text-sm text-red-600 dark:text-red-400';
+                }
+            })
+            .catch(() => {
+                msgDiv.textContent = 'Failed to restore backup';
+                msgDiv.className = 'mt-2 text-sm text-red-600 dark:text-red-400';
+            });
+        }
     </script>
     <script>
 // --- Category Management Vanilla JS ---

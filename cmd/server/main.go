@@ -78,7 +78,7 @@ func main() {
 	sessionService := service.NewSessionService(sessionSecret)
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, pushoverService, logoService)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, pushoverService, logoService, categoryService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	authHandler := handlers.NewAuthHandler(settingsService, sessionService, emailService)
@@ -333,6 +333,7 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		api.GET("/export/json", handler.ExportJSON)
 		api.GET("/export/ical", handler.ExportICal)
 		api.GET("/backup", handler.BackupData)
+		api.POST("/restore", handler.RestoreData)
 		api.DELETE("/clear-all", handler.ClearAllData)
 
 		// Settings routes
