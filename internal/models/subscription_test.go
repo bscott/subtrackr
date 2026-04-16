@@ -981,3 +981,121 @@ func TestSubscription_CarbonLibraryFeatures(t *testing.T) {
 	}
 }
 
+func TestSubscription_DisplaySchedule(t *testing.T) {
+	tests := []struct {
+		name     string
+		schedule string
+		interval int
+		expected string
+	}{
+		{"Monthly default", "Monthly", 1, "Monthly"},
+		{"Monthly zero interval", "Monthly", 0, "Monthly"},
+		{"Annual default", "Annual", 1, "Annual"},
+		{"Every 2 Years", "Annual", 2, "Every 2 Years"},
+		{"Every 10 Years", "Annual", 10, "Every 10 Years"},
+		{"Every 2 Weeks", "Weekly", 2, "Every 2 Weeks"},
+		{"Every 6 Months", "Monthly", 6, "Every 6 Months"},
+		{"Every 3 Days", "Daily", 3, "Every 3 Days"},
+		{"Quarterly default", "Quarterly", 1, "Quarterly"},
+		{"Every 2 Quarters", "Quarterly", 2, "Every 2 Quarters"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &Subscription{Schedule: tt.schedule, ScheduleInterval: tt.interval}
+			assert.Equal(t, tt.expected, sub.DisplaySchedule())
+		})
+	}
+}
+
+func TestSubscription_CostWithInterval(t *testing.T) {
+	tests := []struct {
+		name            string
+		schedule        string
+		interval        int
+		cost            float64
+		expectedAnnual  float64
+		expectedMonthly float64
+	}{
+		{"Monthly interval=1", "Monthly", 1, 10.00, 120.00, 10.00},
+		{"Monthly interval=2", "Monthly", 2, 10.00, 60.00, 5.00},
+		{"Annual interval=1", "Annual", 1, 120.00, 120.00, 10.00},
+		{"Annual interval=2", "Annual", 2, 120.00, 60.00, 5.00},
+		{"Annual interval=10", "Annual", 10, 200.00, 20.00, 200.0 / 120.0},
+		{"Weekly interval=2", "Weekly", 2, 10.00, 260.00, 10.0 * 4.33 / 2},
+		{"Daily interval=1", "Daily", 1, 1.00, 365.00, 30.44},
+		{"Quarterly interval=1", "Quarterly", 1, 30.00, 120.00, 10.00},
+		{"Quarterly interval=2", "Quarterly", 2, 30.00, 60.00, 5.00},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &Subscription{Schedule: tt.schedule, ScheduleInterval: tt.interval, Cost: tt.cost}
+			assert.InDelta(t, tt.expectedAnnual, sub.AnnualCost(), 0.01, "AnnualCost")
+			assert.InDelta(t, tt.expectedMonthly, sub.MonthlyCost(), 0.01, "MonthlyCost")
+		})
+	}
+}
+
+func TestSubscription_RenewalDateWithInterval(t *testing.T) {
+	now := time.Now()
+	pastStart := now.AddDate(0, 0, -10) // 10 days ago
+
+	tests := []struct {
+		name     string
+		schedule string
+		interval int
+		start    *time.Time
+	}{
+		{"Every 2 Years", "Annual", 2, &pastStart},
+		{"Every 2 Weeks", "Weekly", 2, &pastStart},
+		{"Every 3 Months", "Monthly", 3, &pastStart},
+		{"Every 5 Years from now", "Annual", 5, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := &Subscription{
+				Schedule:         tt.schedule,
+				ScheduleInterval: tt.interval,
+				StartDate:        tt.start,
+				Status:           "Active",
+			}
+
+			sub.calculateNextRenewalDate()
+			assert.NotNil(t, sub.RenewalDate)
+			assert.True(t, sub.RenewalDate.After(now), "Renewal should be in the future")
+
+			// Verify interval is respected: e.g. "Every 2 Weeks" from 10 days ago should be 4 days from now (14-10=4)
+			if tt.schedule == "Weekly" && tt.interval == 2 && tt.start != nil {
+				daysDiff := sub.RenewalDate.Sub(pastStart).Hours() / 24
+				assert.InDelta(t, 14, daysDiff, 1, "Every 2 Weeks should be ~14 days from start")
+			}
+			if tt.schedule == "Annual" && tt.interval == 5 && tt.start == nil {
+				yearsDiff := sub.RenewalDate.Year() - now.Year()
+				assert.Equal(t, 5, yearsDiff, "Every 5 Years from now should be 5 years out")
+			}
+		})
+	}
+}
+
+func TestSubscription_RenewalDateV2WithInterval(t *testing.T) {
+	pastStart := time.Now().AddDate(-1, 0, 0) // 1 year ago
+
+	sub := &Subscription{
+		Schedule:               "Annual",
+		ScheduleInterval:       2,
+		StartDate:              &pastStart,
+		Status:                 "Active",
+		DateCalculationVersion: 2,
+	}
+
+	sub.calculateNextRenewalDate()
+	assert.NotNil(t, sub.RenewalDate)
+	assert.True(t, sub.RenewalDate.After(time.Now()))
+
+	// 1 year ago + 2 years = 1 year from now
+	expectedYear := pastStart.Year() + 2
+	assert.Equal(t, expectedYear, sub.RenewalDate.Year(), "Every 2 Years V2 should be 2 years from start")
+}
+
