@@ -339,7 +339,7 @@ function updateScheduleFields() {
 function initScheduleCombo() {
     const combo = document.getElementById('schedule_combo');
     const schedule = document.getElementById('schedule').value;
-    const interval = document.getElementById('schedule_interval').value || '1';
+    const interval = (parseInt(document.getElementById('schedule_interval').value) || 1).toString();
     if (schedule) {
         const comboVal = schedule + '_' + interval;
         for (const opt of combo.options) {

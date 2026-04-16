@@ -960,9 +960,11 @@ func (h *SubscriptionHandler) BackupData(c *gin.Context) {
 
 // RestoreData imports subscriptions from a backup JSON file
 func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20) // 10 MB limit
+
 	file, _, err := c.Request.FormFile("backup_file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No backup file provided"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No backup file provided or file too large (max 10 MB)"})
 		return
 	}
 	defer file.Close()
@@ -1049,6 +1051,9 @@ func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
 	}
 	if len(errors) > 0 {
 		result["errors"] = errors
+		result["partial_success"] = true
+		c.JSON(http.StatusMultiStatus, result)
+		return
 	}
 
 	c.JSON(http.StatusOK, result)

@@ -146,7 +146,7 @@ func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 	if err := tx.Model(&Subscription{}).Where("id = ?", s.ID).First(&original).Error; err == nil {
 		// If schedule changed and status is Active, recalculate renewal date
 		// Use start date if available to preserve billing anniversary
-		if original.Schedule != s.Schedule && s.Status == "Active" {
+		if (original.Schedule != s.Schedule || original.ScheduleInterval != s.ScheduleInterval) && s.Status == "Active" {
 			s.calculateNextRenewalDate()
 		}
 

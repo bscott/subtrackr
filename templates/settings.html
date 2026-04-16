@@ -1312,14 +1312,14 @@
                 method: 'POST',
                 body: formData,
             })
-            .then(r => r.json().then(data => ({ok: r.ok, data})))
-            .then(({ok, data}) => {
-                if (ok) {
-                    let msg = data.message;
-                    if (data.errors && data.errors.length > 0) {
-                        msg += ` (${data.errors.length} errors)`;
-                    }
-                    msgDiv.textContent = msg;
+            .then(r => r.json().then(data => ({status: r.status, ok: r.ok, data})))
+            .then(({status, ok, data}) => {
+                if (status === 207) {
+                    msgDiv.textContent = data.message + ` (${data.errors.length} failed)`;
+                    msgDiv.className = 'mt-2 text-sm text-yellow-600 dark:text-yellow-400';
+                    setTimeout(() => location.reload(), 2000);
+                } else if (ok) {
+                    msgDiv.textContent = data.message;
                     msgDiv.className = 'mt-2 text-sm text-green-600 dark:text-green-400';
                     setTimeout(() => location.reload(), 1500);
                 } else {
