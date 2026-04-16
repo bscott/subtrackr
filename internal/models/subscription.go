@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dromara/carbon/v2"
@@ -25,6 +26,7 @@ type Subscription struct {
 	IconURL                      string     `json:"icon_url" gorm:""` // URL to subscription icon/logo
 	Notes                        string     `json:"notes" gorm:""`
 	Usage                        string     `json:"usage" gorm:"" validate:"omitempty,oneof=High Medium Low None"`
+	ScheduleInterval             int        `json:"schedule_interval" gorm:"default:1"`
 	ReminderEnabled              bool       `json:"reminder_enabled" gorm:"default:true"`
 	DateCalculationVersion       int        `json:"date_calculation_version" gorm:"default:1"`
 	LastReminderSent             *time.Time `json:"last_reminder_sent" gorm:""`              // Tracks when the last reminder was sent
@@ -35,39 +37,64 @@ type Subscription struct {
 	UpdatedAt                    time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
+func (s *Subscription) effectiveInterval() int {
+	if s.ScheduleInterval <= 0 {
+		return 1
+	}
+	return s.ScheduleInterval
+}
+
+// DisplaySchedule returns a human-friendly schedule label
+func (s *Subscription) DisplaySchedule() string {
+	interval := s.effectiveInterval()
+	if interval == 1 {
+		return s.Schedule
+	}
+	unit := map[string]string{
+		"Daily": "Days", "Weekly": "Weeks", "Monthly": "Months",
+		"Quarterly": "Quarters", "Annual": "Years",
+	}
+	if u, ok := unit[s.Schedule]; ok {
+		return fmt.Sprintf("Every %d %s", interval, u)
+	}
+	return s.Schedule
+}
+
 // AnnualCost calculates the annual cost based on schedule
 func (s *Subscription) AnnualCost() float64 {
+	interval := s.effectiveInterval()
 	switch s.Schedule {
 	case "Annual":
-		return s.Cost
+		return s.Cost / float64(interval)
 	case "Quarterly":
-		return s.Cost * 4
+		return s.Cost * 4 / float64(interval)
 	case "Monthly":
-		return s.Cost * 12
+		return s.Cost * 12 / float64(interval)
 	case "Weekly":
-		return s.Cost * 52
+		return s.Cost * 52 / float64(interval)
 	case "Daily":
-		return s.Cost * 365
+		return s.Cost * 365 / float64(interval)
 	default:
-		return s.Cost * 12
+		return s.Cost * 12 / float64(interval)
 	}
 }
 
 // MonthlyCost calculates the monthly cost based on schedule
 func (s *Subscription) MonthlyCost() float64 {
+	interval := s.effectiveInterval()
 	switch s.Schedule {
 	case "Annual":
-		return s.Cost / 12
+		return s.Cost / (12 * float64(interval))
 	case "Quarterly":
-		return s.Cost / 3
+		return s.Cost / (3 * float64(interval))
 	case "Monthly":
-		return s.Cost
+		return s.Cost / float64(interval)
 	case "Weekly":
-		return s.Cost * 4.33 // 52 weeks / 12 months
+		return s.Cost * 4.33 / float64(interval)
 	case "Daily":
-		return s.Cost * 30.44 // Average days per month
+		return s.Cost * 30.44 / float64(interval)
 	default:
-		return s.Cost
+		return s.Cost / float64(interval)
 	}
 }
 
@@ -119,7 +146,7 @@ func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 	if err := tx.Model(&Subscription{}).Where("id = ?", s.ID).First(&original).Error; err == nil {
 		// If schedule changed and status is Active, recalculate renewal date
 		// Use start date if available to preserve billing anniversary
-		if original.Schedule != s.Schedule && s.Status == "Active" {
+		if (original.Schedule != s.Schedule || original.ScheduleInterval != s.ScheduleInterval) && s.Status == "Active" {
 			s.calculateNextRenewalDate()
 		}
 
@@ -205,6 +232,7 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 		return
 	}
 
+	interval := s.effectiveInterval()
 	start := carbon.CreateFromStdTime(*s.StartDate)
 	now := carbon.Now()
 
@@ -212,7 +240,7 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 	case "Monthly":
 		current := start.Copy()
 		for current.Lte(now) {
-			current = current.AddMonthsNoOverflow(1)
+			current = current.AddMonthsNoOverflow(interval)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
@@ -220,7 +248,7 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 	case "Quarterly":
 		current := start.Copy()
 		for current.Lte(now) {
-			current = current.AddMonthsNoOverflow(3)
+			current = current.AddMonthsNoOverflow(3 * interval)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
@@ -228,7 +256,7 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 	case "Annual":
 		current := start.Copy()
 		for current.Lte(now) {
-			current = current.AddYearsNoOverflow(1)
+			current = current.AddYearsNoOverflow(interval)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
@@ -236,7 +264,7 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 	case "Weekly":
 		current := start.Copy()
 		for current.Lte(now) {
-			current = current.AddWeeks(1)
+			current = current.AddWeeks(interval)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
@@ -244,16 +272,15 @@ func (s *Subscription) calculateNextRenewalDateV2() {
 	case "Daily":
 		current := start.Copy()
 		for current.Lte(now) {
-			current = current.AddDays(1)
+			current = current.AddDays(interval)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
 
 	default:
-		// Default to monthly
 		current := start.Copy()
 		for current.Lte(now) {
-			current = current.AddMonthsNoOverflow(1)
+			current = current.AddMonthsNoOverflow(interval)
 		}
 		renewalDate := current.StdTime()
 		s.RenewalDate = &renewalDate
@@ -267,139 +294,108 @@ func (s *Subscription) calculateNextRenewalDateFromStartDate() {
 		return
 	}
 
+	interval := s.effectiveInterval()
 	var renewalDate time.Time
 	baseDate := *s.StartDate
 	now := time.Now()
 
-	// Calculate the next renewal date based on the schedule
 	switch s.Schedule {
 	case "Annual":
-		// Find the next anniversary of the start date
-		years := 1 // Start with first renewal period
+		years := interval
 		for {
 			renewalDate = baseDate.AddDate(years, 0, 0)
 			if renewalDate.After(now) {
 				break
 			}
-			years++
+			years += interval
 		}
 	case "Quarterly":
-		// Find the next quarterly anniversary (every 3 months)
-		// Handle month-end dates specially to preserve "last day of month" semantics
 		startDay := baseDate.Day()
 		startYear := baseDate.Year()
 		startMonth := int(baseDate.Month())
-		quarters := 1 // Start with first renewal period (3 months)
+		step := 3 * interval
+		periods := 1
 
 		for {
-			// Calculate the target year and month properly (3-month increments)
-			totalMonths := startMonth + (quarters * 3) - 1 // Convert to 0-based
+			totalMonths := startMonth + (periods * step) - 1
 			targetYear := startYear + totalMonths/12
-			targetMonth := time.Month((totalMonths % 12) + 1) // Convert back to 1-based
-
-			// Get the last day of the target month
+			targetMonth := time.Month((totalMonths % 12) + 1)
 			lastDay := time.Date(targetYear, targetMonth+1, 0, 0, 0, 0, 0, baseDate.Location()).Day()
-
-			// If original date was on a day that doesn't exist in target month,
-			// use the last day of that month
 			targetDay := startDay
 			if startDay > lastDay {
 				targetDay = lastDay
 			}
-
 			renewalDate = time.Date(targetYear, targetMonth, targetDay,
 				baseDate.Hour(), baseDate.Minute(), baseDate.Second(),
 				baseDate.Nanosecond(), baseDate.Location())
-
 			if renewalDate.After(now) {
 				break
 			}
-			quarters++
+			periods++
 		}
 	case "Monthly":
-		// Find the next monthly anniversary
-		// Handle month-end dates specially to preserve "last day of month" semantics
 		startDay := baseDate.Day()
 		startYear := baseDate.Year()
 		startMonth := int(baseDate.Month())
-		months := 1 // Start with first renewal period, not the start date itself
+		periods := 1
 
 		for {
-			// Calculate the target year and month properly without Go's overflow behavior
-			totalMonths := startMonth + months - 1 // Convert to 0-based
+			totalMonths := startMonth + (periods * interval) - 1
 			targetYear := startYear + totalMonths/12
-			targetMonth := time.Month((totalMonths % 12) + 1) // Convert back to 1-based
-
-			// Get the last day of the target month
+			targetMonth := time.Month((totalMonths % 12) + 1)
 			lastDay := time.Date(targetYear, targetMonth+1, 0, 0, 0, 0, 0, baseDate.Location()).Day()
-
-			// If original date was on a day that doesn't exist in target month,
-			// use the last day of that month
 			targetDay := startDay
 			if startDay > lastDay {
 				targetDay = lastDay
 			}
-
 			renewalDate = time.Date(targetYear, targetMonth, targetDay,
 				baseDate.Hour(), baseDate.Minute(), baseDate.Second(),
 				baseDate.Nanosecond(), baseDate.Location())
-
 			if renewalDate.After(now) {
 				break
 			}
-			months++
+			periods++
 		}
 	case "Weekly":
-		// Find the next weekly anniversary
-		weeks := 1 // Start with first renewal period
+		weeks := interval
 		for {
 			renewalDate = baseDate.AddDate(0, 0, weeks*7)
 			if renewalDate.After(now) {
 				break
 			}
-			weeks++
+			weeks += interval
 		}
 	case "Daily":
-		// Find the next daily renewal
-		days := 1 // Start with first renewal period
+		days := interval
 		for {
 			renewalDate = baseDate.AddDate(0, 0, days)
 			if renewalDate.After(now) {
 				break
 			}
-			days++
+			days += interval
 		}
 	default:
-		// Default to monthly
 		startDay := baseDate.Day()
 		startYear := baseDate.Year()
 		startMonth := int(baseDate.Month())
-		months := 1 // Start with first renewal period, not the start date itself
+		periods := 1
 
 		for {
-			// Calculate the target year and month properly without Go's overflow behavior
-			totalMonths := startMonth + months - 1 // Convert to 0-based
+			totalMonths := startMonth + (periods * interval) - 1
 			targetYear := startYear + totalMonths/12
-			targetMonth := time.Month((totalMonths % 12) + 1) // Convert back to 1-based
-
-			// Get the last day of the target month
+			targetMonth := time.Month((totalMonths % 12) + 1)
 			lastDay := time.Date(targetYear, targetMonth+1, 0, 0, 0, 0, 0, baseDate.Location()).Day()
-
-			// If original date was on a day that doesn't exist in target month,
-			// use the last day of that month
 			targetDay := startDay
 			if startDay > lastDay {
 				targetDay = lastDay
 			}
-
 			renewalDate = time.Date(targetYear, targetMonth, targetDay,
 				baseDate.Hour(), baseDate.Minute(), baseDate.Second(),
 				baseDate.Nanosecond(), baseDate.Location())
-
 			if renewalDate.After(now) {
 				break
 			}
-			months++
+			periods++
 		}
 	}
 
@@ -408,48 +404,50 @@ func (s *Subscription) calculateNextRenewalDateFromStartDate() {
 
 // calculateNextRenewalDateFromNow calculates the next renewal date from current time
 func (s *Subscription) calculateNextRenewalDateFromNow() {
+	interval := s.effectiveInterval()
 	var renewalDate time.Time
 	baseDate := time.Now()
 
 	switch s.Schedule {
 	case "Annual":
-		renewalDate = baseDate.AddDate(1, 0, 0)
+		renewalDate = baseDate.AddDate(interval, 0, 0)
 	case "Quarterly":
-		renewalDate = baseDate.AddDate(0, 3, 0)
+		renewalDate = baseDate.AddDate(0, 3*interval, 0)
 	case "Monthly":
-		renewalDate = baseDate.AddDate(0, 1, 0)
+		renewalDate = baseDate.AddDate(0, interval, 0)
 	case "Weekly":
-		renewalDate = baseDate.AddDate(0, 0, 7)
+		renewalDate = baseDate.AddDate(0, 0, 7*interval)
 	case "Daily":
-		renewalDate = baseDate.AddDate(0, 0, 1)
+		renewalDate = baseDate.AddDate(0, 0, interval)
 	default:
-		renewalDate = baseDate.AddDate(0, 1, 0)
+		renewalDate = baseDate.AddDate(0, interval, 0)
 	}
 	s.RenewalDate = &renewalDate
 }
 
 // calculateNextRenewalDateFromNowV2 calculates renewal date from now using Carbon
 func (s *Subscription) calculateNextRenewalDateFromNowV2() {
+	interval := s.effectiveInterval()
 	now := carbon.Now()
 
 	switch s.Schedule {
 	case "Annual":
-		renewalDate := now.AddYear().StdTime()
+		renewalDate := now.AddYearsNoOverflow(interval).StdTime()
 		s.RenewalDate = &renewalDate
 	case "Quarterly":
-		renewalDate := now.AddMonthsNoOverflow(3).StdTime()
+		renewalDate := now.AddMonthsNoOverflow(3 * interval).StdTime()
 		s.RenewalDate = &renewalDate
 	case "Monthly":
-		renewalDate := now.AddMonthsNoOverflow(1).StdTime()
+		renewalDate := now.AddMonthsNoOverflow(interval).StdTime()
 		s.RenewalDate = &renewalDate
 	case "Weekly":
-		renewalDate := now.AddWeek().StdTime()
+		renewalDate := now.AddWeeks(interval).StdTime()
 		s.RenewalDate = &renewalDate
 	case "Daily":
-		renewalDate := now.AddDay().StdTime()
+		renewalDate := now.AddDays(interval).StdTime()
 		s.RenewalDate = &renewalDate
 	default:
-		renewalDate := now.AddMonthsNoOverflow(1).StdTime()
+		renewalDate := now.AddMonthsNoOverflow(interval).StdTime()
 		s.RenewalDate = &renewalDate
 	}
 }

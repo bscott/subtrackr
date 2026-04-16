@@ -35,9 +35,10 @@ type SubscriptionHandler struct {
 	pushoverService *service.PushoverService
 	webhookService  *service.WebhookService
 	logoService     *service.LogoService
+	categoryService *service.CategoryService
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, logoService *service.LogoService) *SubscriptionHandler {
+func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, logoService *service.LogoService, categoryService *service.CategoryService) *SubscriptionHandler {
 	return &SubscriptionHandler{
 		service:         service,
 		settingsService: settingsService,
@@ -46,6 +47,7 @@ func NewSubscriptionHandler(service *service.SubscriptionService, settingsServic
 		pushoverService: pushoverService,
 		webhookService:  webhookService,
 		logoService:     logoService,
+		categoryService: categoryService,
 	}
 }
 
@@ -66,12 +68,12 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 			ShowConversion:        false,
 		}
 
-		// Only show conversion if currency service is enabled and currencies differ
 		if h.currencyService.IsEnabled() && sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
 			if convertedCost, err := h.currencyService.ConvertAmount(sub.Cost, sub.OriginalCurrency, displayCurrency); err == nil {
 				enriched.ConvertedCost = convertedCost
-				enriched.ConvertedAnnualCost = convertedCost * h.getScheduleMultiplier(sub.Schedule)
-				enriched.ConvertedMonthlyCost = enriched.ConvertedAnnualCost / 12
+				ratio := convertedCost / sub.Cost
+				enriched.ConvertedAnnualCost = sub.AnnualCost() * ratio
+				enriched.ConvertedMonthlyCost = sub.MonthlyCost() * ratio
 				enriched.ShowConversion = true
 			}
 		} else if sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
@@ -139,22 +141,15 @@ func (h *SubscriptionHandler) fetchAndSetLogo(subscription *models.Subscription)
 	}
 }
 
-// getScheduleMultiplier returns the annual multiplier for a schedule
-func (h *SubscriptionHandler) getScheduleMultiplier(schedule string) float64 {
-	switch schedule {
-	case "Annual":
+func parseScheduleInterval(s string) int {
+	if s == "" {
 		return 1
-	case "Quarterly":
-		return 4
-	case "Monthly":
-		return 12
-	case "Weekly":
-		return 52
-	case "Daily":
-		return 365
-	default:
-		return 12
 	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 1 {
+		return 1
+	}
+	return v
 }
 
 // parseDatePtr parses a date string in "2006-01-02" format and returns a pointer to time.Time.
@@ -371,7 +366,7 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 			if sub.OriginalCurrency != "" && sub.OriginalCurrency != h.settingsService.GetCurrency() {
 				subCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 			}
-			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, subCurrencySymbol, sub.Cost, sub.Schedule)
+			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, subCurrencySymbol, sub.Cost, sub.DisplaySchedule())
 			if sub.URL != "" {
 				description += fmt.Sprintf("\\nURL: %s", sub.URL)
 			}
@@ -386,17 +381,21 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 			icalContent += "STATUS:CONFIRMED\r\n"
 			icalContent += "SEQUENCE:0\r\n"
 
+			interval := sub.ScheduleInterval
+			if interval < 1 {
+				interval = 1
+			}
 			switch sub.Schedule {
 			case "Daily":
-				icalContent += "RRULE:FREQ=DAILY;INTERVAL=1\r\n"
+				icalContent += fmt.Sprintf("RRULE:FREQ=DAILY;INTERVAL=%d\r\n", interval)
 			case "Weekly":
-				icalContent += "RRULE:FREQ=WEEKLY;INTERVAL=1\r\n"
+				icalContent += fmt.Sprintf("RRULE:FREQ=WEEKLY;INTERVAL=%d\r\n", interval)
 			case "Monthly":
-				icalContent += "RRULE:FREQ=MONTHLY;INTERVAL=1\r\n"
+				icalContent += fmt.Sprintf("RRULE:FREQ=MONTHLY;INTERVAL=%d\r\n", interval)
 			case "Quarterly":
-				icalContent += "RRULE:FREQ=MONTHLY;INTERVAL=3\r\n"
+				icalContent += fmt.Sprintf("RRULE:FREQ=MONTHLY;INTERVAL=%d\r\n", 3*interval)
 			case "Annual":
-				icalContent += "RRULE:FREQ=YEARLY;INTERVAL=1\r\n"
+				icalContent += fmt.Sprintf("RRULE:FREQ=YEARLY;INTERVAL=%d\r\n", interval)
 			}
 
 			icalContent += "END:VEVENT\r\n"
@@ -569,15 +568,16 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		}
 	}
 	subscription.Schedule = c.PostForm("schedule")
+	subscription.ScheduleInterval = parseScheduleInterval(c.PostForm("schedule_interval"))
 	subscription.Status = c.PostForm("status")
 	subscription.OriginalCurrency = c.PostForm("original_currency")
 	if subscription.OriginalCurrency == "" {
-		subscription.OriginalCurrency = "USD" // Default to USD
+		subscription.OriginalCurrency = "USD"
 	}
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
 	subscription.URL = c.PostForm("url")
-	subscription.IconURL = c.PostForm("icon_url") // Allow manual icon URL override
+	subscription.IconURL = c.PostForm("icon_url")
 	subscription.Notes = c.PostForm("notes")
 	subscription.Usage = c.PostForm("usage")
 
@@ -698,6 +698,9 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	}
 	if val, ok := c.GetPostForm("schedule"); ok {
 		existing.Schedule = val
+	}
+	if val, ok := c.GetPostForm("schedule_interval"); ok {
+		existing.ScheduleInterval = parseScheduleInterval(val)
 	}
 	if val, ok := c.GetPostForm("status"); ok {
 		existing.Status = val
@@ -874,7 +877,7 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 	defer writer.Flush()
 
 	// Write CSV header
-	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
+	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Schedule Interval", "Status", "Payment Method", "Account", "Start Date", "Renewal Date", "Cancellation Date", "URL", "Notes", "Usage", "Created At"}
 	writer.Write(header)
 
 	// Write subscription data
@@ -893,7 +896,8 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 			categoryName,
 			fmt.Sprintf("%.2f", sub.Cost),
 			currency,
-			sub.Schedule,
+			sub.DisplaySchedule(),
+			fmt.Sprintf("%d", sub.ScheduleInterval),
 			sub.Status,
 			sub.PaymentMethod,
 			sub.Account,
@@ -952,6 +956,107 @@ func (h *SubscriptionHandler) BackupData(c *gin.Context) {
 	c.Header("Content-Type", "application/json")
 	c.Header("Content-Disposition", "attachment; filename=subtrackr-backup.json")
 	c.JSON(http.StatusOK, backup)
+}
+
+// RestoreData imports subscriptions from a backup JSON file
+func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20) // 10 MB limit
+
+	file, _, err := c.Request.FormFile("backup_file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No backup file provided or file too large (max 10 MB)"})
+		return
+	}
+	defer file.Close()
+
+	var backup struct {
+		Version       string                `json:"version"`
+		Subscriptions []models.Subscription `json:"subscriptions"`
+	}
+
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&backup); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backup file format"})
+		return
+	}
+
+	if len(backup.Subscriptions) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Backup file contains no subscriptions"})
+		return
+	}
+
+	mode := c.PostForm("mode")
+	if mode == "" {
+		mode = "replace"
+	}
+	if mode != "replace" && mode != "merge" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid mode, must be 'replace' or 'merge'"})
+		return
+	}
+
+	if mode == "replace" {
+		existing, err := h.service.GetAll()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch existing data"})
+			return
+		}
+		for _, sub := range existing {
+			if err := h.service.Delete(sub.ID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to clear existing data: %v", err)})
+				return
+			}
+		}
+	}
+
+	categoryMap := make(map[string]uint)
+	categories, _ := h.categoryService.GetAll()
+	for _, cat := range categories {
+		categoryMap[cat.Name] = cat.ID
+	}
+
+	imported := 0
+	var errors []string
+	for _, sub := range backup.Subscriptions {
+		if sub.Category.Name != "" {
+			if catID, ok := categoryMap[sub.Category.Name]; ok {
+				sub.CategoryID = catID
+			} else {
+				newCat := &models.Category{Name: sub.Category.Name}
+				created, err := h.categoryService.Create(newCat)
+				if err == nil {
+					categoryMap[created.Name] = created.ID
+					sub.CategoryID = created.ID
+				}
+			}
+		}
+
+		sub.ID = 0
+		sub.Category = models.Category{}
+		sub.CreatedAt = time.Time{}
+		sub.UpdatedAt = time.Time{}
+
+		_, err := h.service.Create(&sub)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Failed to import '%s': %v", sub.Name, err))
+			continue
+		}
+		imported++
+	}
+
+	result := gin.H{
+		"message":        fmt.Sprintf("Successfully imported %d subscriptions", imported),
+		"imported_count": imported,
+		"total_in_file":  len(backup.Subscriptions),
+		"mode":           mode,
+	}
+	if len(errors) > 0 {
+		result["errors"] = errors
+		result["partial_success"] = true
+		c.JSON(http.StatusMultiStatus, result)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // ClearAllData removes all subscription data

@@ -40,16 +40,18 @@ func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*mod
 			err := r.db.Transaction(func(tx *gorm.DB) error {
 				result := tx.Exec(`
 					INSERT INTO subscriptions (
-						name, cost, schedule, status, category_id, category, original_currency,
+						name, cost, schedule, schedule_interval, status, category_id, category, original_currency,
 						payment_method, account, start_date, renewal_date,
-						cancellation_date, url, notes, usage, date_calculation_version, created_at, updated_at
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					subscription.Name, subscription.Cost, subscription.Schedule,
+						cancellation_date, url, icon_url, notes, usage, reminder_enabled,
+						date_calculation_version, created_at, updated_at
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					subscription.Name, subscription.Cost, subscription.Schedule, subscription.ScheduleInterval,
 					subscription.Status, subscription.CategoryID, category.Name, subscription.OriginalCurrency,
 					subscription.PaymentMethod, subscription.Account,
 					subscription.StartDate, subscription.RenewalDate,
-					subscription.CancellationDate, subscription.URL,
-					subscription.Notes, subscription.Usage, subscription.DateCalculationVersion,
+					subscription.CancellationDate, subscription.URL, subscription.IconURL,
+					subscription.Notes, subscription.Usage, subscription.ReminderEnabled,
+					subscription.DateCalculationVersion,
 					time.Now(), time.Now())
 
 				if result.Error != nil {
@@ -152,6 +154,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.Name = subscription.Name
 	existing.Cost = subscription.Cost
 	existing.Schedule = subscription.Schedule
+	existing.ScheduleInterval = subscription.ScheduleInterval
 	existing.Status = subscription.Status
 	existing.CategoryID = subscription.CategoryID
 	existing.OriginalCurrency = subscription.OriginalCurrency
@@ -160,6 +163,8 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 	existing.StartDate = subscription.StartDate
 	existing.LastReminderSent = subscription.LastReminderSent
 	existing.LastReminderRenewalDate = subscription.LastReminderRenewalDate
+	existing.LastCancellationReminderSent = subscription.LastCancellationReminderSent
+	existing.LastCancellationReminderDate = subscription.LastCancellationReminderDate
 	existing.RenewalDate = subscription.RenewalDate
 	existing.CancellationDate = subscription.CancellationDate
 	existing.URL = subscription.URL
@@ -177,6 +182,7 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 				"name":                       existing.Name,
 				"cost":                       existing.Cost,
 				"schedule":                   existing.Schedule,
+				"schedule_interval":          existing.ScheduleInterval,
 				"status":                     existing.Status,
 				"category_id":                existing.CategoryID,
 				"category":                   category.Name,
@@ -192,8 +198,10 @@ func (r *SubscriptionRepository) Update(id uint, subscription *models.Subscripti
 				"usage":                      existing.Usage,
 				"last_reminder_sent":         existing.LastReminderSent,
 				"last_reminder_renewal_date": existing.LastReminderRenewalDate,
-				"reminder_enabled":           existing.ReminderEnabled,
-				"updated_at":                 time.Now(),
+				"reminder_enabled":                    existing.ReminderEnabled,
+				"last_cancellation_reminder_sent":     existing.LastCancellationReminderSent,
+				"last_cancellation_reminder_date":     existing.LastCancellationReminderDate,
+				"updated_at":                          time.Now(),
 			}
 			if err := r.db.Model(&existing).Where("id = ?", id).Updates(updates).Error; err != nil {
 				return nil, err

@@ -88,16 +88,30 @@
 
             <!-- Schedule -->
             <div>
-                <label for="schedule" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Schedule *</label>
-                <select id="schedule" name="schedule" required
+                <label for="schedule_combo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Schedule *</label>
+                <select id="schedule_combo" required
+                        onchange="updateScheduleFields()"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
                     <option value="">Select schedule</option>
-                    <option value="Monthly" {{if .Subscription}}{{if eq .Subscription.Schedule "Monthly"}}selected{{end}}{{end}}>Monthly</option>
-                    <option value="Quarterly" {{if .Subscription}}{{if eq .Subscription.Schedule "Quarterly"}}selected{{end}}{{end}}>Quarterly</option>
-                    <option value="Annual" {{if .Subscription}}{{if eq .Subscription.Schedule "Annual"}}selected{{end}}{{end}}>Annual</option>
-                    <option value="Weekly" {{if .Subscription}}{{if eq .Subscription.Schedule "Weekly"}}selected{{end}}{{end}}>Weekly</option>
-                    <option value="Daily" {{if .Subscription}}{{if eq .Subscription.Schedule "Daily"}}selected{{end}}{{end}}>Daily</option>
+                    <optgroup label="Common">
+                        <option value="Daily_1">Daily</option>
+                        <option value="Weekly_1">Weekly</option>
+                        <option value="Weekly_2">Every 2 Weeks</option>
+                        <option value="Monthly_1">Monthly</option>
+                        <option value="Monthly_2">Every 2 Months</option>
+                        <option value="Quarterly_1">Quarterly</option>
+                        <option value="Monthly_6">Every 6 Months</option>
+                        <option value="Annual_1">Annual</option>
+                    </optgroup>
+                    <optgroup label="Multi-Year">
+                        <option value="Annual_2">Every 2 Years</option>
+                        <option value="Annual_3">Every 3 Years</option>
+                        <option value="Annual_5">Every 5 Years</option>
+                        <option value="Annual_10">Every 10 Years</option>
+                    </optgroup>
                 </select>
+                <input type="hidden" id="schedule" name="schedule" value="{{if .Subscription}}{{.Subscription.Schedule}}{{end}}">
+                <input type="hidden" id="schedule_interval" name="schedule_interval" value="{{if .Subscription}}{{.Subscription.ScheduleInterval}}{{else}}1{{end}}">
             </div>
 
             <!-- Status -->
@@ -311,74 +325,84 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-function calculateRenewalDate() {
-    const scheduleSelect = document.getElementById('schedule');
-    const statusSelect = document.getElementById('status');
-    const renewalDateInput = document.getElementById('renewal_date');
+function updateScheduleFields() {
+    const combo = document.getElementById('schedule_combo');
+    const scheduleInput = document.getElementById('schedule');
+    const intervalInput = document.getElementById('schedule_interval');
+    if (!combo.value) return;
+    const parts = combo.value.split('_');
+    scheduleInput.value = parts[0];
+    intervalInput.value = parts[1] || '1';
+    calculateRenewalDate();
+}
 
-    if (!scheduleSelect.value) {
-        return;
+function initScheduleCombo() {
+    const combo = document.getElementById('schedule_combo');
+    const schedule = document.getElementById('schedule').value;
+    const interval = (parseInt(document.getElementById('schedule_interval').value) || 1).toString();
+    if (schedule) {
+        const comboVal = schedule + '_' + interval;
+        for (const opt of combo.options) {
+            if (opt.value === comboVal) {
+                opt.selected = true;
+                break;
+            }
+        }
     }
+}
 
-    // Calculate renewal date regardless of status for live preview
+function addMonths(date, months) {
+    const d = new Date(date);
+    const targetMonth = d.getMonth() + months;
+    const targetYear = d.getFullYear() + Math.floor(targetMonth / 12);
+    const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+    const lastDay = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+    const day = Math.min(d.getDate(), lastDay);
+    return new Date(targetYear, normalizedMonth, day);
+}
+
+function calculateRenewalDate() {
+    const schedule = document.getElementById('schedule').value;
+    const interval = parseInt(document.getElementById('schedule_interval').value) || 1;
+    const renewalDateInput = document.getElementById('renewal_date');
+    if (!schedule) return;
+
     const today = new Date();
-    let renewalDate = new Date(today);
+    let renewalDate;
 
-    switch (scheduleSelect.value) {
+    switch (schedule) {
         case 'Daily':
-            renewalDate.setDate(today.getDate() + 1);
+            renewalDate = new Date(today);
+            renewalDate.setDate(today.getDate() + interval);
             break;
         case 'Weekly':
-            renewalDate.setDate(today.getDate() + 7);
+            renewalDate = new Date(today);
+            renewalDate.setDate(today.getDate() + 7 * interval);
             break;
-        case 'Monthly': {
-            // Robust month addition: handle month-end dates
-            const targetMonth = today.getMonth() + 1;
-            const targetYear = today.getFullYear() + (targetMonth > 11 ? 1 : 0);
-            const normalizedMonth = targetMonth % 12;
-            // Get last day of target month
-            const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
-            const day = Math.min(today.getDate(), lastDayOfTargetMonth);
-            renewalDate = new Date(targetYear, normalizedMonth, day);
+        case 'Monthly':
+            renewalDate = addMonths(today, interval);
             break;
-        }
-        case 'Quarterly': {
-            // Robust quarter addition: handle month-end dates (3 months)
-            const targetMonth = today.getMonth() + 3;
-            const targetYear = today.getFullYear() + Math.floor(targetMonth / 12);
-            const normalizedMonth = targetMonth % 12;
-            // Get last day of target month
-            const lastDayOfTargetMonth = new Date(targetYear, normalizedMonth + 1, 0).getDate();
-            const day = Math.min(today.getDate(), lastDayOfTargetMonth);
-            renewalDate = new Date(targetYear, normalizedMonth, day);
+        case 'Quarterly':
+            renewalDate = addMonths(today, 3 * interval);
             break;
-        }
         case 'Annual':
-            renewalDate.setFullYear(today.getFullYear() + 1);
+            renewalDate = new Date(today);
+            renewalDate.setFullYear(today.getFullYear() + interval);
             break;
         default:
             return;
     }
 
-    // Format date as YYYY-MM-DD for input field (using local timezone)
     const year = renewalDate.getFullYear();
     const month = String(renewalDate.getMonth() + 1).padStart(2, '0');
     const day = String(renewalDate.getDate()).padStart(2, '0');
-    const formattedDate = `${year}-${month}-${day}`;
-    renewalDateInput.value = formattedDate;
+    renewalDateInput.value = `${year}-${month}-${day}`;
 }
 
-// Add event listeners when modal content loads
 function initRenewalCalculator() {
-    const scheduleSelect = document.getElementById('schedule');
-
-    if (scheduleSelect) {
-        scheduleSelect.addEventListener('change', calculateRenewalDate);
-    }
-    // Note: Status changes should NOT trigger renewal date recalculation (fixes #68)
+    initScheduleCombo();
 }
 
-// Initialize immediately since this script loads with the form
 initRenewalCalculator();
 
 // Also initialize on DOM content loaded as backup

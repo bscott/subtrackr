@@ -208,7 +208,7 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.Schedule}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.DisplaySchedule}}</div>
 			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .FormattedRenewalDate}}<div class="detail-row"><span class="label">Next Renewal:</span> {{.FormattedRenewalDate}}</div>{{end}}
@@ -290,7 +290,7 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.Schedule}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.DisplaySchedule}}</div>
 			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .FormattedRenewalDate}}<div class="detail-row"><span class="label">Renewal Date:</span> {{.FormattedRenewalDate}}</div>{{end}}
@@ -378,7 +378,7 @@ func (e *EmailService) SendCancellationReminder(subscription *models.Subscriptio
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.Schedule}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.DisplaySchedule}}</div>
 			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .FormattedCancellationDate}}<div class="detail-row"><span class="label">Cancellation Date:</span> {{.FormattedCancellationDate}}</div>{{end}}
