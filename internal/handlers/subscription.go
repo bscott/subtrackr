@@ -965,6 +965,13 @@ func (h *SubscriptionHandler) GetStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+func subscriptionFormCurrency(subscription *models.Subscription, preferredCurrency string) string {
+	if subscription != nil && subscription.OriginalCurrency != "" {
+		return subscription.OriginalCurrency
+	}
+	return preferredCurrency
+}
+
 // GetSubscriptionForm returns the subscription form (for add/edit)
 func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 	var subscription *models.Subscription
@@ -996,11 +1003,13 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 		}
 		tagsCSV = strings.Join(names, ", ")
 	}
+	formCurrency := subscriptionFormCurrency(subscription, h.settingsService.GetCurrency())
 
 	c.HTML(http.StatusOK, "subscription-form.html", gin.H{
 		"Subscription":   subscription,
 		"IsEdit":         isEdit,
-		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
+		"CurrencySymbol": service.CurrencySymbolForCode(formCurrency),
+		"FormCurrency":   formCurrency,
 		"Categories":     categories,
 		"Currencies":     service.GetAvailableCurrencies(),
 		"TagsCSV":        tagsCSV,
