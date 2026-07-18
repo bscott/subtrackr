@@ -123,6 +123,35 @@ func TestEnrichWithCurrencyConversion_UsesOriginalCurrencyWhenNoRateExists(t *te
 	assert.Equal(t, 36.0, result[0].ConvertedAnnualCost)
 }
 
+func TestSortSubscriptionsByCost_UsesConvertedValuesWhenRatesExist(t *testing.T) {
+	handler, exchangeRateRepo, _ := newCurrencyTestHandler(t)
+	saveEURRates(t, exchangeRateRepo, time.Now().Add(-time.Hour))
+
+	subscriptions := handler.enrichWithCurrencyConversion([]models.Subscription{
+		{Name: "Foreign", Cost: 3, Schedule: "Monthly", OriginalCurrency: "USD"},
+		{Name: "Local", Cost: 20, Schedule: "Monthly", OriginalCurrency: "SEK"},
+	})
+	sortSubscriptionsByCost(subscriptions, "SEK", "asc")
+
+	assert.Equal(t, []string{"Local", "Foreign"}, []string{subscriptions[0].Name, subscriptions[1].Name})
+}
+
+func TestSortSubscriptionsByCost_GroupsMissingRatesAndSortsWithinCurrencies(t *testing.T) {
+	handler, _, _ := newCurrencyTestHandler(t)
+	subscriptions := handler.enrichWithCurrencyConversion([]models.Subscription{
+		{Name: "USD 3", Cost: 3, Schedule: "Monthly", OriginalCurrency: "USD"},
+		{Name: "SEK 20", Cost: 20, Schedule: "Monthly", OriginalCurrency: "SEK"},
+		{Name: "USD 1", Cost: 1, Schedule: "Monthly", OriginalCurrency: "USD"},
+		{Name: "SEK 10", Cost: 10, Schedule: "Monthly", OriginalCurrency: "SEK"},
+	})
+	sortSubscriptionsByCost(subscriptions, "SEK", "desc")
+
+	assert.Equal(t,
+		[]string{"SEK 20", "SEK 10", "USD 3", "USD 1"},
+		[]string{subscriptions[0].Name, subscriptions[1].Name, subscriptions[2].Name, subscriptions[3].Name},
+	)
+}
+
 func TestIsHighCostWithCurrency_DoesNotCompareUnconvertedCurrencies(t *testing.T) {
 	handler, _, settingsService := newCurrencyTestHandler(t)
 	require.NoError(t, settingsService.SetFloatSetting("high_cost_threshold", 50))

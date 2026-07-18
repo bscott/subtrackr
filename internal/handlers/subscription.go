@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"subtrackr/internal/i18n"
@@ -126,6 +127,52 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 	}
 
 	return result
+}
+
+func sortSubscriptionsByCost(subscriptions []SubscriptionWithConversion, preferredCurrency, order string) {
+	if order != "asc" && order != "desc" {
+		order = "desc"
+	}
+	sort.SliceStable(subscriptions, func(i, j int) bool {
+		left := subscriptions[i]
+		right := subscriptions[j]
+
+		if left.DisplayCurrency != right.DisplayCurrency {
+			if left.DisplayCurrency == preferredCurrency {
+				return true
+			}
+			if right.DisplayCurrency == preferredCurrency {
+				return false
+			}
+			return left.DisplayCurrency < right.DisplayCurrency
+		}
+
+		if left.ConvertedCost == right.ConvertedCost {
+			return left.Name < right.Name
+		}
+		if order == "desc" {
+			return left.ConvertedCost > right.ConvertedCost
+		}
+		return left.ConvertedCost < right.ConvertedCost
+	})
+}
+
+func (h *SubscriptionHandler) getSubscriptionsForDisplay(sortBy, order string) ([]SubscriptionWithConversion, error) {
+	if sortBy == "cost" {
+		subscriptions, err := h.service.GetAll()
+		if err != nil {
+			return nil, err
+		}
+		enriched := h.enrichWithCurrencyConversion(subscriptions)
+		sortSubscriptionsByCost(enriched, h.settingsService.GetCurrency(), order)
+		return enriched, nil
+	}
+
+	subscriptions, err := h.service.GetAllSorted(sortBy, order)
+	if err != nil {
+		return nil, err
+	}
+	return h.enrichWithCurrencyConversion(subscriptions), nil
 }
 
 // isHighCostWithCurrency checks if a subscription is high-cost, respecting currency conversion
@@ -250,14 +297,11 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 	order := c.DefaultQuery("order", "desc")
 
 	// Get sorted subscriptions
-	subscriptions, err := h.service.GetAllSorted(sortBy, order)
+	enrichedSubs, err := h.getSubscriptionsForDisplay(sortBy, order)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
 	}
-
-	// Enrich with currency conversion
-	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
 
 	c.HTML(http.StatusOK, "subscriptions.html", gin.H{
 		"Title":          "Subscriptions",
@@ -606,14 +650,11 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	order := c.DefaultQuery("order", "desc")
 
 	// Get sorted subscriptions
-	subscriptions, err := h.service.GetAllSorted(sortBy, order)
+	enrichedSubs, err := h.getSubscriptionsForDisplay(sortBy, order)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Enrich with currency conversion
-	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
 
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
 		"Subscriptions":  enrichedSubs,
