@@ -90,8 +90,8 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 
 		if h.currencyService.IsEnabled() && sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
 			if convertedCost, err := h.currencyService.ConvertAmount(sub.Cost, sub.OriginalCurrency, displayCurrency); err == nil {
-				enriched.ConvertedCost = convertedCost
-				ratio := convertedCost / sub.Cost
+				enriched.ConvertedCost = convertedCost.Amount
+				ratio := convertedCost.Amount / sub.Cost
 				enriched.ConvertedAnnualCost = sub.AnnualCost() * ratio
 				enriched.ConvertedMonthlyCost = sub.MonthlyCost() * ratio
 				enriched.ConvertedShareCost = sub.MyShareCost() * ratio
@@ -145,7 +145,7 @@ func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscr
 	}
 
 	// Compare converted monthly cost against threshold
-	return convertedMonthlyCost > threshold
+	return convertedMonthlyCost.Amount > threshold
 }
 
 // fetchAndSetLogo fetches a logo for a subscription if URL is provided and icon_url is empty

@@ -76,7 +76,7 @@ func TestCurrencyService_Integration_ConvertAmount_SameCurrency(t *testing.T) {
 	result, err := service.ConvertAmount(amount, "USD", "USD")
 
 	assert.NoError(t, err)
-	assert.Equal(t, amount, result)
+	assert.Equal(t, amount, result.Amount)
 }
 
 func TestCurrencyService_Integration_ConvertAmount_WithCachedRate(t *testing.T) {
@@ -87,11 +87,11 @@ func TestCurrencyService_Integration_ConvertAmount_WithCachedRate(t *testing.T) 
 	repo := repository.NewExchangeRateRepository(db)
 	service := NewCurrencyService(repo)
 
-	// Create a cached rate
+	// Create a cached EUR-based rate
 	cachedRate := &models.ExchangeRate{
-		BaseCurrency: "USD",
-		Currency:     "EUR",
-		Rate:         0.85,
+		BaseCurrency: "EUR",
+		Currency:     "USD",
+		Rate:         1.25,
 		Date:         time.Now(),
 	}
 
@@ -102,7 +102,7 @@ func TestCurrencyService_Integration_ConvertAmount_WithCachedRate(t *testing.T) 
 	result, err := service.ConvertAmount(amount, "USD", "EUR")
 
 	assert.NoError(t, err)
-	assert.Equal(t, 85.0, result)
+	assert.Equal(t, 80.0, result.Amount)
 }
 
 func TestCurrencyService_Integration_ConvertAmount_NoAPIKey(t *testing.T) {
@@ -116,8 +116,8 @@ func TestCurrencyService_Integration_ConvertAmount_NoAPIKey(t *testing.T) {
 	result, err := service.ConvertAmount(amount, "USD", "EUR")
 
 	assert.Error(t, err)
-	assert.Equal(t, 0.0, result)
-	assert.Contains(t, err.Error(), "currency conversion not available")
+	assert.Equal(t, 0.0, result.Amount)
+	assert.Contains(t, err.Error(), "exchange rate for USD to EUR not available")
 }
 
 func TestCurrencyService_Integration_ConvertAmount_InvalidAmount(t *testing.T) {
@@ -130,9 +130,9 @@ func TestCurrencyService_Integration_ConvertAmount_InvalidAmount(t *testing.T) {
 
 	// Pre-cache a rate to avoid API calls
 	cachedRate := models.ExchangeRate{
-		BaseCurrency: "USD",
-		Currency:     "EUR",
-		Rate:         0.85,
+		BaseCurrency: "EUR",
+		Currency:     "USD",
+		Rate:         1.25,
 		Date:         time.Now(),
 	}
 	repo.SaveRates([]models.ExchangeRate{cachedRate})
@@ -142,7 +142,7 @@ func TestCurrencyService_Integration_ConvertAmount_InvalidAmount(t *testing.T) {
 		amount   float64
 		expected float64
 	}{
-		{"Negative amount", -100.0, -85.0}, // Negative amounts are converted
+		{"Negative amount", -100.0, -80.0}, // Negative amounts are converted
 		{"Zero amount", 0.0, 0.0},
 	}
 
@@ -150,7 +150,7 @@ func TestCurrencyService_Integration_ConvertAmount_InvalidAmount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := service.ConvertAmount(tt.amount, "USD", "EUR")
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.expected, result.Amount)
 		})
 	}
 }
@@ -171,7 +171,7 @@ func TestCurrencyService_Integration_SupportedCurrencies(t *testing.T) {
 			// Test by attempting same-currency conversion (should always work)
 			result, err := service.ConvertAmount(100.0, currency, currency)
 			assert.NoError(t, err)
-			assert.Equal(t, 100.0, result)
+			assert.Equal(t, 100.0, result.Amount)
 		})
 	}
 }
@@ -185,7 +185,7 @@ func TestCurrencyService_Integration_BDTCurrency(t *testing.T) {
 	t.Run("BDT same currency conversion", func(t *testing.T) {
 		result, err := service.ConvertAmount(100.0, "BDT", "BDT")
 		assert.NoError(t, err, "BDT should be supported")
-		assert.Equal(t, 100.0, result, "Same currency conversion should return same amount")
+		assert.Equal(t, 100.0, result.Amount, "Same currency conversion should return same amount")
 	})
 
 	t.Run("BDT in SupportedCurrencies list", func(t *testing.T) {
@@ -287,4 +287,106 @@ func TestSettingsService_SetCurrency_BDT(t *testing.T) {
 			}
 		})
 	}
+}
+
+func saveEURRates(t *testing.T, repo *repository.ExchangeRateRepository, rates ...models.ExchangeRate) {
+	t.Helper()
+	if err := repo.SaveRates(rates); err != nil {
+		t.Fatalf("save EUR rates: %v", err)
+	}
+}
+
+func TestCurrencyService_ConvertAmount_DerivesFreshCrossRateWithoutAPIKey(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	repo := repository.NewExchangeRateRepository(setupTestDB(t))
+	rateDate := time.Now().Add(-time.Hour)
+	saveEURRates(t, repo,
+		models.ExchangeRate{BaseCurrency: "EUR", Currency: "USD", Rate: 1.2, Date: rateDate},
+		models.ExchangeRate{BaseCurrency: "EUR", Currency: "SEK", Rate: 12, Date: rateDate},
+	)
+
+	conversion, err := NewCurrencyService(repo).ConvertAmount(3, "USD", "SEK")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 30.0, conversion.Amount)
+	assert.True(t, conversion.RateDate.Equal(rateDate))
+	assert.False(t, conversion.Stale)
+}
+
+func TestCurrencyService_ConvertAmount_UsesFreshDirectEURRateWithoutAPIKey(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	repo := repository.NewExchangeRateRepository(setupTestDB(t))
+	rateDate := time.Now().Add(-time.Hour)
+	saveEURRates(t, repo, models.ExchangeRate{BaseCurrency: "EUR", Currency: "SEK", Rate: 12, Date: rateDate})
+
+	conversion, err := NewCurrencyService(repo).ConvertAmount(2, "EUR", "SEK")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 24.0, conversion.Amount)
+	assert.True(t, conversion.RateDate.Equal(rateDate))
+	assert.False(t, conversion.Stale)
+}
+
+func TestCurrencyService_ConvertAmount_UsesFreshInverseEURRateWithoutAPIKey(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	repo := repository.NewExchangeRateRepository(setupTestDB(t))
+	rateDate := time.Now().Add(-time.Hour)
+	saveEURRates(t, repo, models.ExchangeRate{BaseCurrency: "EUR", Currency: "USD", Rate: 1.2, Date: rateDate})
+
+	conversion, err := NewCurrencyService(repo).ConvertAmount(12, "USD", "EUR")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 10.0, conversion.Amount)
+	assert.True(t, conversion.RateDate.Equal(rateDate))
+	assert.False(t, conversion.Stale)
+}
+
+func TestCurrencyService_ConvertAmount_UsesOlderLegAsQuoteDate(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	repo := repository.NewExchangeRateRepository(setupTestDB(t))
+	newerDate := time.Now().Add(-time.Hour)
+	olderDate := newerDate.Add(-time.Hour)
+	saveEURRates(t, repo,
+		models.ExchangeRate{BaseCurrency: "EUR", Currency: "USD", Rate: 1.2, Date: newerDate},
+		models.ExchangeRate{BaseCurrency: "EUR", Currency: "SEK", Rate: 12, Date: olderDate},
+	)
+
+	conversion, err := NewCurrencyService(repo).ConvertAmount(3, "USD", "SEK")
+
+	assert.NoError(t, err)
+	assert.True(t, conversion.RateDate.Equal(olderDate))
+	assert.False(t, conversion.Stale)
+}
+
+func TestCurrencyService_ConvertAmount_ReturnsStaleCachedCrossRateWithoutAPIKey(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	repo := repository.NewExchangeRateRepository(setupTestDB(t))
+	rateDate := time.Now().Add(-5 * 24 * time.Hour)
+	saveEURRates(t, repo,
+		models.ExchangeRate{BaseCurrency: "EUR", Currency: "USD", Rate: 1.2, Date: rateDate},
+		models.ExchangeRate{BaseCurrency: "EUR", Currency: "SEK", Rate: 12, Date: rateDate},
+	)
+
+	conversion, err := NewCurrencyService(repo).ConvertAmount(3, "USD", "SEK")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 30.0, conversion.Amount)
+	assert.True(t, conversion.RateDate.Equal(rateDate))
+	assert.True(t, conversion.Stale)
+}
+
+func TestCurrencyService_ConvertAmount_FailsWithoutCompleteCachedPairOrAPIKey(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	repo := repository.NewExchangeRateRepository(setupTestDB(t))
+	saveEURRates(t, repo, models.ExchangeRate{
+		BaseCurrency: "EUR",
+		Currency:     "USD",
+		Rate:         1.2,
+		Date:         time.Now().Add(-time.Hour),
+	})
+
+	conversion, err := NewCurrencyService(repo).ConvertAmount(3, "USD", "SEK")
+
+	assert.Error(t, err)
+	assert.Zero(t, conversion.Amount)
 }

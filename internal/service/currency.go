@@ -98,6 +98,19 @@ type CurrencyService struct {
 	apiKey string
 }
 
+// Conversion contains a converted amount and the cache state used to calculate it.
+type Conversion struct {
+	Amount   float64
+	RateDate time.Time
+	Stale    bool
+}
+
+type exchangeRateQuote struct {
+	Rate  float64
+	Date  time.Time
+	Stale bool
+}
+
 type FixerResponse struct {
 	Success   bool               `json:"success"`
 	Timestamp int64              `json:"timestamp"`
@@ -126,32 +139,79 @@ func (s *CurrencyService) IsEnabled() bool {
 
 // GetExchangeRate retrieves exchange rate between two currencies
 func (s *CurrencyService) GetExchangeRate(fromCurrency, toCurrency string) (float64, error) {
-	if fromCurrency == toCurrency {
-		return 1.0, nil
-	}
-
-	// Try to get cached rate first
-	rate, err := s.repo.GetRate(fromCurrency, toCurrency)
-	if err == nil && !rate.IsStale() {
-		return rate.Rate, nil
-	}
-
-	// If no API key, return error
-	if !s.IsEnabled() {
-		return 0, fmt.Errorf("currency conversion not available - no Fixer API key configured")
-	}
-
-	// Fetch from Fixer.io API
-	return s.fetchAndCacheRates(fromCurrency, toCurrency)
-}
-
-// ConvertAmount converts an amount from one currency to another
-func (s *CurrencyService) ConvertAmount(amount float64, fromCurrency, toCurrency string) (float64, error) {
-	rate, err := s.GetExchangeRate(fromCurrency, toCurrency)
+	quote, err := s.cachedExchangeRate(fromCurrency, toCurrency)
 	if err != nil {
 		return 0, err
 	}
-	return amount * rate, nil
+	return quote.Rate, nil
+}
+
+// ConvertAmount converts an amount from one currency to another
+func (s *CurrencyService) ConvertAmount(amount float64, fromCurrency, toCurrency string) (Conversion, error) {
+	if fromCurrency == toCurrency {
+		return Conversion{Amount: amount, RateDate: time.Now()}, nil
+	}
+
+	quote, err := s.cachedExchangeRate(fromCurrency, toCurrency)
+	if err != nil {
+		return Conversion{}, err
+	}
+	return Conversion{
+		Amount:   amount * quote.Rate,
+		RateDate: quote.Date,
+		Stale:    quote.Stale,
+	}, nil
+}
+
+func (s *CurrencyService) cachedExchangeRate(fromCurrency, toCurrency string) (*exchangeRateQuote, error) {
+	if fromCurrency == toCurrency {
+		return &exchangeRateQuote{Rate: 1, Date: time.Now()}, nil
+	}
+
+	if fromCurrency == "EUR" {
+		targetRate, err := s.eurRate(toCurrency)
+		if err != nil {
+			return nil, fmt.Errorf("exchange rate for %s to %s not available: %w", fromCurrency, toCurrency, err)
+		}
+		return &exchangeRateQuote{Rate: targetRate.Rate, Date: targetRate.Date, Stale: targetRate.IsStale()}, nil
+	}
+
+	if toCurrency == "EUR" {
+		sourceRate, err := s.eurRate(fromCurrency)
+		if err != nil || sourceRate.Rate == 0 {
+			return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
+		}
+		return &exchangeRateQuote{Rate: 1 / sourceRate.Rate, Date: sourceRate.Date, Stale: sourceRate.IsStale()}, nil
+	}
+
+	sourceRate, err := s.eurRate(fromCurrency)
+	if err != nil || sourceRate.Rate == 0 {
+		return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
+	}
+	targetRate, err := s.eurRate(toCurrency)
+	if err != nil {
+		return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
+	}
+
+	return &exchangeRateQuote{
+		Rate:  targetRate.Rate / sourceRate.Rate,
+		Date:  olderTime(sourceRate.Date, targetRate.Date),
+		Stale: sourceRate.IsStale() || targetRate.IsStale(),
+	}, nil
+}
+
+func (s *CurrencyService) eurRate(currency string) (*models.ExchangeRate, error) {
+	if currency == "EUR" {
+		return &models.ExchangeRate{BaseCurrency: "EUR", Currency: "EUR", Rate: 1, Date: time.Now()}, nil
+	}
+	return s.repo.GetRate("EUR", currency)
+}
+
+func olderTime(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
 }
 
 // fetchAndCacheRates fetches rates from Fixer.io and caches them.
