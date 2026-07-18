@@ -302,22 +302,29 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 	// Filter subscriptions with renewal dates and group by date
 	// Create a simplified structure for JavaScript
 	type Event struct {
-		Name    string  `json:"name"`
-		Cost    float64 `json:"cost"`
-		ID      uint    `json:"id"`
-		IconURL string  `json:"icon_url"`
+		Name           string  `json:"name"`
+		Cost           float64 `json:"cost"`
+		CurrencySymbol string  `json:"currency_symbol"`
+		ID             uint    `json:"id"`
+		IconURL        string  `json:"icon_url"`
 	}
-	eventsByDate := make(map[string][]Event)
+	calendarSubscriptions := make([]models.Subscription, 0, len(subscriptions))
 	for _, sub := range subscriptions {
 		if sub.RenewalDate != nil && sub.Status == "Active" {
-			dateKey := sub.RenewalDate.Format("2006-01-02")
-			eventsByDate[dateKey] = append(eventsByDate[dateKey], Event{
-				Name:    sub.Name,
-				Cost:    sub.Cost,
-				ID:      sub.ID,
-				IconURL: sub.IconURL,
-			})
+			calendarSubscriptions = append(calendarSubscriptions, sub)
 		}
+	}
+
+	eventsByDate := make(map[string][]Event)
+	for _, sub := range h.enrichWithCurrencyConversion(calendarSubscriptions) {
+		dateKey := sub.RenewalDate.Format("2006-01-02")
+		eventsByDate[dateKey] = append(eventsByDate[dateKey], Event{
+			Name:           sub.Name,
+			Cost:           sub.ConvertedCost,
+			CurrencySymbol: sub.DisplayCurrencySymbol,
+			ID:             sub.ID,
+			IconURL:        sub.IconURL,
+		})
 	}
 
 	// Get current month/year or from query params
@@ -384,7 +391,6 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 		"FirstOfMonth":            firstOfMonth,
 		"PrevMonth":               prevMonth,
 		"NextMonth":               nextMonth,
-		"CurrencySymbol":          h.settingsService.GetCurrencySymbol(),
 		"DarkMode":                h.settingsService.IsDarkModeEnabled(),
 		"ICalSubscriptionEnabled": icalSubscriptionEnabled,
 		"ICalSubscriptionURL":     icalSubscriptionURL,
