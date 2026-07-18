@@ -276,28 +276,3 @@ func (r *SubscriptionRepository) GetUpcomingCancellations(days int) ([]models.Su
 	}
 	return subscriptions, nil
 }
-
-func (r *SubscriptionRepository) GetCategoryStats() ([]models.CategoryStat, error) {
-	var stats []models.CategoryStat
-	// Divide by COALESCE(share_count,1) so shared subscriptions only count the user's share,
-	// matching the in-Go MonthlyCost/AnnualCost calculations.
-	if err := r.db.Table("subscriptions").
-		Select(`categories.name as category,
-			SUM(
-				CASE WHEN subscriptions.schedule = 'Annual'    THEN subscriptions.cost/12
-				     WHEN subscriptions.schedule = 'Quarterly' THEN subscriptions.cost/3
-				     WHEN subscriptions.schedule = 'Monthly'   THEN subscriptions.cost
-				     WHEN subscriptions.schedule = 'Weekly'    THEN subscriptions.cost*4.33
-				     WHEN subscriptions.schedule = 'Daily'     THEN subscriptions.cost*30.44
-				     ELSE subscriptions.cost END
-				/ CAST(COALESCE(NULLIF(subscriptions.share_count, 0), 1) AS REAL)
-			) as amount,
-			COUNT(*) as count`).
-		Joins("left join categories on subscriptions.category_id = categories.id").
-		Where("subscriptions.status = ?", "Active").
-		Group("categories.name").
-		Scan(&stats).Error; err != nil {
-		return nil, err
-	}
-	return stats, nil
-}

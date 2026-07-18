@@ -502,10 +502,3 @@ type CurrencyTotals struct {
 	ActiveSubscriptions    int     `json:"active_subscriptions"`
 	CancelledSubscriptions int     `json:"cancelled_subscriptions"`
 }
-
-// CategoryStat represents spending by category
-type CategoryStat struct {
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	Count    int     `json:"count"`
-}
