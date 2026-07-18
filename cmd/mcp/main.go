@@ -30,9 +30,13 @@ func main() {
 	}
 
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	exchangeRateRepo := repository.NewExchangeRateRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
 	categoryService := service.NewCategoryService(categoryRepo)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
+	settingsService := service.NewSettingsService(settingsRepo)
+	currencyService := service.NewCurrencyService(exchangeRateRepo, settingsRepo)
 
 	server := mcp.NewServer(
 		&mcp.Implementation{Name: "subtrackr", Version: version.GetVersion()},
@@ -226,7 +230,7 @@ func main() {
 		Name:        "get_stats",
 		Description: "Get subscription statistics including total spending, counts, and category breakdown",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, input StatsInput) (*mcp.CallToolResult, *models.Stats, error) {
-		stats, err := subscriptionService.GetStats()
+		stats, err := subscriptionService.GetStats(currencyService, settingsService.GetCurrency())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get stats: %w", err)
 		}

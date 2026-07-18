@@ -63,6 +63,10 @@ func NewSubscriptionHandler(service *service.SubscriptionService, settingsServic
 	}
 }
 
+func (h *SubscriptionHandler) getStats() (*models.Stats, error) {
+	return h.service.GetStats(h.currencyService, h.settingsService.GetCurrency())
+}
+
 // activeLang resolves the user-preferred language code, defaulting to "en" when unset
 // or when the requested language has no loaded translations.
 func (h *SubscriptionHandler) activeLang() string {
@@ -213,7 +217,7 @@ func parseDatePtr(dateStr string) *time.Time {
 
 // Dashboard renders the main dashboard page
 func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -270,7 +274,7 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 
 // Analytics renders the analytics page
 func (h *SubscriptionHandler) Analytics(c *gin.Context) {
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -961,7 +965,7 @@ func (h *SubscriptionHandler) DeleteSubscription(c *gin.Context) {
 
 // GetStats returns current statistics
 func (h *SubscriptionHandler) GetStats(c *gin.Context) {
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1099,7 +1103,7 @@ func (h *SubscriptionHandler) BackupData(c *gin.Context) {
 		return
 	}
 
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
