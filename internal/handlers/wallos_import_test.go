@@ -41,8 +41,9 @@ func newWallosTestHandler(t *testing.T) (*gin.Engine, *service.SubscriptionServi
 
 	categoryService := service.NewCategoryService(repository.NewCategoryRepository(db))
 	subscriptionService := service.NewSubscriptionService(repository.NewSubscriptionRepository(db), categoryService)
-	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
-	currencyService := service.NewCurrencyService(repository.NewExchangeRateRepository(db))
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsService := service.NewSettingsService(settingsRepo)
+	currencyService := service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo)
 
 	handler := NewSubscriptionHandler(
 		subscriptionService,

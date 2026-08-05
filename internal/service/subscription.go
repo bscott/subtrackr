@@ -108,7 +108,7 @@ func (s *SubscriptionService) Count() int64 {
 	return s.repo.Count()
 }
 
-func (s *SubscriptionService) GetStats() (*models.Stats, error) {
+func (s *SubscriptionService) GetStats(currencyService *CurrencyService, displayCurrency string) (*models.Stats, error) {
 	activeSubscriptions, err := s.repo.GetActiveSubscriptions()
 	if err != nil {
 		return nil, err
@@ -124,36 +124,87 @@ func (s *SubscriptionService) GetStats() (*models.Stats, error) {
 		return nil, err
 	}
 
-	categoryStats, err := s.repo.GetCategoryStats()
-	if err != nil {
-		return nil, err
-	}
-
 	stats := &models.Stats{
-		ActiveSubscriptions:    len(activeSubscriptions),
-		CancelledSubscriptions: len(cancelledSubscriptions),
-		UpcomingRenewals:       len(upcomingRenewals),
-		CategorySpending:       make(map[string]float64),
+		ActiveSubscriptions:        len(activeSubscriptions),
+		CancelledSubscriptions:     len(cancelledSubscriptions),
+		UpcomingRenewals:           len(upcomingRenewals),
+		CategorySpending:           make(map[string]float64),
+		ConversionComplete:         true,
+		TotalsByCurrency:           make(map[string]models.CurrencyTotals),
+		CategorySpendingByCurrency: make(map[string]map[string]float64),
 	}
 
-	// Calculate totals
-	for _, sub := range activeSubscriptions {
-		stats.TotalMonthlySpend += sub.MonthlyCost()
-		stats.TotalAnnualSpend += sub.AnnualCost()
+	currencies := make(map[string]struct{})
+	for i := range activeSubscriptions {
+		sub := &activeSubscriptions[i]
+		currency := subscriptionCurrency(sub, displayCurrency)
+		currencies[currency] = struct{}{}
+		addActiveCurrencyTotals(stats, currency, sub)
+	}
+	for i := range cancelledSubscriptions {
+		sub := &cancelledSubscriptions[i]
+		currency := subscriptionCurrency(sub, displayCurrency)
+		currencies[currency] = struct{}{}
+		addCancelledCurrencyTotals(stats, currency, sub)
 	}
 
-	// Calculate savings from cancelled subscriptions
-	for _, sub := range cancelledSubscriptions {
-		stats.TotalSaved += sub.AnnualCost()
-		stats.MonthlySaved += sub.MonthlyCost()
+	rates := make(map[string]float64, len(currencies))
+	for currency := range currencies {
+		rate, err := currencyService.GetExchangeRate(currency, displayCurrency)
+		if err != nil {
+			stats.ConversionComplete = false
+			break
+		}
+		rates[currency] = rate
 	}
 
-	// Build category spending map
-	for _, cat := range categoryStats {
-		stats.CategorySpending[cat.Category] = cat.Amount
+	if !stats.ConversionComplete {
+		return stats, nil
+	}
+
+	for i := range activeSubscriptions {
+		sub := &activeSubscriptions[i]
+		rate := rates[subscriptionCurrency(sub, displayCurrency)]
+		stats.TotalMonthlySpend += sub.MonthlyCost() * rate
+		stats.TotalAnnualSpend += sub.AnnualCost() * rate
+		stats.CategorySpending[sub.Category.Name] += sub.MonthlyCost() * rate
+	}
+	for i := range cancelledSubscriptions {
+		sub := &cancelledSubscriptions[i]
+		rate := rates[subscriptionCurrency(sub, displayCurrency)]
+		stats.TotalSaved += sub.AnnualCost() * rate
+		stats.MonthlySaved += sub.MonthlyCost() * rate
 	}
 
 	return stats, nil
+}
+
+func subscriptionCurrency(subscription *models.Subscription, displayCurrency string) string {
+	if subscription.OriginalCurrency == "" {
+		return displayCurrency
+	}
+	return subscription.OriginalCurrency
+}
+
+func addActiveCurrencyTotals(stats *models.Stats, currency string, subscription *models.Subscription) {
+	totals := stats.TotalsByCurrency[currency]
+	totals.TotalMonthlySpend += subscription.MonthlyCost()
+	totals.TotalAnnualSpend += subscription.AnnualCost()
+	totals.ActiveSubscriptions++
+	stats.TotalsByCurrency[currency] = totals
+
+	if stats.CategorySpendingByCurrency[subscription.Category.Name] == nil {
+		stats.CategorySpendingByCurrency[subscription.Category.Name] = make(map[string]float64)
+	}
+	stats.CategorySpendingByCurrency[subscription.Category.Name][currency] += subscription.MonthlyCost()
+}
+
+func addCancelledCurrencyTotals(stats *models.Stats, currency string, subscription *models.Subscription) {
+	totals := stats.TotalsByCurrency[currency]
+	totals.TotalSaved += subscription.AnnualCost()
+	totals.MonthlySaved += subscription.MonthlyCost()
+	totals.CancelledSubscriptions++
+	stats.TotalsByCurrency[currency] = totals
 }
 
 func (s *SubscriptionService) GetAllCategories() ([]models.Category, error) {

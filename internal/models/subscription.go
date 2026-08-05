@@ -481,19 +481,24 @@ func (s *Subscription) calculateNextRenewalDateFromNowV2() {
 
 // Stats represents aggregated subscription statistics
 type Stats struct {
-	TotalMonthlySpend      float64            `json:"total_monthly_spend"`
-	TotalAnnualSpend       float64            `json:"total_annual_spend"`
-	ActiveSubscriptions    int                `json:"active_subscriptions"`
-	CancelledSubscriptions int                `json:"cancelled_subscriptions"`
-	TotalSaved             float64            `json:"total_saved"`
-	MonthlySaved           float64            `json:"monthly_saved"`
-	UpcomingRenewals       int                `json:"upcoming_renewals"`
-	CategorySpending       map[string]float64 `json:"category_spending"`
+	TotalMonthlySpend          float64                       `json:"total_monthly_spend"`
+	TotalAnnualSpend           float64                       `json:"total_annual_spend"`
+	ActiveSubscriptions        int                           `json:"active_subscriptions"`
+	CancelledSubscriptions     int                           `json:"cancelled_subscriptions"`
+	TotalSaved                 float64                       `json:"total_saved"`
+	MonthlySaved               float64                       `json:"monthly_saved"`
+	UpcomingRenewals           int                           `json:"upcoming_renewals"`
+	CategorySpending           map[string]float64            `json:"category_spending"`
+	ConversionComplete         bool                          `json:"conversion_complete"`
+	TotalsByCurrency           map[string]CurrencyTotals     `json:"totals_by_currency"`
+	CategorySpendingByCurrency map[string]map[string]float64 `json:"category_spending_by_currency"`
 }
 
-// CategoryStat represents spending by category
-type CategoryStat struct {
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	Count    int     `json:"count"`
+type CurrencyTotals struct {
+	TotalMonthlySpend      float64 `json:"total_monthly_spend"`
+	TotalAnnualSpend       float64 `json:"total_annual_spend"`
+	TotalSaved             float64 `json:"total_saved"`
+	MonthlySaved           float64 `json:"monthly_saved"`
+	ActiveSubscriptions    int     `json:"active_subscriptions"`
+	CancelledSubscriptions int     `json:"cancelled_subscriptions"`
 }
