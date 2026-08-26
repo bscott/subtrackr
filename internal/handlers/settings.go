@@ -113,9 +113,10 @@ func (h *SettingsHandler) TestSMTPConnection(c *gin.Context) {
 		return
 	}
 
-	// Test connection with TLS/SSL support
+	// Test connection with TLS/SSL support. The auth mechanism (PLAIN, or LOGIN
+	// for Office 365 / Outlook) is negotiated from the server's advertised list.
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
-	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
+	auth := service.SMTPAuth(config.Host, config.Username, config.Password)
 
 	// Determine if this is an implicit TLS port (SMTPS)
 	isSSLPort := config.Port == 465 || config.Port == 8465 || config.Port == 443

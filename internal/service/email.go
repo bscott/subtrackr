@@ -46,11 +46,11 @@ func (e *EmailService) SendEmail(subject, body string) error {
 	// Determine if this is an implicit TLS port (SMTPS)
 	isSSLPort := config.Port == 465 || config.Port == 8465 || config.Port == 443
 
-	var auth smtp.Auth
-	var addr string
-
-	auth = smtp.PlainAuth("", config.Username, config.Password, config.Host)
-	addr = fmt.Sprintf("%s:%d", config.Host, config.Port)
+	// Negotiate the auth mechanism based on what the server advertises (PLAIN,
+	// or LOGIN for Office 365 / Outlook). The actual choice happens during the
+	// handshake once the server's mechanism list is known.
+	auth := SMTPAuth(config.Host, config.Username, config.Password)
+	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 
 	if isSSLPort {
 		// Use implicit TLS (direct SSL connection)
