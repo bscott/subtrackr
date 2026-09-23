@@ -605,6 +605,14 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 	// Get auth settings
 	authEnabled := h.settingsService.IsAuthEnabled()
 	authUsername, _ := h.settingsService.GetAuthUsername()
+	var oidcConfig *models.OIDCConfig
+	oidcConfigured := false
+	oidcCfg, err := h.settingsService.GetOIDCConfig()
+	if err == nil && oidcCfg != nil {
+		oidcConfigured = oidcCfg.IssuerURL != "" && oidcCfg.ClientID != "" && oidcCfg.ClientSecret != ""
+		oidcCfg.ClientSecret = ""
+		oidcConfig = oidcCfg
+	}
 
 	// Build iCal subscription URL if enabled
 	icalSubscriptionEnabled := h.settingsService.IsICalSubscriptionEnabled()
@@ -637,6 +645,8 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"SMTPConfigured":               smtpConfigured,
 		"AuthEnabled":                  authEnabled,
 		"AuthUsername":                 authUsername,
+		"OIDCConfig":                   oidcConfig,
+		"OIDCConfigured":               oidcConfigured,
 		"ICalSubscriptionEnabled":      icalSubscriptionEnabled,
 		"ICalSubscriptionURL":          icalSubscriptionURL,
 		"BaseURL":                      h.settingsService.GetBaseURL(),

@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,13 +13,20 @@ import (
 	"subtrackr/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
 )
+
+type OIDCAuthenticator interface {
+	AuthorizationURL(ctx context.Context, redirectURI, state, nonce, codeVerifier string) (string, error)
+	ExchangeAndVerify(ctx context.Context, redirectURI, code, codeVerifier, expectedNonce string) (*service.OIDCIdentity, error)
+}
 
 type AuthHandler struct {
 	settingsService *service.SettingsService
 	sessionService  *service.SessionService
 	emailService    *service.EmailService
 	i18nCatalog     *i18n.Catalog
+	oidcService     OIDCAuthenticator
 }
 
 func NewAuthHandler(settingsService *service.SettingsService, sessionService *service.SessionService, emailService *service.EmailService, i18nCatalog *i18n.Catalog) *AuthHandler {
@@ -25,6 +35,7 @@ func NewAuthHandler(settingsService *service.SettingsService, sessionService *se
 		sessionService:  sessionService,
 		emailService:    emailService,
 		i18nCatalog:     i18nCatalog,
+		oidcService:     service.NewOIDCService(settingsService, nil),
 	}
 }
 
@@ -40,17 +51,14 @@ func (h *AuthHandler) activeLang() string {
 
 // isValidRedirect validates that a redirect URL is safe (relative URL only)
 func isValidRedirect(redirect string) bool {
-	// Check URL length to prevent DoS or log injection
-	if len(redirect) > 2048 {
+	if redirect == "" || len(redirect) > 2048 || strings.ContainsAny(redirect, "#\\\r\n") {
 		return false
 	}
-
-	// Only allow relative URLs starting with / but not //
-	// This prevents open redirect vulnerabilities
-	if strings.HasPrefix(redirect, "/") && !strings.HasPrefix(redirect, "//") {
-		return true
+	parsed, err := url.ParseRequestURI(redirect)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.User != nil || parsed.Opaque != "" || parsed.Fragment != "" {
+		return false
 	}
-	return false
+	return strings.HasPrefix(parsed.Path, "/") && !strings.HasPrefix(parsed.Path, "//")
 }
 
 // ShowLoginPage displays the login page
@@ -65,16 +73,31 @@ func (h *AuthHandler) ShowLoginPage(c *gin.Context) {
 	if redirect == "" || !isValidRedirect(redirect) {
 		redirect = "/"
 	}
+	oidcConfig, _ := h.settingsService.GetOIDCConfig()
+	oidcDisplayName := "OpenID Connect"
+	if oidcConfig != nil && strings.TrimSpace(oidcConfig.DisplayName) != "" {
+		oidcDisplayName = strings.TrimSpace(oidcConfig.DisplayName)
+	}
 
 	c.HTML(http.StatusOK, "login.html", gin.H{
-		"Redirect": redirect,
-		"Error":    c.Query("error"),
-		"Lang":     h.activeLang(),
+		"Redirect":         redirect,
+		"Error":            c.Query("error"),
+		"Lang":             h.activeLang(),
+		"LocalAuthEnabled": h.settingsService.IsAuthEnabled(),
+		"OIDCEnabled":      h.settingsService.IsOIDCEnabled(),
+		"OIDCDisplayName":  oidcDisplayName,
 	})
 }
 
 // Login handles login form submission
 func (h *AuthHandler) Login(c *gin.Context) {
+	if !h.settingsService.IsAuthEnabled() {
+		c.HTML(http.StatusForbidden, "login-error.html", gin.H{
+			"Error": "Local authentication is disabled",
+		})
+		return
+	}
+
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 	rememberMe := c.PostForm("remember_me") == "on"
@@ -110,7 +133,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Create session
-	if err := h.sessionService.CreateSession(c.Writer, c.Request, rememberMe); err != nil {
+	secureCookie := strings.HasPrefix(strings.ToLower(strings.TrimSpace(h.settingsService.GetBaseURL())), "https://")
+	if err := h.sessionService.CreateSession(c.Writer, c.Request, rememberMe, secureCookie); err != nil {
 		c.HTML(http.StatusInternalServerError, "login-error.html", gin.H{
 			"Error": "Failed to create session",
 		})
@@ -120,6 +144,93 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Redirect to original destination or dashboard
 	c.Header("HX-Redirect", redirect)
 	c.Status(http.StatusOK)
+}
+
+// OIDCLogin starts an OpenID Connect authorization-code flow.
+func (h *AuthHandler) OIDCLogin(c *gin.Context) {
+	if !h.settingsService.IsOIDCEnabled() {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("OIDC login is not configured"))
+		return
+	}
+
+	redirect := c.Query("redirect")
+	if redirect == "" || !isValidRedirect(redirect) {
+		redirect = "/"
+	}
+	state, err := randomOIDCValue()
+	if err != nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("Unable to start OIDC login"))
+		return
+	}
+	nonce, err := randomOIDCValue()
+	if err != nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("Unable to start OIDC login"))
+		return
+	}
+	codeVerifier := oauth2.GenerateVerifier()
+	baseURL := strings.TrimRight(h.settingsService.GetBaseURL(), "/")
+	redirectURI := baseURL + "/auth/oidc/callback"
+	secureCookie := strings.HasPrefix(strings.ToLower(baseURL), "https://")
+	authorizationURL, err := h.oidcService.AuthorizationURL(c.Request.Context(), redirectURI, state, nonce, codeVerifier)
+	if err != nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("Unable to connect to the OIDC provider"))
+		return
+	}
+	if err := h.sessionService.SaveOIDCFlow(c.Writer, c.Request, state, &service.OIDCFlow{
+		Nonce:        nonce,
+		CodeVerifier: codeVerifier,
+		Redirect:     redirect,
+	}, secureCookie); err != nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("Unable to save OIDC login state"))
+		return
+	}
+	c.Redirect(http.StatusFound, authorizationURL)
+}
+
+// OIDCCallback completes an OpenID Connect authorization-code flow.
+func (h *AuthHandler) OIDCCallback(c *gin.Context) {
+	baseURL := strings.TrimRight(h.settingsService.GetBaseURL(), "/")
+	secureCookie := strings.HasPrefix(strings.ToLower(baseURL), "https://")
+	flow, err := h.sessionService.ConsumeOIDCFlow(c.Writer, c.Request, c.Query("state"), secureCookie)
+	if err != nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("Invalid or expired OIDC login state"))
+		return
+	}
+	if c.Query("error") != "" {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("OIDC login was denied"))
+		return
+	}
+
+	redirectURI := baseURL + "/auth/oidc/callback"
+	identity, err := h.oidcService.ExchangeAndVerify(
+		c.Request.Context(),
+		redirectURI,
+		c.Query("code"),
+		flow.CodeVerifier,
+		flow.Nonce,
+	)
+	if err != nil || identity == nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("OIDC login could not be verified"))
+		return
+	}
+	if err := h.sessionService.CreateSession(c.Writer, c.Request, false, secureCookie); err != nil {
+		c.Redirect(http.StatusFound, "/login?error="+url.QueryEscape("Unable to create login session"))
+		return
+	}
+
+	redirect := flow.Redirect
+	if redirect == "" || !isValidRedirect(redirect) {
+		redirect = "/"
+	}
+	c.Redirect(http.StatusFound, redirect)
+}
+
+func randomOIDCValue() (string, error) {
+	value := make([]byte, 32)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(value), nil
 }
 
 // Logout handles logout
