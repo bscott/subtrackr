@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"strconv"
 	"strings"
 	"subtrackr/internal/i18n"
@@ -18,8 +19,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func splitLines(s string) []string { return strings.Split(s, "\n") }
-func trimSpace(s string) string    { return strings.TrimSpace(s) }
+func splitLines(s string) []string         { return strings.Split(s, "\n") }
+func trimSpace(s string) string            { return strings.TrimSpace(s) }
 func splitN(s, sep string, n int) []string { return strings.SplitN(s, sep, n) }
 
 type SettingsHandler struct {
@@ -532,6 +533,85 @@ func (h *SettingsHandler) SetupAuth(c *gin.Context) {
 	})
 }
 
+// SaveOIDCSettings saves OpenID Connect login configuration.
+func (h *SettingsHandler) SaveOIDCSettings(c *gin.Context) {
+	existing, _ := h.service.GetOIDCConfig()
+	config := &models.OIDCConfig{
+		Enabled:      c.PostForm("enabled") == "true" || c.PostForm("enabled") == "on",
+		DisplayName:  strings.TrimSpace(c.PostForm("display_name")),
+		IssuerURL:    strings.TrimRight(strings.TrimSpace(c.PostForm("issuer_url")), "/"),
+		ClientID:     strings.TrimSpace(c.PostForm("client_id")),
+		ClientSecret: c.PostForm("client_secret"),
+		Scopes:       normalizeOIDCScopes(c.PostForm("scopes")),
+	}
+	if config.DisplayName == "" {
+		config.DisplayName = "OpenID Connect"
+	}
+	if config.ClientSecret == "" && existing != nil {
+		config.ClientSecret = existing.ClientSecret
+	}
+
+	if config.Enabled {
+		baseURL, err := url.Parse(h.service.GetBaseURL())
+		if err != nil || baseURL.Scheme == "" || baseURL.Host == "" || (baseURL.Scheme != "https" && baseURL.Scheme != "http") || baseURL.User != nil || baseURL.RawQuery != "" || baseURL.Fragment != "" {
+			c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+				"Error": "A valid application Base URL is required before OIDC can be enabled",
+				"Type":  "error",
+			})
+			return
+		}
+		issuer, err := url.Parse(config.IssuerURL)
+		if err != nil || issuer.Host == "" || (issuer.Scheme != "https" && issuer.Scheme != "http") || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" {
+			c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+				"Error": "Issuer URL must be an absolute HTTP or HTTPS URL without query parameters or fragments",
+				"Type":  "error",
+			})
+			return
+		}
+		if baseURL.Scheme == "https" && issuer.Scheme != "https" {
+			c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+				"Error": "Issuer URL must use HTTPS when the application Base URL uses HTTPS",
+				"Type":  "error",
+			})
+			return
+		}
+		if config.ClientID == "" || config.ClientSecret == "" {
+			c.HTML(http.StatusBadRequest, "auth-message.html", gin.H{
+				"Error": "Client ID and client secret are required when OIDC is enabled",
+				"Type":  "error",
+			})
+			return
+		}
+	}
+
+	if err := h.service.SaveOIDCConfig(config); err != nil {
+		c.HTML(http.StatusInternalServerError, "auth-message.html", gin.H{
+			"Error": "Failed to save OIDC settings",
+			"Type":  "error",
+		})
+		return
+	}
+	c.HTML(http.StatusOK, "auth-message.html", gin.H{
+		"Message": "OIDC settings saved successfully",
+		"Type":    "success",
+	})
+}
+
+func normalizeOIDCScopes(value string) []string {
+	scopes := []string{"openid"}
+	seen := map[string]bool{"openid": true}
+	for _, scope := range strings.Fields(value) {
+		if !seen[scope] {
+			scopes = append(scopes, scope)
+			seen[scope] = true
+		}
+	}
+	if len(scopes) == 1 {
+		scopes = append(scopes, "profile", "email")
+	}
+	return scopes
+}
+
 // DisableAuth disables authentication
 func (h *SettingsHandler) DisableAuth(c *gin.Context) {
 	err := h.service.DisableAuth()
@@ -924,9 +1004,9 @@ func (h *SettingsHandler) GetTelegramConfig(c *gin.Context) {
 
 	// Don't send the full token, just indicate if configured
 	c.JSON(http.StatusOK, gin.H{
-		"configured":     true,
-		"has_bot_token":  config.BotToken != "",
-		"has_chat_id":    config.ChatID != "",
+		"configured":    true,
+		"has_bot_token": config.BotToken != "",
+		"has_chat_id":   config.ChatID != "",
 	})
 }
 
@@ -990,7 +1070,27 @@ func (h *SettingsHandler) RegenerateICalToken(c *gin.Context) {
 
 // UpdateBaseURL saves the base URL setting
 func (h *SettingsHandler) UpdateBaseURL(c *gin.Context) {
-	baseURL := c.PostForm("base_url")
+	baseURL := strings.TrimSpace(c.PostForm("base_url"))
+
+	if h.service.IsOIDCEnabled() {
+		parsed, parseErr := url.Parse(baseURL)
+		if parseErr != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "A valid application Base URL is required while OIDC is enabled"})
+			return
+		}
+		if parsed.Scheme == "https" {
+			oidcConfig, configErr := h.service.GetOIDCConfig()
+			if configErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load OIDC settings"})
+				return
+			}
+			issuer, issuerErr := url.Parse(oidcConfig.IssuerURL)
+			if issuerErr != nil || issuer.Scheme != "https" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "The OIDC issuer must use HTTPS before the application Base URL can use HTTPS"})
+				return
+			}
+		}
+	}
 
 	if err := h.service.SetBaseURL(baseURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

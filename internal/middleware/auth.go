@@ -13,7 +13,7 @@ import (
 func AuthMiddleware(settingsService *service.SettingsService, sessionService *service.SessionService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check if auth is enabled
-		if !settingsService.IsAuthEnabled() {
+		if !settingsService.IsAnyAuthEnabled() {
 			c.Next()
 			return
 		}
@@ -29,7 +29,7 @@ func AuthMiddleware(settingsService *service.SettingsService, sessionService *se
 		if !sessionService.IsAuthenticated(c.Request) {
 			// Redirect to login page for HTML requests
 			if isHTMLRequest(c.Request) {
-				c.Redirect(http.StatusFound, "/login?redirect="+url.QueryEscape(c.Request.URL.Path))
+				c.Redirect(http.StatusFound, "/login?redirect="+url.QueryEscape(c.Request.URL.RequestURI()))
 				c.Abort()
 				return
 			}
@@ -46,27 +46,25 @@ func AuthMiddleware(settingsService *service.SettingsService, sessionService *se
 
 // isPublicRoute checks if a route should be accessible without authentication
 func isPublicRoute(path string) bool {
-	publicRoutes := []string{
-		"/login",
-		"/forgot-password",
-		"/reset-password",
-		"/api/auth/login",
-		"/api/auth/logout",
-		"/api/auth/forgot-password",
-		"/api/auth/reset-password",
-		"/static/",
-		"/favicon.ico",
-		"/healthz",
-		"/ical/",
+	exactPublicRoutes := map[string]struct{}{
+		"/login":                    {},
+		"/forgot-password":          {},
+		"/reset-password":           {},
+		"/api/auth/login":           {},
+		"/api/auth/logout":          {},
+		"/auth/oidc/login":          {},
+		"/auth/oidc/callback":       {},
+		"/api/auth/forgot-password": {},
+		"/api/auth/reset-password":  {},
+		"/favicon.ico":              {},
+		"/healthz":                  {},
 	}
-
-	// API v1 routes use API keys, not session auth
-	if strings.HasPrefix(path, "/api/v1/") {
+	if _, ok := exactPublicRoutes[path]; ok {
 		return true
 	}
 
-	for _, route := range publicRoutes {
-		if strings.HasPrefix(path, route) {
+	for _, prefix := range []string{"/static/", "/ical/", "/api/v1/"} {
+		if strings.HasPrefix(path, prefix) {
 			return true
 		}
 	}

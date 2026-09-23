@@ -391,6 +391,8 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 	router.GET("/login", authHandler.ShowLoginPage)
 	router.GET("/forgot-password", authHandler.ShowForgotPasswordPage)
 	router.GET("/reset-password", authHandler.ShowResetPasswordPage)
+	router.GET("/auth/oidc/login", authHandler.OIDCLogin)
+	router.GET("/auth/oidc/callback", authHandler.OIDCCallback)
 
 	// iCal subscription route (public, token-validated)
 	router.GET("/ical/:token", handler.ServeICalSubscription)
@@ -468,12 +470,14 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		// Auth routes
 		api.POST("/auth/login", authHandler.Login)
 		api.GET("/auth/logout", authHandler.Logout)
+
 		api.POST("/auth/forgot-password", authHandler.ForgotPassword)
 		api.POST("/auth/reset-password", authHandler.ResetPassword)
 
 		// Auth settings routes
 		api.POST("/settings/auth/setup", settingsHandler.SetupAuth)
 		api.POST("/settings/auth/disable", settingsHandler.DisableAuth)
+		api.POST("/settings/auth/oidc", settingsHandler.SaveOIDCSettings)
 		api.GET("/settings/auth/status", settingsHandler.GetAuthStatus)
 
 		// Theme settings routes

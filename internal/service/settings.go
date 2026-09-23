@@ -49,6 +49,29 @@ func (s *SettingsService) GetSMTPConfig() (*models.SMTPConfig, error) {
 	return &config, nil
 }
 
+// SaveOIDCConfig saves OpenID Connect login configuration.
+func (s *SettingsService) SaveOIDCConfig(config *models.OIDCConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("oidc_config", string(data))
+}
+
+// GetOIDCConfig retrieves OpenID Connect login configuration.
+func (s *SettingsService) GetOIDCConfig() (*models.OIDCConfig, error) {
+	data, err := s.repo.Get("oidc_config")
+	if err != nil {
+		return nil, err
+	}
+
+	var config models.OIDCConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
 // SetBoolSetting saves a boolean setting
 func (s *SettingsService) SetBoolSetting(key string, value bool) error {
 	return s.repo.Set(key, fmt.Sprintf("%t", value))
@@ -290,6 +313,17 @@ func (s *SettingsService) IsDarkModeEnabled() bool {
 // IsAuthEnabled returns whether authentication is enabled
 func (s *SettingsService) IsAuthEnabled() bool {
 	return s.GetBoolSettingWithDefault("auth_enabled", false)
+}
+
+// IsOIDCEnabled returns whether a complete OIDC configuration is enabled.
+func (s *SettingsService) IsOIDCEnabled() bool {
+	config, err := s.GetOIDCConfig()
+	return err == nil && config.Enabled && config.IssuerURL != "" && config.ClientID != "" && config.ClientSecret != ""
+}
+
+// IsAnyAuthEnabled returns whether local or OIDC login protects the application.
+func (s *SettingsService) IsAnyAuthEnabled() bool {
+	return s.IsAuthEnabled() || s.IsOIDCEnabled()
 }
 
 // SetAuthEnabled enables or disables authentication

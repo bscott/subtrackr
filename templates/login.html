@@ -22,6 +22,26 @@
         </div>
 
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {{if .Error}}
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{.Error}}</div>
+            {{end}}
+
+            {{if .OIDCEnabled}}
+            <a href="/auth/oidc/login?redirect={{urlquery .Redirect}}"
+               class="block w-full rounded-lg bg-blue-600 px-4 py-2 text-center font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                Continue with {{.OIDCDisplayName}}
+            </a>
+            {{end}}
+
+            {{if and .OIDCEnabled .LocalAuthEnabled}}
+            <div class="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-gray-500">
+                <span class="h-px flex-1 bg-gray-200"></span>
+                <span>or</span>
+                <span class="h-px flex-1 bg-gray-200"></span>
+            </div>
+            {{end}}
+
+            {{if .LocalAuthEnabled}}
             <form hx-post="/api/auth/login" hx-target="#login-error" hx-swap="innerHTML">
                 <input type="hidden" name="redirect" value="{{.Redirect}}">
                 
@@ -54,6 +74,7 @@
                     </div>
                 </div>
             </form>
+            {{end}}
         </div>
     </div>
 </body>

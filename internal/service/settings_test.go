@@ -165,3 +165,37 @@ func TestWebhookConfig_NotConfigured(t *testing.T) {
 	_, err := s.GetWebhookConfig()
 	assert.Error(t, err, "Should error when webhook not configured")
 }
+
+func TestOIDCConfig_SaveAndRetrieve(t *testing.T) {
+	s := setupSettingsTestDB(t)
+	config := &models.OIDCConfig{
+		Enabled:      true,
+		DisplayName:  "Pocket ID",
+		IssuerURL:    "https://id.example.com",
+		ClientID:     "subtrackr",
+		ClientSecret: "client-secret",
+	}
+
+	assert.NoError(t, s.SaveOIDCConfig(config))
+
+	retrieved, err := s.GetOIDCConfig()
+	assert.NoError(t, err)
+	assert.Equal(t, config, retrieved)
+	assert.True(t, s.IsOIDCEnabled())
+	assert.True(t, s.IsAnyAuthEnabled())
+}
+
+func TestAnyAuthEnabled_WhenOnlyLocalAuthIsConfigured(t *testing.T) {
+	s := setupSettingsTestDB(t)
+	assert.NoError(t, s.SetAuthEnabled(true))
+
+	assert.False(t, s.IsOIDCEnabled())
+	assert.True(t, s.IsAnyAuthEnabled())
+}
+
+func TestAnyAuthEnabled_DefaultsToFalse(t *testing.T) {
+	s := setupSettingsTestDB(t)
+
+	assert.False(t, s.IsOIDCEnabled())
+	assert.False(t, s.IsAnyAuthEnabled())
+}

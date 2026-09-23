@@ -928,6 +928,51 @@
 
                     <div id="auth-message" class="mt-4"></div>
                 </div>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mt-4 transition-colors duration-200">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-2">OpenID Connect</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">Use a discovery-compatible identity provider such as Pocket ID or Authentik. Configure the application Base URL before enabling OIDC.</p>
+                    <form id="oidc-form" hx-post="/api/settings/auth/oidc" hx-target="#oidc-message" hx-swap="innerHTML">
+                        <div class="space-y-4">
+                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                                <input type="checkbox" id="oidc_enabled" name="enabled" value="true" {{if and .OIDCConfig .OIDCConfig.Enabled}}checked{{end}} class="rounded border-gray-300 text-primary focus:ring-primary">
+                                Enable OIDC login
+                            </label>
+                            <div>
+                                <label for="oidc_display_name" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Provider name</label>
+                                <input type="text" id="oidc_display_name" name="display_name" value="{{if .OIDCConfig}}{{.OIDCConfig.DisplayName}}{{end}}" placeholder="Pocket ID"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="oidc_issuer_url" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Issuer URL</label>
+                                <input type="url" id="oidc_issuer_url" name="issuer_url" value="{{if .OIDCConfig}}{{.OIDCConfig.IssuerURL}}{{end}}" placeholder="https://id.example.com"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="oidc_client_id" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Client ID</label>
+                                <input type="text" id="oidc_client_id" name="client_id" value="{{if .OIDCConfig}}{{.OIDCConfig.ClientID}}{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="oidc_client_secret" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Client secret</label>
+                                <input type="password" id="oidc_client_secret" name="client_secret" placeholder="{{if .OIDCConfigured}}Configured — leave blank to keep existing secret{{end}}"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <label for="oidc_scopes" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Scopes</label>
+                                <input type="text" id="oidc_scopes" name="scopes" value="{{if .OIDCConfig}}{{range $index, $scope := .OIDCConfig.Scopes}}{{if $index}} {{end}}{{$scope}}{{end}}{{end}}" placeholder="openid profile email"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Space-separated scopes. The <code>openid</code> scope is always included.</p>
+                            </div>
+                            <p class="text-xs text-gray-600 dark:text-gray-300">
+                                Register this callback URL with your provider:
+                                <code class="break-all">{{.BaseURL}}/auth/oidc/callback</code>
+                            </p>
+                            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">Save OIDC settings</button>
+                        </div>
+                    </form>
+                    <div id="oidc-message" class="mt-4"></div>
+                </div>
             </div>
 
             

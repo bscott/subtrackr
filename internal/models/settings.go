@@ -24,6 +24,16 @@ type SMTPConfig struct {
 	To       string `json:"smtp_to"` // Recipient email address for notifications
 }
 
+// OIDCConfig represents OpenID Connect login configuration.
+type OIDCConfig struct {
+	Enabled      bool     `json:"enabled"`
+	DisplayName  string   `json:"display_name"`
+	IssuerURL    string   `json:"issuer_url"`
+	ClientID     string   `json:"client_id"`
+	ClientSecret string   `json:"client_secret"`
+	Scopes       []string `json:"scopes,omitempty"`
+}
+
 // PushoverConfig represents Pushover notification configuration
 type PushoverConfig struct {
 	UserKey  string `json:"pushover_user_key"`  // Pushover user key
