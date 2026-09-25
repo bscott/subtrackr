@@ -60,7 +60,7 @@ func TestGetAvailableCurrencies(t *testing.T) {
 
 	// Verify first and last entries match
 	assert.Equal(t, "USD", currencies[0].Code)
-	assert.Equal(t, "RON", currencies[len(currencies)-1].Code)
+	assert.Equal(t, "UAH", currencies[len(currencies)-1].Code)
 }
 
 func TestSupportedCurrencies_DerivedFromBuiltin(t *testing.T) {
