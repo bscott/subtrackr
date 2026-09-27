@@ -69,9 +69,12 @@ test('search survives sorting and autopay states remain distinct', async ({ page
     await expect(page.locator('tbody tr', { hasText: subscriptions[1].name })).toBeHidden();
     await expect(page.locator('tbody tr', { hasText: subscriptions[2].name })).toBeHidden();
 
-    const sortResponse = page.waitForResponse(response =>
-      response.url().includes('/api/subscriptions?sort=name') && response.ok()
-    );
+    const sortResponse = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/subscriptions'
+        && (url.searchParams.get('sorts') || '').startsWith('name:')
+        && response.ok();
+    });
     await page.locator('#subscription-list thead button', { hasText: 'Name' }).click();
     await sortResponse;
 
