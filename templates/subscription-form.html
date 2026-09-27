@@ -92,7 +92,7 @@
             <div>
                 <label for="cost" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{t .Lang "form.cost"}} *</label>
                 <div class="relative">
-                    <span class="absolute left-3 top-2 text-gray-500 dark:text-gray-400">{{.CurrencySymbol}}</span>
+                    <span id="cost-currency-symbol" class="absolute left-3 top-2 text-gray-500 dark:text-gray-400">{{.CurrencySymbol}}</span>
                     <input type="number" id="cost" name="cost" step="0.01" min="0" required
                            value="{{if .Subscription}}{{.Subscription.Cost}}{{end}}"
                            class="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
@@ -114,10 +114,10 @@
             <!-- Original Currency -->
             <div>
                 <label for="original_currency" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{t .Lang "form.currency"}} *</label>
-                <select id="original_currency" name="original_currency" required
+                <select id="original_currency" name="original_currency" required onchange="updateCostCurrencySymbol()"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
                     {{range .Currencies}}
-                    <option value="{{.Code}}" {{if $.Subscription}}{{if eq $.Subscription.OriginalCurrency .Code}}selected{{end}}{{else}}{{if eq .Code "USD"}}selected{{end}}{{end}}>{{.Symbol}} {{.Code}}</option>
+                    <option value="{{.Code}}" data-symbol="{{.Symbol}}" {{if eq $.FormCurrency .Code}}selected{{end}}>{{.Symbol}} {{.Code}}</option>
                     {{end}}
                 </select>
             </div>
@@ -411,6 +411,12 @@ function updateScheduleFields() {
     scheduleInput.value = parts[0];
     intervalInput.value = parts[1] || '1';
     calculateRenewalDate();
+}
+
+function updateCostCurrencySymbol() {
+    const currencySelect = document.getElementById('original_currency');
+    const currencySymbol = document.getElementById('cost-currency-symbol');
+    currencySymbol.textContent = currencySelect.selectedOptions[0].dataset.symbol;
 }
 
 function initScheduleCombo() {

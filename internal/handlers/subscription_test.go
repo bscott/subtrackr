@@ -4,8 +4,43 @@ import (
 	"testing"
 	"time"
 
+	"subtrackr/internal/models"
+
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSubscriptionFormCurrency(t *testing.T) {
+	tests := []struct {
+		name              string
+		subscription      *models.Subscription
+		preferredCurrency string
+		expected          string
+	}{
+		{
+			name:              "new subscription uses preferred currency",
+			preferredCurrency: "SEK",
+			expected:          "SEK",
+		},
+		{
+			name:              "existing subscription uses original currency",
+			subscription:      &models.Subscription{OriginalCurrency: "USD"},
+			preferredCurrency: "SEK",
+			expected:          "USD",
+		},
+		{
+			name:              "existing subscription without currency uses preferred currency",
+			subscription:      &models.Subscription{},
+			preferredCurrency: "SEK",
+			expected:          "SEK",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, subscriptionFormCurrency(tt.subscription, tt.preferredCurrency))
+		})
+	}
+}
 
 func TestParseDatePtr(t *testing.T) {
 	tests := []struct {
@@ -105,4 +140,3 @@ func TestParseDatePtr(t *testing.T) {
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
-
