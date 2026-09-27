@@ -13,6 +13,7 @@ import (
 	"subtrackr/internal/i18n"
 	"subtrackr/internal/models"
 	"subtrackr/internal/service"
+	"subtrackr/internal/sortorder"
 	"subtrackr/internal/version"
 	"time"
 
@@ -266,14 +267,19 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 	})
 }
 
+func subscriptionSortRules(c *gin.Context) []sortorder.Rule {
+	if spec, exists := c.GetQuery("sorts"); exists {
+		return sortorder.Parse(spec)
+	}
+	return sortorder.FromLegacy(c.Query("sort"), c.Query("order"))
+}
+
 // SubscriptionsList renders the subscriptions list page
 func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
-	// Get sort parameters from query string
-	sortBy := c.DefaultQuery("sort", "created_at")
-	order := c.DefaultQuery("order", "desc")
+	rules := subscriptionSortRules(c)
 
 	// Get sorted subscriptions
-	subscriptions, err := h.service.GetAllSorted(sortBy, order)
+	subscriptions, err := h.service.GetAllSorted(rules)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -288,8 +294,7 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
-		"SortBy":         sortBy,
-		"Order":          order,
+		"SortSpec":       sortorder.Encode(rules),
 		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 		"Lang":           h.activeLang(),
 	})
@@ -665,12 +670,10 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 
 // GetSubscriptions returns subscriptions as HTML fragments
 func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
-	// Get sort parameters from query string
-	sortBy := c.DefaultQuery("sort", "created_at")
-	order := c.DefaultQuery("order", "desc")
+	rules := subscriptionSortRules(c)
 
 	// Get sorted subscriptions
-	subscriptions, err := h.service.GetAllSorted(sortBy, order)
+	subscriptions, err := h.service.GetAllSorted(rules)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -682,8 +685,7 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
 		"Subscriptions":  enrichedSubs,
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
-		"SortBy":         sortBy,
-		"Order":          order,
+		"SortSpec":       sortorder.Encode(rules),
 		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 		"Lang":           h.activeLang(),
 	})
