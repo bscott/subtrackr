@@ -21,7 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      # write, not read: the review action posts its findings as a PR comment.
+      # With read it still runs and bills, then discards the result on a
+      # permission denial while the check reports green.
+      pull-requests: write
       issues: read
       id-token: write
 
