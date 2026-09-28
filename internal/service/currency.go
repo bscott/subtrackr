@@ -58,6 +58,7 @@ var BuiltinCurrencies = []CurrencyInfo{
 	{Code: "CZK", Symbol: "Kč", Name: "Czech Koruna"},
 	{Code: "HUF", Symbol: "Ft", Name: "Hungarian Forint"},
 	{Code: "RON", Symbol: "lei", Name: "Romanian Leu"},
+	{Code: "UAH", Symbol: "₴", Name: "Ukrainian Hryvnia"},
 }
 
 // currencyInfoMap provides O(1) lookup by code

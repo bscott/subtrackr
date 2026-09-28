@@ -3,6 +3,7 @@ package repository
 import (
 	"strings"
 	"subtrackr/internal/models"
+	"subtrackr/internal/sortorder"
 	"time"
 
 	"gorm.io/gorm"
@@ -90,43 +91,48 @@ func (r *SubscriptionRepository) GetAll() ([]models.Subscription, error) {
 	return subscriptions, nil
 }
 
-// GetAllSorted returns all subscriptions sorted by the specified column and order
-// sortBy: name, cost, status, renewal_date, schedule, category, created_at
-// order: asc, desc
-func (r *SubscriptionRepository) GetAllSorted(sortBy, order string) ([]models.Subscription, error) {
+// GetAllSorted returns all subscriptions sorted by the ordered list of criteria.
+func (r *SubscriptionRepository) GetAllSorted(rules []sortorder.Rule) ([]models.Subscription, error) {
 	var subscriptions []models.Subscription
 	query := r.db.Preload("Category").Preload("Tags")
 
 	// Validate and set sort column
 	validSortColumns := map[string]string{
-		"name":         "name",
-		"cost":         "cost",
-		"status":       "status",
-		"renewal_date": "renewal_date",
-		"schedule":     "schedule",
+		"name":         "subscriptions.name",
+		"cost":         "subscriptions.cost",
+		"status":       "subscriptions.status",
+		"renewal_date": "subscriptions.renewal_date",
+		"schedule":     "subscriptions.schedule",
 		"category":     "categories.name",
-		"created_at":   "created_at",
+		"created_at":   "subscriptions.created_at",
 	}
 
-	sortColumn, ok := validSortColumns[sortBy]
-	if !ok {
-		sortColumn = "created_at" // default
+	rules = sortorder.Normalize(rules)
+	if len(rules) == 0 {
+		rules = []sortorder.Rule{{Field: "created_at", Direction: "desc"}}
 	}
 
-	// Validate order
-	if order != "asc" && order != "desc" {
-		order = "desc" // default
+	orderColumns := make([]string, 0, len(rules))
+	needsCategoryJoin := false
+	for _, rule := range rules {
+		sortColumn, ok := validSortColumns[rule.Field]
+		if !ok {
+			continue
+		}
+		orderColumns = append(orderColumns, sortColumn+" "+strings.ToUpper(rule.Direction))
+		if rule.Field == "category" {
+			needsCategoryJoin = true
+		}
+	}
+	if len(orderColumns) == 0 {
+		orderColumns = append(orderColumns, "subscriptions.created_at DESC")
 	}
 
-	// Build order clause
-	orderClause := sortColumn + " " + strings.ToUpper(order)
-
-	// Special handling for category (requires join)
-	if sortBy == "category" {
+	if needsCategoryJoin {
 		query = query.Joins("LEFT JOIN categories ON subscriptions.category_id = categories.id")
 	}
 
-	if err := query.Order(orderClause).Find(&subscriptions).Error; err != nil {
+	if err := query.Order(strings.Join(orderColumns, ", ")).Find(&subscriptions).Error; err != nil {
 		return nil, err
 	}
 	return subscriptions, nil

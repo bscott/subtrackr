@@ -1,114 +1,66 @@
-<div id="subscription-list" class="overflow-x-auto">
+<div id="subscription-list" class="overflow-x-auto" data-sort-spec="{{.SortSpec}}">
     {{if .Subscriptions}}
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-800">
             <tr>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button 
-                        hx-get="/api/subscriptions?sort=name&order={{if and (eq .SortBy "name") (eq .Order "asc")}}desc{{else}}asc{{end}}"
-                        hx-target="#subscription-list"
-                        hx-swap="outerHTML"
+                    <button type="button" data-sort-field="name" aria-pressed="false"
                         class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                         <span>{{t $.Lang "subscriptions.name"}}</span>
-                        {{if eq .SortBy "name"}}
-                        <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg data-sort-arrow class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                         </svg>
-                        {{else}}
-                        <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                        </svg>
-                        {{end}}
+                        <span data-sort-priority class="hidden text-[10px] font-semibold text-primary dark:text-primary-light"></span>
                     </button>
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button 
-                        hx-get="/api/subscriptions?sort=category&order={{if and (eq .SortBy "category") (eq .Order "asc")}}desc{{else}}asc{{end}}"
-                        hx-target="#subscription-list"
-                        hx-swap="outerHTML"
+                    <button type="button" data-sort-field="category" aria-pressed="false"
                         class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                         <span>{{t $.Lang "subscriptions.category"}}</span>
-                        {{if eq .SortBy "category"}}
-                        <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg data-sort-arrow class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                         </svg>
-                        {{else}}
-                        <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                        </svg>
-                        {{end}}
+                        <span data-sort-priority class="hidden text-[10px] font-semibold text-primary dark:text-primary-light"></span>
                     </button>
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button 
-                        hx-get="/api/subscriptions?sort=cost&order={{if and (eq .SortBy "cost") (eq .Order "asc")}}desc{{else}}asc{{end}}"
-                        hx-target="#subscription-list"
-                        hx-swap="outerHTML"
+                    <button type="button" data-sort-field="cost" aria-pressed="false"
                         class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                         <span>{{t $.Lang "subscriptions.cost"}}</span>
-                        {{if eq .SortBy "cost"}}
-                        <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg data-sort-arrow class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                         </svg>
-                        {{else}}
-                        <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                        </svg>
-                        {{end}}
+                        <span data-sort-priority class="hidden text-[10px] font-semibold text-primary dark:text-primary-light"></span>
                     </button>
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button 
-                        hx-get="/api/subscriptions?sort=schedule&order={{if and (eq .SortBy "schedule") (eq .Order "asc")}}desc{{else}}asc{{end}}"
-                        hx-target="#subscription-list"
-                        hx-swap="outerHTML"
+                    <button type="button" data-sort-field="schedule" aria-pressed="false"
                         class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                         <span>{{t $.Lang "subscriptions.schedule"}}</span>
-                        {{if eq .SortBy "schedule"}}
-                        <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg data-sort-arrow class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                         </svg>
-                        {{else}}
-                        <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                        </svg>
-                        {{end}}
+                        <span data-sort-priority class="hidden text-[10px] font-semibold text-primary dark:text-primary-light"></span>
                     </button>
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button 
-                        hx-get="/api/subscriptions?sort=status&order={{if and (eq .SortBy "status") (eq .Order "asc")}}desc{{else}}asc{{end}}"
-                        hx-target="#subscription-list"
-                        hx-swap="outerHTML"
+                    <button type="button" data-sort-field="status" aria-pressed="false"
                         class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                         <span>{{t $.Lang "subscriptions.status"}}</span>
-                        {{if eq .SortBy "status"}}
-                        <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg data-sort-arrow class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                         </svg>
-                        {{else}}
-                        <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                        </svg>
-                        {{end}}
+                        <span data-sort-priority class="hidden text-[10px] font-semibold text-primary dark:text-primary-light"></span>
                     </button>
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <button 
-                        hx-get="/api/subscriptions?sort=renewal_date&order={{if and (eq .SortBy "renewal_date") (eq .Order "asc")}}desc{{else}}asc{{end}}"
-                        hx-target="#subscription-list"
-                        hx-swap="outerHTML"
+                    <button type="button" data-sort-field="renewal_date" aria-pressed="false"
                         class="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
                         <span>{{t $.Lang "subscriptions.renewal_date"}}</span>
-                        {{if eq .SortBy "renewal_date"}}
-                        <svg class="w-4 h-4 {{if eq .Order "asc"}}transform rotate-180{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg data-sort-arrow class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
                         </svg>
-                        {{else}}
-                        <svg class="w-4 h-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-                        </svg>
-                        {{end}}
+                        <span data-sort-priority class="hidden text-[10px] font-semibold text-primary dark:text-primary-light"></span>
                     </button>
                 </th>
                 <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">

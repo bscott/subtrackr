@@ -6,6 +6,7 @@ import (
 	"strings"
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
+	"subtrackr/internal/sortorder"
 	"time"
 )
 
@@ -53,8 +54,8 @@ func (s *SubscriptionService) GetAll() ([]models.Subscription, error) {
 	return s.repo.GetAll()
 }
 
-func (s *SubscriptionService) GetAllSorted(sortBy, order string) ([]models.Subscription, error) {
-	return s.repo.GetAllSorted(sortBy, order)
+func (s *SubscriptionService) GetAllSorted(rules []sortorder.Rule) ([]models.Subscription, error) {
+	return s.repo.GetAllSorted(rules)
 }
 
 func (s *SubscriptionService) GetByID(id uint) (*models.Subscription, error) {

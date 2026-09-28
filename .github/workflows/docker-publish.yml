@@ -24,6 +24,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Tags are needed so the version stamp below resolves via git
+          # describe; without them GIT_TAG falls back to "dev".
+          fetch-depth: 0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

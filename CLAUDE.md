@@ -105,6 +105,34 @@ git pull --ff-only
 RELEASE_SHA=$(git rev-parse HEAD)
 ```
 
+Drop `--delete-branch` for pull requests from forks. The branch lives in the
+contributor's repository, so the delete fails for lack of permission — and when
+the PR's head branch is the fork's `main` (common for drive-by contributions),
+it is that fork's default branch, which GitHub refuses to delete outright.
+
+Merge **everything** destined for the release before pinning `$RELEASE_SHA`.
+`docker-publish.yml` sets `concurrency.cancel-in-progress`, keyed on the ref, so
+a later push to `main` cancels the build for an earlier one. Pinning first and
+then merging again leaves step 9 watching a cancelled run, which `gh run watch
+--exit-status` reports as a failure rather than as the no-op it is.
+
+### 8b. Collecting several contributor PRs into one release
+
+When a release gathers external PRs rather than your own feature branch, merge
+their refs into the version branch instead of merging each PR on GitHub. This
+keeps one CI run and one Docker build to verify, and preserves the contributors'
+commits and authorship:
+
+```bash
+for n in <pr numbers>; do git fetch origin "pull/$n/head:pr-$n"; done
+git merge --no-ff -m "Merge PR #<n>: <title>" "pr-<n>"   # repeat per PR
+```
+
+Test the combined tree (`go build ./... && go vet ./... && go test ./...`)
+before opening the release PR. Because the contributor PRs are never merged
+through GitHub, they stay open: close each one with a comment pointing at the
+release PR, and put its `Closes #<n>` lines in the release PR body.
+
 ### 9. Verify Docker Build on Main
 
 Every merge to main triggers the Docker build workflow, which pushes `:main` and `:sha-*` images. Do NOT publish the release until the build for `$RELEASE_SHA` succeeds — it proves the exact commit that will be tagged produces a working image.

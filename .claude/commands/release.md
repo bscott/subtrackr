@@ -55,11 +55,38 @@ Notify issue reporters:
 gh issue comment <number> --body "Fixed in PR #XX. Description."
 ```
 
-## After Merge (user tells you to publish)
+## Merge & Pin the Release Commit
+
+After CI passes on the PR:
 
 ```bash
-gh release edit $ARGUMENTS --draft=false
+gh pr merge <pr-number> --merge --delete-branch
+git checkout main
+git pull --ff-only
+RELEASE_SHA=$(git rev-parse HEAD)
+```
+
+## Verify Docker Build on Main
+
+Every merge to main triggers `docker-publish.yml`, which pushes `:main` and `:sha-*` images. Do NOT publish until the build for `$RELEASE_SHA` succeeds.
+
+```bash
+RUN_ID=$(gh run list --workflow=docker-publish.yml --commit "$RELEASE_SHA" --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch "$RUN_ID" --exit-status
+```
+
+The workflow cancels in-progress runs on the same ref, so a later merge to main can cancel this build. If the run shows as cancelled rather than failed, re-run it (`gh run rerun "$RUN_ID"`) and watch again before publishing.
+
+## Publish (only when the user tells you to)
+
+```bash
+# Publish the draft and create its tag at the verified commit, not moving main
+gh release edit $ARGUMENTS --target "$RELEASE_SHA" --draft=false
+
+# Verify the published tag resolves to the verified commit
+git fetch --tags origin
+test "$(git rev-parse '$ARGUMENTS^{commit}')" = "$RELEASE_SHA"
 gh release view $ARGUMENTS
 ```
 
-The published tag triggers the Docker build workflow automatically.
+The published tag triggers a second Docker build for the same commit, publishing the semver image tag (without the leading `v`) and `:latest`.
