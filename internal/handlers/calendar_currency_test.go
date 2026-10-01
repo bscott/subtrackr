@@ -26,9 +26,10 @@ import (
 type calendarTestEvent struct {
 	Cost           float64 `json:"cost"`
 	CurrencySymbol string  `json:"currency_symbol"`
+	Type           string  `json:"type"`
 }
 
-func newCalendarCurrencyTestRouter(t *testing.T, withRate bool) *gin.Engine {
+func newCalendarCurrencyTestRouter(t *testing.T, withRate bool, noticeDays ...int) *gin.Engine {
 	t.Helper()
 	t.Setenv("FIXER_API_KEY", "")
 	gin.SetMode(gin.TestMode)
@@ -57,13 +58,19 @@ func newCalendarCurrencyTestRouter(t *testing.T, withRate bool) *gin.Engine {
 	categoryService := service.NewCategoryService(repository.NewCategoryRepository(db))
 	subscriptionService := service.NewSubscriptionService(repository.NewSubscriptionRepository(db), categoryService)
 	renewalDate := time.Now().AddDate(0, 0, 1)
+	notice := 0
+	if len(noticeDays) > 0 {
+		notice = noticeDays[0]
+		renewalDate = time.Now().AddDate(0, 0, 30)
+	}
 	_, err = subscriptionService.Create(&models.Subscription{
-		Name:             "Foreign subscription",
-		Cost:             3,
-		OriginalCurrency: "USD",
-		Schedule:         "Monthly",
-		Status:           "Active",
-		RenewalDate:      &renewalDate,
+		Name:                   "Foreign subscription",
+		Cost:                   3,
+		OriginalCurrency:       "USD",
+		Schedule:               "Monthly",
+		Status:                 "Active",
+		RenewalDate:            &renewalDate,
+		CancellationNoticeDays: notice,
 	})
 	require.NoError(t, err)
 
@@ -84,10 +91,11 @@ func newCalendarCurrencyTestRouter(t *testing.T, withRate bool) *gin.Engine {
 	router := gin.New()
 	router.SetHTMLTemplate(template.Must(template.New("calendar.html").Parse(`{{define "calendar.html"}}<script>{{.EventsByDate}}</script>{{end}}`)))
 	router.GET("/calendar", handler.Calendar)
+	router.GET("/api/export/ical", handler.ExportICal)
 	return router
 }
 
-func getCalendarTestEvent(t *testing.T, router *gin.Engine) calendarTestEvent {
+func getCalendarTestEvents(t *testing.T, router *gin.Engine) map[string][]calendarTestEvent {
 	t.Helper()
 
 	recorder := httptest.NewRecorder()
@@ -97,6 +105,12 @@ func getCalendarTestEvent(t *testing.T, router *gin.Engine) calendarTestEvent {
 	var eventsByDate map[string][]calendarTestEvent
 	eventsJSON := strings.TrimSuffix(strings.TrimPrefix(recorder.Body.String(), "<script>"), "</script>")
 	require.NoError(t, json.Unmarshal([]byte(eventsJSON), &eventsByDate))
+	return eventsByDate
+}
+
+func getCalendarTestEvent(t *testing.T, router *gin.Engine) calendarTestEvent {
+	t.Helper()
+	eventsByDate := getCalendarTestEvents(t, router)
 	for _, events := range eventsByDate {
 		require.Len(t, events, 1)
 		return events[0]
@@ -117,4 +131,37 @@ func TestCalendar_UsesOriginalCurrencyWhenRateIsMissing(t *testing.T) {
 
 	assert.InDelta(t, 3, event.Cost, 0.001)
 	assert.Equal(t, "$", event.CurrencySymbol)
+}
+
+func TestCalendar_KeepsCancellationEventsAlongsideConvertedCosts(t *testing.T) {
+	router := newCalendarCurrencyTestRouter(t, true, 7)
+	eventsByDate := getCalendarTestEvents(t, router)
+	require.Len(t, eventsByDate, 2)
+	var renewalDate, cancelDate time.Time
+	for date, events := range eventsByDate {
+		require.Len(t, events, 1)
+		assert.InDelta(t, 30, events[0].Cost, 0.001)
+		assert.Equal(t, "kr", events[0].CurrencySymbol)
+		parsed, err := time.Parse("2006-01-02", date)
+		require.NoError(t, err)
+		switch events[0].Type {
+		case "renewal":
+			renewalDate = parsed
+		case "cancel_by":
+			cancelDate = parsed
+		default:
+			t.Fatalf("unexpected calendar event type %q", events[0].Type)
+		}
+	}
+	require.False(t, renewalDate.IsZero())
+	require.False(t, cancelDate.IsZero())
+	assert.Equal(t, renewalDate.AddDate(0, 0, -7), cancelDate)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/export/ical", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, 2, strings.Count(recorder.Body.String(), "BEGIN:VEVENT"))
+	assert.Contains(t, recorder.Body.String(), "SUMMARY:Foreign subscription Renewal")
+	assert.Contains(t, recorder.Body.String(), "SUMMARY:Cancel Foreign subscription by today")
+	assert.Contains(t, recorder.Body.String(), "DTSTART:"+cancelDate.Format("20060102"))
 }
