@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"cmp"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"subtrackr/internal/i18n"
@@ -23,13 +25,15 @@ import (
 // SubscriptionWithConversion represents a subscription with currency conversion info
 type SubscriptionWithConversion struct {
 	*models.Subscription
-	ConvertedCost         float64 `json:"converted_cost"`
-	ConvertedAnnualCost   float64 `json:"converted_annual_cost"`
-	ConvertedMonthlyCost  float64 `json:"converted_monthly_cost"`
-	ConvertedShareCost    float64 `json:"converted_share_cost"` // Per-period cost in display currency, after share split
-	DisplayCurrency       string  `json:"display_currency"`
-	DisplayCurrencySymbol string  `json:"display_currency_symbol"`
-	ShowConversion        bool    `json:"show_conversion"`
+	ConvertedCost         float64   `json:"converted_cost"`
+	ConvertedAnnualCost   float64   `json:"converted_annual_cost"`
+	ConvertedMonthlyCost  float64   `json:"converted_monthly_cost"`
+	ConvertedShareCost    float64   `json:"converted_share_cost"` // Per-period cost in display currency, after share split
+	DisplayCurrency       string    `json:"display_currency"`
+	DisplayCurrencySymbol string    `json:"display_currency_symbol"`
+	ShowConversion        bool      `json:"show_conversion"`
+	ConversionRateDate    time.Time `json:"conversion_rate_date"`
+	ConversionRateStale   bool      `json:"conversion_rate_stale"`
 }
 
 type SubscriptionHandler struct {
@@ -62,6 +66,10 @@ func NewSubscriptionHandler(service *service.SubscriptionService, settingsServic
 	}
 }
 
+func (h *SubscriptionHandler) getStats() (*models.Stats, error) {
+	return h.service.GetStats(h.currencyService, h.settingsService.GetCurrency())
+}
+
 // activeLang resolves the user-preferred language code, defaulting to "en" when unset
 // or when the requested language has no loaded translations.
 func (h *SubscriptionHandler) activeLang() string {
@@ -89,23 +97,26 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 			ShowConversion:        false,
 		}
 
-		if h.currencyService.IsEnabled() && sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
-			if convertedCost, err := h.currencyService.ConvertAmount(sub.Cost, sub.OriginalCurrency, displayCurrency); err == nil {
-				enriched.ConvertedCost = convertedCost
-				ratio := convertedCost / sub.Cost
-				enriched.ConvertedAnnualCost = sub.AnnualCost() * ratio
-				enriched.ConvertedMonthlyCost = sub.MonthlyCost() * ratio
-				enriched.ConvertedShareCost = sub.MyShareCost() * ratio
+		if sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
+			if conversion, err := h.currencyService.ConvertAmount(1, sub.OriginalCurrency, displayCurrency); err == nil {
+				rate := conversion.Amount
+				enriched.ConvertedCost = sub.Cost * rate
+				enriched.ConvertedAnnualCost = sub.AnnualCost() * rate
+				enriched.ConvertedMonthlyCost = sub.MonthlyCost() * rate
+				enriched.ConvertedShareCost = sub.MyShareCost() * rate
 				enriched.ShowConversion = true
+				enriched.ConversionRateDate = conversion.RateDate
+				enriched.ConversionRateStale = conversion.Stale
+			} else {
+				// Without a usable rate, presenting the original amount avoids labeling
+				// one currency's value with another currency's symbol.
+				enriched.ConvertedCost = sub.Cost
+				enriched.ConvertedAnnualCost = sub.AnnualCost()
+				enriched.ConvertedMonthlyCost = sub.MonthlyCost()
+				enriched.ConvertedShareCost = sub.MyShareCost()
+				enriched.DisplayCurrency = sub.OriginalCurrency
+				enriched.DisplayCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 			}
-		} else if sub.OriginalCurrency != "" && sub.OriginalCurrency != displayCurrency {
-			// Different currency but conversion not available - show original currency
-			enriched.ConvertedCost = sub.Cost
-			enriched.ConvertedAnnualCost = sub.AnnualCost()
-			enriched.ConvertedMonthlyCost = sub.MonthlyCost()
-			enriched.ConvertedShareCost = sub.MyShareCost()
-			enriched.DisplayCurrency = sub.OriginalCurrency
-			enriched.DisplayCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 		} else {
 			// Same currency or no conversion needed
 			enriched.ConvertedCost = sub.Cost
@@ -120,6 +131,82 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 	return result
 }
 
+func sortSubscriptionsForDisplay(subscriptions []SubscriptionWithConversion, preferredCurrency string, rules []sortorder.Rule) {
+	sort.SliceStable(subscriptions, func(i, j int) bool {
+		left := subscriptions[i]
+		right := subscriptions[j]
+		for _, rule := range rules {
+			comparison := 0
+			switch rule.Field {
+			case "name":
+				comparison = cmp.Compare(left.Name, right.Name)
+			case "category":
+				comparison = cmp.Compare(left.Category.Name, right.Category.Name)
+			case "cost":
+				// Values in different currencies have no meaningful numerical order.
+				// Keep the preferred currency first, then group remaining currencies.
+				if left.DisplayCurrency != right.DisplayCurrency {
+					if left.DisplayCurrency == preferredCurrency {
+						return true
+					}
+					if right.DisplayCurrency == preferredCurrency {
+						return false
+					}
+					return left.DisplayCurrency < right.DisplayCurrency
+				}
+				comparison = cmp.Compare(left.ConvertedCost, right.ConvertedCost)
+			case "schedule":
+				comparison = cmp.Compare(left.Schedule, right.Schedule)
+			case "status":
+				comparison = cmp.Compare(left.Status, right.Status)
+			case "renewal_date":
+				var leftDate, rightDate int64
+				if left.RenewalDate != nil {
+					leftDate = left.RenewalDate.UnixNano()
+				}
+				if right.RenewalDate != nil {
+					rightDate = right.RenewalDate.UnixNano()
+				}
+				comparison = cmp.Compare(leftDate, rightDate)
+			case "created_at":
+				comparison = left.CreatedAt.Compare(right.CreatedAt)
+			}
+			if comparison != 0 {
+				if rule.Direction == "desc" {
+					return comparison > 0
+				}
+				return comparison < 0
+			}
+		}
+		return false
+	})
+}
+
+func (h *SubscriptionHandler) getSubscriptionsForDisplay(rules []sortorder.Rule) ([]SubscriptionWithConversion, error) {
+	convertCost := false
+	for _, rule := range rules {
+		if rule.Field == "cost" {
+			convertCost = true
+			break
+		}
+	}
+	// Preserve database ordering for other sort chains, including its default.
+	if !convertCost {
+		subscriptions, err := h.service.GetAllSorted(rules)
+		if err != nil {
+			return nil, err
+		}
+		return h.enrichWithCurrencyConversion(subscriptions), nil
+	}
+	subscriptions, err := h.service.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	enriched := h.enrichWithCurrencyConversion(subscriptions)
+	sortSubscriptionsForDisplay(enriched, h.settingsService.GetCurrency(), rules)
+	return enriched, nil
+}
+
 // isHighCostWithCurrency checks if a subscription is high-cost, respecting currency conversion
 // The threshold is in the user's display currency, so we convert the subscription's monthly cost
 // to the display currency before comparing
@@ -130,23 +217,23 @@ func (h *SubscriptionHandler) isHighCostWithCurrency(subscription *models.Subscr
 	// Get monthly cost in subscription's original currency
 	monthlyCost := subscription.MonthlyCost()
 
-	// If currencies match or conversion is disabled, compare directly
-	if subscription.OriginalCurrency == displayCurrency || !h.currencyService.IsEnabled() {
+	// Subscriptions without an original currency predate currency tracking and
+	// retain the existing assumption that their cost uses the display currency.
+	if subscription.OriginalCurrency == "" || subscription.OriginalCurrency == displayCurrency {
 		return monthlyCost > threshold
 	}
 
 	// Convert monthly cost to display currency
 	convertedMonthlyCost, err := h.currencyService.ConvertAmount(monthlyCost, subscription.OriginalCurrency, displayCurrency)
 	if err != nil {
-		// If conversion fails, fall back to direct comparison
-		// Note: This may not be accurate if currencies differ, but prevents silent failures
-		// The warning log helps identify when this fallback is used
-		log.Printf("Warning: Failed to convert currency for high-cost check (%s to %s): %v. Using direct comparison.", subscription.OriginalCurrency, displayCurrency, err)
-		return monthlyCost > threshold
+		// Comparing unlike currencies can produce a false alert, so defer the
+		// classification until a conversion rate is available.
+		log.Printf("Warning: Failed to convert currency for high-cost check (%s to %s): %v", subscription.OriginalCurrency, displayCurrency, err)
+		return false
 	}
 
 	// Compare converted monthly cost against threshold
-	return convertedMonthlyCost > threshold
+	return convertedMonthlyCost.Amount > threshold
 }
 
 // fetchAndSetLogo fetches a logo for a subscription if URL is provided and icon_url is empty
@@ -241,7 +328,7 @@ func parseDatePtr(dateStr string) *time.Time {
 
 // Dashboard renders the main dashboard page
 func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -279,14 +366,11 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 	rules := subscriptionSortRules(c)
 
 	// Get sorted subscriptions
-	subscriptions, err := h.service.GetAllSorted(rules)
+	enrichedSubs, err := h.getSubscriptionsForDisplay(rules)
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
 	}
-
-	// Enrich with currency conversion
-	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
 
 	c.HTML(http.StatusOK, "subscriptions.html", gin.H{
 		"Title":          "Subscriptions",
@@ -302,7 +386,7 @@ func (h *SubscriptionHandler) SubscriptionsList(c *gin.Context) {
 
 // Analytics renders the analytics page
 func (h *SubscriptionHandler) Analytics(c *gin.Context) {
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 		return
@@ -330,33 +414,29 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 	// Filter subscriptions with renewal dates and group by date
 	// Create a simplified structure for JavaScript
 	type Event struct {
-		Name    string  `json:"name"`
-		Cost    float64 `json:"cost"`
-		ID      uint    `json:"id"`
-		IconURL string  `json:"icon_url"`
-		Type    string  `json:"type"`
+		Name           string  `json:"name"`
+		Cost           float64 `json:"cost"`
+		CurrencySymbol string  `json:"currency_symbol"`
+		ID             uint    `json:"id"`
+		IconURL        string  `json:"icon_url"`
+		Type           string  `json:"type"`
 	}
-	eventsByDate := make(map[string][]Event)
+	calendarSubscriptions := make([]models.Subscription, 0, len(subscriptions))
 	for _, sub := range subscriptions {
 		if sub.RenewalDate != nil && sub.Status == "Active" {
-			dateKey := sub.RenewalDate.Format("2006-01-02")
-			eventsByDate[dateKey] = append(eventsByDate[dateKey], Event{
-				Name:    sub.Name,
-				Cost:    sub.Cost,
-				ID:      sub.ID,
-				IconURL: sub.IconURL,
-				Type:    "renewal",
-			})
-			if cancelBy := sub.CancelByDate(); cancelBy != nil {
-				cancelKey := cancelBy.Format("2006-01-02")
-				eventsByDate[cancelKey] = append(eventsByDate[cancelKey], Event{
-					Name:    sub.Name,
-					Cost:    sub.Cost,
-					ID:      sub.ID,
-					IconURL: sub.IconURL,
-					Type:    "cancel_by",
-				})
-			}
+			calendarSubscriptions = append(calendarSubscriptions, sub)
+		}
+	}
+
+	eventsByDate := make(map[string][]Event)
+	for _, sub := range h.enrichWithCurrencyConversion(calendarSubscriptions) {
+		event := Event{Name: sub.Name, Cost: sub.ConvertedCost, CurrencySymbol: sub.DisplayCurrencySymbol, ID: sub.ID, IconURL: sub.IconURL, Type: "renewal"}
+		dateKey := sub.RenewalDate.Format("2006-01-02")
+		eventsByDate[dateKey] = append(eventsByDate[dateKey], event)
+		if cancelBy := sub.CancelByDate(); cancelBy != nil {
+			event.Type = "cancel_by"
+			cancelKey := cancelBy.Format("2006-01-02")
+			eventsByDate[cancelKey] = append(eventsByDate[cancelKey], event)
 		}
 	}
 
@@ -424,7 +504,6 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 		"FirstOfMonth":            firstOfMonth,
 		"PrevMonth":               prevMonth,
 		"NextMonth":               nextMonth,
-		"CurrencySymbol":          h.settingsService.GetCurrencySymbol(),
 		"DarkMode":                h.settingsService.IsDarkModeEnabled(),
 		"ICalSubscriptionEnabled": icalSubscriptionEnabled,
 		"ICalSubscriptionURL":     icalSubscriptionURL,
@@ -673,14 +752,11 @@ func (h *SubscriptionHandler) GetSubscriptions(c *gin.Context) {
 	rules := subscriptionSortRules(c)
 
 	// Get sorted subscriptions
-	subscriptions, err := h.service.GetAllSorted(rules)
+	enrichedSubs, err := h.getSubscriptionsForDisplay(rules)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Enrich with currency conversion
-	enrichedSubs := h.enrichWithCurrencyConversion(subscriptions)
 
 	c.HTML(http.StatusOK, "subscription-list.html", gin.H{
 		"Subscriptions":  enrichedSubs,
@@ -1049,7 +1125,7 @@ func (h *SubscriptionHandler) DeleteSubscription(c *gin.Context) {
 
 // GetStats returns current statistics
 func (h *SubscriptionHandler) GetStats(c *gin.Context) {
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1193,7 +1269,7 @@ func (h *SubscriptionHandler) BackupData(c *gin.Context) {
 		return
 	}
 
-	stats, err := h.service.GetStats()
+	stats, err := h.getStats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

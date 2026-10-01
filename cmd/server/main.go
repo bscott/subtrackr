@@ -55,7 +55,7 @@ func main() {
 
 	// Initialize services
 	categoryService := service.NewCategoryService(categoryRepo)
-	currencyService := service.NewCurrencyService(exchangeRateRepo)
+	currencyService := service.NewCurrencyService(exchangeRateRepo, settingsRepo)
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
 	tagService := service.NewTagService(tagRepo)
 	settingsService := service.NewSettingsService(settingsRepo)

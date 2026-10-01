@@ -173,19 +173,39 @@
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{{t .Lang "analytics.total_monthly_spend"}}</h3>
+        {{if .Stats.ConversionComplete}}
         <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
+        {{else}}
+        {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
+        <p class="text-2xl font-bold text-primary">{{printf "%.2f" $totals.TotalMonthlySpend}} {{$currency}}</p>
+        {{end}}{{end}}
+        {{end}}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Across {{.Stats.ActiveSubscriptions}} active subscriptions</p>
     </div>
     
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{{t .Lang "analytics.total_annual_spend"}}</h3>
+        {{if .Stats.ConversionComplete}}
         <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalAnnualSpend}}</p>
+        {{else}}
+        {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
+        <p class="text-2xl font-bold text-success">{{printf "%.2f" $totals.TotalAnnualSpend}} {{$currency}}</p>
+        {{end}}{{end}}
+        {{end}}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "analytics.projected_yearly"}}</p>
     </div>
     
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{{t .Lang "analytics.annual_savings"}}</h3>
+        {{if .Stats.ConversionComplete}}
         <p class="text-2xl font-bold text-danger">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalSaved}}</p>
+        {{else if .Stats.CancelledSubscriptions}}
+        {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.CancelledSubscriptions}}
+        <p class="text-2xl font-bold text-danger">{{printf "%.2f" $totals.TotalSaved}} {{$currency}}</p>
+        {{end}}{{end}}
+        {{else}}
+        <p class="text-2xl font-bold text-danger">{{.CurrencySymbol}}0.00</p>
+        {{end}}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">From {{.Stats.CancelledSubscriptions}} cancelled subscriptions</p>
     </div>
 </div>
@@ -196,6 +216,7 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">{{t .Lang "analytics.spending_by_category"}}</h3>
         <div class="space-y-4">
+            {{if .Stats.ConversionComplete}}
             {{range $category, $amount := .Stats.CategorySpending}}
             <div class="flex items-center justify-between">
                 <div class="flex items-center flex-1">
@@ -210,6 +231,21 @@
                     <span class="text-sm font-medium text-gray-900 dark:text-white w-16 text-right">{{$.CurrencySymbol}}{{printf "%.2f" $amount}}</span>
                 </div>
             </div>
+            {{end}}
+            {{else}}
+            {{range $category, $amounts := .Stats.CategorySpendingByCurrency}}
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="w-3 h-3 bg-primary rounded-full mr-3"></div>
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{$category}}</span>
+                </div>
+                <div class="text-right">
+                    {{range $currency, $amount := $amounts}}
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{printf "%.2f" $amount}} {{$currency}}</div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
             {{end}}
         </div>
     </div>
@@ -250,12 +286,24 @@
     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">{{t .Lang "analytics.cost_analysis"}}</h3>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="text-center p-4 bg-blue-50 dark:bg-blue-900/50 rounded-lg transition-colors duration-200">
+            {{if .Stats.ConversionComplete}}
             <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{printf "%.2f" (div .Stats.TotalMonthlySpend 30)}}</p>
+            {{else}}
+            {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
+            <p class="text-2xl font-bold text-primary">{{printf "%.2f" (div $totals.TotalMonthlySpend 30)}} {{$currency}}</p>
+            {{end}}{{end}}
+            {{end}}
             <p class="text-sm text-gray-600 dark:text-gray-300">{{t .Lang "analytics.avg_daily_cost"}}</p>
         </div>
         
         <div class="text-center p-4 bg-green-50 dark:bg-green-900/50 rounded-lg transition-colors duration-200">
+            {{if .Stats.ConversionComplete}}
             <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
+            {{else}}
+            {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
+            <p class="text-2xl font-bold text-success">{{printf "%.2f" $totals.TotalMonthlySpend}} {{$currency}}</p>
+            {{end}}{{end}}
+            {{end}}
             <p class="text-sm text-gray-600 dark:text-gray-300">{{t .Lang "analytics.total_monthly_cost"}}</p>
         </div>
     </div>

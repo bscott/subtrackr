@@ -32,8 +32,9 @@ func newSubscriptionUpdateTestRouter(t *testing.T) (*gin.Engine, *service.Subscr
 	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	categoryService := service.NewCategoryService(repository.NewCategoryRepository(db))
 	subscriptionService := service.NewSubscriptionService(subscriptionRepo, categoryService)
-	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
-	currencyService := service.NewCurrencyService(repository.NewExchangeRateRepository(db))
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsService := service.NewSettingsService(settingsRepo)
+	currencyService := service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo)
 
 	handler := NewSubscriptionHandler(
 		subscriptionService,
