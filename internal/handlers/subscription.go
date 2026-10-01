@@ -797,7 +797,7 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	subscription.Status = c.PostForm("status")
 	subscription.OriginalCurrency = c.PostForm("original_currency")
 	if subscription.OriginalCurrency == "" {
-		subscription.OriginalCurrency = "USD"
+		subscription.OriginalCurrency = h.settingsService.GetCurrency()
 	}
 	subscription.PaymentMethod = c.PostForm("payment_method")
 	subscription.Account = c.PostForm("account")
@@ -986,7 +986,7 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	}
 	if val, ok := c.GetPostForm("original_currency"); ok {
 		if val == "" {
-			existing.OriginalCurrency = "USD"
+			existing.OriginalCurrency = h.settingsService.GetCurrency()
 		} else {
 			existing.OriginalCurrency = val
 		}
@@ -1173,6 +1173,14 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 		tagsCSV = strings.Join(names, ", ")
 	}
 	formCurrency := subscriptionFormCurrency(subscription, h.settingsService.GetCurrency())
+	availableCurrencies := service.GetAvailableCurrencies()
+	extraCurrency := true
+	for _, currency := range availableCurrencies {
+		if currency.Code == formCurrency {
+			extraCurrency = false
+			break
+		}
+	}
 
 	c.HTML(http.StatusOK, "subscription-form.html", gin.H{
 		"Subscription":   subscription,
@@ -1180,7 +1188,8 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 		"CurrencySymbol": service.CurrencySymbolForCode(formCurrency),
 		"FormCurrency":   formCurrency,
 		"Categories":     categories,
-		"Currencies":     service.GetAvailableCurrencies(),
+		"Currencies":     availableCurrencies,
+		"ExtraCurrency":  extraCurrency,
 		"TagsCSV":        tagsCSV,
 		"Lang":           h.activeLang(),
 	})
@@ -1453,6 +1462,9 @@ func (h *SubscriptionHandler) ImportWallos(c *gin.Context) {
 	imported := 0
 	errors := append([]string{}, warnings...)
 	for _, sub := range subscriptions {
+		if sub.OriginalCurrency == "" {
+			sub.OriginalCurrency = h.settingsService.GetCurrency()
+		}
 		if sub.Category.Name != "" {
 			if catID, ok := categoryMap[sub.Category.Name]; ok {
 				sub.CategoryID = catID

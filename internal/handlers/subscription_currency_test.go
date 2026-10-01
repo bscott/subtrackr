@@ -153,6 +153,21 @@ func TestSortSubscriptionsByCost_GroupsMissingRatesAndSortsWithinCurrencies(t *t
 	)
 }
 
+func TestSortSubscriptionsForDisplay_RespectsMultiColumnRules(t *testing.T) {
+	handler, exchangeRates, _ := newCurrencyTestHandler(t)
+	saveEURRates(t, exchangeRates, time.Now().Add(-time.Hour))
+	subscriptions := handler.enrichWithCurrencyConversion([]models.Subscription{
+		{Name: "B", Cost: 1, OriginalCurrency: "USD", Status: "Active"},
+		{Name: "C", Cost: 4, OriginalCurrency: "SEK", Status: "Paused"},
+		{Name: "A", Cost: 5, OriginalCurrency: "SEK", Status: "Active"},
+	})
+	sortSubscriptionsForDisplay(subscriptions, "SEK", []sortorder.Rule{
+		{Field: "status", Direction: "asc"},
+		{Field: "cost", Direction: "asc"},
+	})
+	assert.Equal(t, []string{"A", "B", "C"}, []string{subscriptions[0].Name, subscriptions[1].Name, subscriptions[2].Name})
+}
+
 func TestIsHighCostWithCurrency_DoesNotCompareUnconvertedCurrencies(t *testing.T) {
 	handler, _, settingsService := newCurrencyTestHandler(t)
 	require.NoError(t, settingsService.SetFloatSetting("high_cost_threshold", 50))

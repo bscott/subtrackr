@@ -116,7 +116,7 @@ func main() {
 			sub.Status = "Active"
 		}
 		if sub.OriginalCurrency == "" {
-			sub.OriginalCurrency = "USD"
+			sub.OriginalCurrency = settingsService.GetCurrency()
 		}
 		if input.StartDate != "" {
 			if t, err := time.Parse("2006-01-02", input.StartDate); err == nil {

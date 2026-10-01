@@ -43,6 +43,7 @@ func newWallosTestHandler(t *testing.T) (*gin.Engine, *service.SubscriptionServi
 	subscriptionService := service.NewSubscriptionService(repository.NewSubscriptionRepository(db), categoryService)
 	settingsRepo := repository.NewSettingsRepository(db)
 	settingsService := service.NewSettingsService(settingsRepo)
+	require.NoError(t, settingsService.SetCurrency("SEK"))
 	currencyService := service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo)
 
 	handler := NewSubscriptionHandler(
@@ -62,6 +63,17 @@ func newWallosTestHandler(t *testing.T) (*gin.Engine, *service.SubscriptionServi
 	router := gin.New()
 	router.POST("/api/import/wallos", handler.ImportWallos)
 	return router, subscriptionService, categoryService
+}
+
+func TestImportWallos_AmbiguousSymbolUsesInstanceCurrency(t *testing.T) {
+	router, subscriptions, _ := newWallosTestHandler(t)
+	fixture := `{"success":true,"subscriptions":[{"Name":"Local plan","Payment Cycle":"Monthly","Price":"kr 99","Active":"Yes"}]}`
+	response := postWallosFile(t, router, "wallos_file", "wallos.json", fixture, "merge")
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	all, err := subscriptions.GetAll()
+	require.NoError(t, err)
+	require.Len(t, all, 1)
+	assert.Equal(t, "SEK", all[0].OriginalCurrency)
 }
 
 func postWallosFile(t *testing.T, router *gin.Engine, field, filename, content, mode string) *httptest.ResponseRecorder {
