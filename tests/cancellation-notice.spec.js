@@ -64,8 +64,9 @@ test('cancellation notice period round-trips through form, API, CSV, and list ba
     await expect(noticeInput).toBeVisible();
     await expect(noticeInput).toHaveValue('28');
     await noticeInput.fill('14');
+    const refresh = page.waitForEvent('load');
     await page.locator('#modal-content form button[type="submit"]').click();
-    await page.waitForLoadState('networkidle');
+    await refresh;
 
     const updatedResponse = await request.get(`/api/subscriptions/${created.id}`);
     expect(updatedResponse.ok()).toBeTruthy();
