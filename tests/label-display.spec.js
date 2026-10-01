@@ -1,13 +1,11 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { seedSubscription } = require('./helpers/subscriptions');
 
 async function seedLabeledSubscription(request) {
   const name = `Label test ${Date.now()}`;
-  const response = await request.post('/api/subscriptions', { form: {
-    name, label: 'example.com', cost: '1', schedule: 'Monthly', status: 'Active', original_currency: 'USD',
-  } });
-  expect(response.ok()).toBeTruthy();
-  return { name, id: (await response.json()).id };
+  const created = await seedSubscription(request, { name, label: 'example.com' });
+  return { name, id: created.id };
 }
 
 test('label field renders under subscription name', async ({ page, request }) => {
