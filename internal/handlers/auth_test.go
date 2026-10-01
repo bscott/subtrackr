@@ -224,6 +224,22 @@ func TestShowLoginPage_OffersOIDCWithoutLocalPasswordForm(t *testing.T) {
 	assert.NotContains(t, response.Body.String(), `name="password"`)
 }
 
+func TestShowLoginPage_LocalizesOIDCActionAndDocumentLanguage(t *testing.T) {
+	router, authHandler := newAuthTestRouter(t)
+	require.NoError(t, authHandler.settingsService.SetStringSetting("lang", "zh"))
+	require.NoError(t, authHandler.settingsService.SaveOIDCConfig(&models.OIDCConfig{
+		Enabled: true, DisplayName: "Pocket ID", IssuerURL: "https://id.example.com",
+		ClientID: "subtrackr", ClientSecret: "client-secret",
+	}))
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/login", nil))
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Contains(t, response.Body.String(), `<html lang="zh">`)
+	assert.Contains(t, response.Body.String(), "使用 Pocket ID 继续")
+	assert.NotContains(t, response.Body.String(), "Continue with Pocket ID")
+}
+
 func TestShowLoginPage_OffersLocalAndOIDCWhenBothAreEnabled(t *testing.T) {
 	router, authHandler := newAuthTestRouter(t)
 	require.NoError(t, authHandler.settingsService.SetBoolSetting("auth_enabled", true))
