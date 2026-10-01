@@ -9,6 +9,7 @@ Currently shipped:
 - `es.json` — Español
 - `de.json` — Deutsch
 - `nl.json` — Nederlands
+- `zh.json` — 中文
 
 ## Translation quality note
 
@@ -50,7 +51,7 @@ The translation pass currently covers the primary user surfaces:
 A few things stay English by design:
 
 - Proper-noun service names (SMTP, Pushover, Webhook, SubTrackr, SQLite, API, JSON, CSV)
-- Language self-names in the language selector (English, Español, Deutsch, Nederlands)
+- Language self-names in the language selector (English, Español, Deutsch, Nederlands, 中文)
 - The in-page API documentation reference under Settings (developer-facing; standard
   practice to keep English)
 

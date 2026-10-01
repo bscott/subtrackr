@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{.Lang}}">
 <head>
     <script src="/static/js/theme-init.js"></script>
     <meta charset="UTF-8">
@@ -267,9 +267,8 @@
         
         const year = parseInt({{.Year}}) || new Date().getFullYear();
         const month = parseInt({{.Month}}) || new Date().getMonth() + 1;
-        const currencySymbol = "{{.CurrencySymbol}}";
         const cancelByLabel = "{{t .Lang "calendar.cancel_by"}}";
-        
+
         console.log('Calendar initialized:', { year, month, eventsCount: Object.keys(eventsByDate).length });
         
         // Render calendar grid
@@ -313,6 +312,7 @@
                         const eventName = (event.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                         const eventId = event.id || 0;
                         const iconURL = event.icon_url || '';
+                        const currencySymbol = event.currency_symbol || '';
                         const hasIcon = iconURL && iconURL.trim() !== '';
                         
                         let iconHtml = '';

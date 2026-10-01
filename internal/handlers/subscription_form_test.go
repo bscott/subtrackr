@@ -24,7 +24,8 @@ func TestGetSubscriptionForm_Integration_UsesPreferredCurrency(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, database.RunMigrations(db))
 
-	settingsService := service.NewSettingsService(repository.NewSettingsRepository(db))
+	settingsRepo := repository.NewSettingsRepository(db)
+	settingsService := service.NewSettingsService(settingsRepo)
 	require.NoError(t, settingsService.SetCurrency("SEK"))
 
 	categoryService := service.NewCategoryService(repository.NewCategoryRepository(db))
@@ -32,7 +33,7 @@ func TestGetSubscriptionForm_Integration_UsesPreferredCurrency(t *testing.T) {
 	handler := NewSubscriptionHandler(
 		subscriptionService,
 		settingsService,
-		service.NewCurrencyService(repository.NewExchangeRateRepository(db)),
+		service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo),
 		nil,
 		nil,
 		nil,

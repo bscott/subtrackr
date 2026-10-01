@@ -1,13 +1,15 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { ensureCategory } = require('./helpers/subscriptions');
 
 // These tests assume a clean-ish state with the dev DB (at least one category
 // exists — the default Entertainment / Productivity etc. seeded categories).
 // Each test creates a uniquely-named subscription so re-runs don't collide.
 
 test.describe('Subscription CRUD Operations', () => {
-  test('can create a new subscription', async ({ page }) => {
+  test('can create a new subscription', async ({ page, request }) => {
     const uniqueName = `CRUD Test ${Date.now()}`;
+    const categoryID = await ensureCategory(request);
 
     await page.goto('/subscriptions');
     await page.waitForLoadState('networkidle');
@@ -21,8 +23,7 @@ test.describe('Subscription CRUD Operations', () => {
     await page.fill('input[name="cost"]', '9.99');
 
     // Pick the first non-empty category (any real category in the DB)
-    const categoryOption = await page.locator('select[name="category_id"] option').nth(1).getAttribute('value');
-    await page.selectOption('select[name="category_id"]', categoryOption);
+    await page.selectOption('select[name="category_id"]', String(categoryID));
 
     // Pick Monthly from the schedule combo (the form's onchange wires this into hidden schedule + schedule_interval)
     await page.selectOption('select#schedule_combo', 'Monthly_1');
@@ -44,9 +45,7 @@ test.describe('Subscription CRUD Operations', () => {
     const updatedName = `${baseName} Updated`;
 
     // Seed a subscription via the API so the test doesn't depend on previous test order
-    const categoriesResp = await page.request.get('/api/categories');
-    const categories = await categoriesResp.json();
-    expect(categories.length).toBeGreaterThan(0);
+    const categoryID = await ensureCategory(page.request);
 
     await page.request.post('/api/subscriptions', {
       form: {
@@ -55,7 +54,7 @@ test.describe('Subscription CRUD Operations', () => {
         schedule: 'Monthly',
         status: 'Active',
         original_currency: 'USD',
-        category_id: String(categories[0].id),
+        category_id: String(categoryID),
       },
     });
 

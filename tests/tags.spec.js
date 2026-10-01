@@ -1,20 +1,28 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const { seedSubscription } = require('./helpers/subscriptions');
 
-test('tag chips render under the subscription name', async ({ page }) => {
-  await page.goto('/subscriptions');
-  await page.waitForLoadState('networkidle');
-  await expect(page.getByText('#work').first()).toBeVisible();
-  await expect(page.getByText('#autopay').first()).toBeVisible();
-  await expect(page.getByText('#important').first()).toBeVisible();
-  await page.screenshot({ path: 'screenshots/v0.6.0-tags.png', fullPage: true });
+const fixtureTags = 'work, autopay, important';
+
+test('tag chips render under the subscription name', async ({ page, request }) => {
+  const subscription = await seedSubscription(request, { tags: fixtureTags });
+  try {
+    await page.goto('/subscriptions');
+    const row = page.locator('tbody tr', { hasText: subscription.name });
+    await expect(row.getByText('#work')).toBeVisible();
+    await expect(row.getByText('#autopay')).toBeVisible();
+    await expect(row.getByText('#important')).toBeVisible();
+  } finally {
+    await request.delete(`/api/subscriptions/${subscription.id}`);
+  }
 });
 
-test('tags input pre-fills in edit form', async ({ page }) => {
-  // Open the form for subscription 35 directly (the one tagged with work/autopay/important)
-  await page.goto('/form/subscription/35');
-  await page.waitForSelector('input[name="tags"]', { timeout: 5000 });
-  const value = await page.inputValue('input[name="tags"]');
-  expect(value).toContain('work');
-  expect(value).toContain('autopay');
+test('tags input pre-fills in edit form', async ({ page, request }) => {
+  const subscription = await seedSubscription(request, { tags: fixtureTags });
+  try {
+    await page.goto(`/form/subscription/${subscription.id}`);
+    await expect(page.locator('input[name="tags"]')).toHaveValue(/work.*autopay.*important/);
+  } finally {
+    await request.delete(`/api/subscriptions/${subscription.id}`);
+  }
 });
