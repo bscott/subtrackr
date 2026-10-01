@@ -23,6 +23,7 @@
   "common.reminders_disabled": "Erinnerungen deaktiviert",
   "common.add_subscription": "Abonnement hinzufügen",
   "common.copied": "Kopiert!",
+  "currency.rate_from": "Wechselkurs vom",
 
   "status.active": "Aktiv",
   "status.cancelled": "Gekündigt",

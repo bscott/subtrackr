@@ -122,6 +122,24 @@ func TestSubscriptionService_GetStats_ConvertsEveryAggregateWhenRatesExist(t *te
 	assert.Equal(t, 1, stats.CancelledSubscriptions)
 }
 
+func TestSubscriptionService_GetStats_MarksAggregateWhenCachedRatesAreStale(t *testing.T) {
+	services := newStatsTestServices(t)
+	seedMixedCurrencyStats(t, services)
+	rateDate := time.Now().Add(-5 * 24 * time.Hour).Truncate(time.Second)
+	require.NoError(t, services.rates.SaveRates([]models.ExchangeRate{
+		{BaseCurrency: "EUR", Currency: "USD", Rate: 1.2, Date: rateDate},
+		{BaseCurrency: "EUR", Currency: "SEK", Rate: 12, Date: rateDate},
+	}))
+
+	stats, err := services.subscriptions.GetStats(services.currency, "SEK")
+
+	require.NoError(t, err)
+	assert.True(t, stats.ConversionComplete)
+	assert.True(t, stats.ConversionRateStale)
+	assert.WithinDuration(t, rateDate, stats.ConversionRateDate, time.Second)
+	assert.InDelta(t, 50, stats.TotalMonthlySpend, 0.001)
+}
+
 func TestSubscriptionService_GetStats_GroupsEveryAggregateWhenARateIsMissing(t *testing.T) {
 	services := newStatsTestServices(t)
 	seedMixedCurrencyStats(t, services)

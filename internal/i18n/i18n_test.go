@@ -1,11 +1,13 @@
 package i18n
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCatalogLoadAndLookup(t *testing.T) {
@@ -33,4 +35,26 @@ func TestCatalogLoadAndLookup(t *testing.T) {
 
 	langs := c2.AvailableLanguages()
 	assert.GreaterOrEqual(t, len(langs), 3)
+}
+
+func TestShippedLocalesHaveMatchingKeys(t *testing.T) {
+	dir := filepath.Join("..", "..", "web", "locales")
+	readKeys := func(name string) map[string]bool {
+		t.Helper()
+		contents, err := os.ReadFile(filepath.Join(dir, name))
+		require.NoError(t, err)
+		var translations map[string]string
+		require.NoError(t, json.Unmarshal(contents, &translations))
+		keys := make(map[string]bool, len(translations))
+		for key, value := range translations {
+			assert.NotEmpty(t, value, "%s: %s", name, key)
+			keys[key] = true
+		}
+		return keys
+	}
+
+	englishKeys := readKeys("en.json")
+	for _, name := range []string{"de.json", "es.json", "nl.json", "zh.json"} {
+		assert.Equal(t, englishKeys, readKeys(name), name)
+	}
 }

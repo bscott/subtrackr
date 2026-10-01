@@ -23,6 +23,7 @@
   "common.reminders_disabled": "Herinneringen uitgeschakeld",
   "common.add_subscription": "Abonnement toevoegen",
   "common.copied": "Gekopieerd!",
+  "currency.rate_from": "Wisselkoers van",
 
   "status.active": "Actief",
   "status.cancelled": "Opgezegd",

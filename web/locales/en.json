@@ -23,6 +23,7 @@
   "common.reminders_disabled": "Reminders disabled",
   "common.add_subscription": "Add Subscription",
   "common.copied": "Copied!",
+  "currency.rate_from": "Rate from",
 
   "status.active": "Active",
   "status.cancelled": "Cancelled",

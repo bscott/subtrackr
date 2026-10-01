@@ -169,6 +169,9 @@
         <main class="flex-1 p-4">
             <div class="max-w-7xl mx-auto">
 <!-- Stats Cards -->
+{{if .Stats.ConversionRateStale}}
+<p class="text-sm text-amber-700 dark:text-amber-300 mb-3" role="status">{{t .Lang "currency.rate_from"}} {{.Stats.ConversionRateDate.Format "2006-01-02"}}</p>
+{{end}}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <!-- Monthly Spend -->
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
@@ -338,7 +341,7 @@
                     </svg>
                 </a>
                 {{if .ConversionRateStale}}
-                <p class="text-xs text-gray-500 dark:text-gray-400">Rate from {{.ConversionRateDate.Format "2006-01-02"}}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{t $.Lang "currency.rate_from"}} {{.ConversionRateDate.Format "2006-01-02"}}</p>
                 {{end}}
                 {{else}}
                 <p class="text-sm font-medium text-gray-900 dark:text-white">{{.DisplayCurrencySymbol}}{{printf "%.2f" .Cost}}</p>

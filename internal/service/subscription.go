@@ -150,17 +150,25 @@ func (s *SubscriptionService) GetStats(currencyService *CurrencyService, display
 	}
 
 	rates := make(map[string]float64, len(currencies))
+	var oldestStaleRate time.Time
 	for currency := range currencies {
-		rate, err := currencyService.GetExchangeRate(currency, displayCurrency)
+		conversion, err := currencyService.ConvertAmount(1, currency, displayCurrency)
 		if err != nil {
 			stats.ConversionComplete = false
 			break
 		}
-		rates[currency] = rate
+		rates[currency] = conversion.Amount
+		if conversion.Stale && (oldestStaleRate.IsZero() || conversion.RateDate.Before(oldestStaleRate)) {
+			oldestStaleRate = conversion.RateDate
+		}
 	}
 
 	if !stats.ConversionComplete {
 		return stats, nil
+	}
+	if !oldestStaleRate.IsZero() {
+		stats.ConversionRateStale = true
+		stats.ConversionRateDate = oldestStaleRate
 	}
 
 	for i := range activeSubscriptions {

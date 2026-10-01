@@ -557,6 +557,8 @@ type Stats struct {
 	UpcomingRenewals           int                           `json:"upcoming_renewals"`
 	CategorySpending           map[string]float64            `json:"category_spending"`
 	ConversionComplete         bool                          `json:"conversion_complete"`
+	ConversionRateStale        bool                          `json:"conversion_rate_stale"`
+	ConversionRateDate         time.Time                     `json:"conversion_rate_date"`
 	TotalsByCurrency           map[string]CurrencyTotals     `json:"totals_by_currency"`
 	CategorySpendingByCurrency map[string]map[string]float64 `json:"category_spending_by_currency"`
 }

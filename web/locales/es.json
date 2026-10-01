@@ -23,6 +23,7 @@
   "common.reminders_disabled": "Recordatorios desactivados",
   "common.add_subscription": "Agregar suscripción",
   "common.copied": "¡Copiado!",
+  "currency.rate_from": "Tipo de cambio del",
 
   "status.active": "Activa",
   "status.cancelled": "Cancelada",

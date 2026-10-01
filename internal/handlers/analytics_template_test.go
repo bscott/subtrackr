@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"subtrackr/internal/models"
 
@@ -116,6 +117,18 @@ func TestAnalyticsTemplate_ShowsConvertedAggregateAndPercentageBarsWhenConversio
 	assert.Contains(t, output, "kr600.00")
 	assert.Contains(t, output, "style=\"width:")
 	assert.NotContains(t, output, "20.00 SEK")
+}
+
+func TestAggregateTemplates_ShowStaleRateDate(t *testing.T) {
+	stats := &models.Stats{
+		ConversionComplete:  true,
+		ConversionRateStale: true,
+		ConversionRateDate:  time.Date(2026, time.September, 25, 0, 0, 0, 0, time.UTC),
+	}
+
+	for _, output := range []string{renderDashboardTemplate(t, stats), renderAnalyticsTemplate(t, stats)} {
+		assert.Contains(t, output, "currency.rate_from 2026-09-25")
+	}
 }
 
 func TestDashboardTemplate_GroupsCurrenciesWithoutPercentageBarsWhenConversionIsIncomplete(t *testing.T) {

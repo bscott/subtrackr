@@ -124,7 +124,7 @@
                         </svg>
                     </a>
                     {{if .ConversionRateStale}}
-                    <div class="text-xs text-gray-500 dark:text-gray-400">Rate from {{.ConversionRateDate.Format "2006-01-02"}}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">{{t $.Lang "currency.rate_from"}} {{.ConversionRateDate.Format "2006-01-02"}}</div>
                     {{end}}
                     {{else}}
                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{.DisplayCurrencySymbol}}{{printf "%.2f" .Cost}}</div>

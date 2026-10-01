@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -409,6 +410,25 @@ func TestCurrencyService_ConvertAmount_FailsWithoutCompleteCachedPairOrAPIKey(t 
 	assert.Zero(t, conversion.Amount)
 }
 
+func TestCurrencyService_RejectsZeroCachedRate(t *testing.T) {
+	for _, pair := range [][2]string{{"EUR", "USD"}, {"USD", "EUR"}, {"SEK", "USD"}} {
+		t.Run(pair[0]+" to "+pair[1], func(t *testing.T) {
+			t.Setenv("FIXER_API_KEY", "")
+			db := setupTestDB(t)
+			repo := repository.NewExchangeRateRepository(db)
+			saveEURRates(t, repo,
+				models.ExchangeRate{BaseCurrency: "EUR", Currency: "USD", Rate: 0, Date: time.Now()},
+				models.ExchangeRate{BaseCurrency: "EUR", Currency: "SEK", Rate: 12, Date: time.Now()},
+			)
+
+			conversion, err := NewCurrencyService(repo, repository.NewSettingsRepository(db)).ConvertAmount(3, pair[0], pair[1])
+
+			assert.Error(t, err)
+			assert.Zero(t, conversion.Amount)
+		})
+	}
+}
+
 func fixerSuccessBody(at time.Time) string {
 	return fmt.Sprintf(`{"success":true,"timestamp":%d,"base":"EUR","date":"%s","rates":{"USD":1.2,"SEK":12,"GBP":0.8}}`, at.Unix(), at.Format("2006-01-02"))
 }
@@ -545,6 +565,80 @@ func TestCurrencyService_DoesNotRetryFailedRefreshDuringCooldown(t *testing.T) {
 	assert.Error(t, secondError)
 	assert.Equal(t, int32(1), requestCount.Load())
 	assert.Equal(t, 1, bytes.Count(logs.Bytes(), []byte("monthly quota reached")))
+}
+
+func TestCurrencyService_RetriesOnceAfterAnHourThenUsesDailyCooldown(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	var requestCount atomic.Int32
+	server := newFixerTestServer(t, `{"success":false,"error":{"code":104,"info":"monthly quota reached"}}`, &requestCount)
+	defer server.Close()
+	currencyService := newTestCurrencyService(repo, settingsRepo, server)
+
+	_, err := currencyService.ConvertAmount(3, "USD", "SEK")
+	require.Error(t, err)
+	assert.Equal(t, int32(1), requestCount.Load())
+
+	// The first failed fetch gets one early retry.
+	require.NoError(t, settingsRepo.Set(currencyRefreshLastAttemptKey, time.Now().Add(-61*time.Minute).UTC().Format(time.RFC3339Nano)))
+	_, err = currencyService.ConvertAmount(3, "USD", "SEK")
+	require.Error(t, err)
+	assert.Equal(t, int32(2), requestCount.Load())
+
+	// Repeated failures return to the daily limit, protecting the free quota.
+	require.NoError(t, settingsRepo.Set(currencyRefreshLastAttemptKey, time.Now().Add(-2*time.Hour).UTC().Format(time.RFC3339Nano)))
+	_, err = currencyService.ConvertAmount(3, "USD", "SEK")
+	require.Error(t, err)
+	assert.Equal(t, int32(2), requestCount.Load())
+}
+
+func TestCurrencyService_RecoversFromMalformedRefreshTimestamp(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	require.NoError(t, settingsRepo.Set(currencyRefreshLastAttemptKey, "invalid"))
+	var requestCount atomic.Int32
+	server := newFixerTestServer(t, fixerSuccessBody(time.Now()), &requestCount)
+	defer server.Close()
+
+	conversion, err := newTestCurrencyService(repo, settingsRepo, server).ConvertAmount(3, "USD", "SEK")
+
+	require.NoError(t, err)
+	assert.InDelta(t, 30, conversion.Amount, 0.001)
+	assert.Equal(t, int32(1), requestCount.Load())
+	lastAttempt, err := settingsRepo.Get(currencyRefreshLastAttemptKey)
+	require.NoError(t, err)
+	_, err = time.Parse(time.RFC3339Nano, lastAttempt)
+	assert.NoError(t, err)
+}
+
+func TestCurrencyService_SuccessRestoresDailyRefreshLimit(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+	settingsRepo := repository.NewSettingsRepository(db)
+	var failedRequests atomic.Int32
+	failingServer := newFixerTestServer(t, `{"success":false,"error":{"code":104,"info":"monthly quota reached"}}`, &failedRequests)
+	defer failingServer.Close()
+	_, err := newTestCurrencyService(repo, settingsRepo, failingServer).ConvertAmount(3, "USD", "SEK")
+	require.Error(t, err)
+
+	require.NoError(t, settingsRepo.Set(currencyRefreshLastAttemptKey, time.Now().Add(-61*time.Minute).UTC().Format(time.RFC3339Nano)))
+	var successfulRequests atomic.Int32
+	// A stale response keeps the next conversion on the refresh path, so this
+	// test checks the cooldown rather than a fresh-cache shortcut.
+	server := newFixerTestServer(t, fixerSuccessBody(time.Now().Add(-5*24*time.Hour)), &successfulRequests)
+	defer server.Close()
+	service := newTestCurrencyService(repo, settingsRepo, server)
+	_, err = service.ConvertAmount(3, "USD", "SEK")
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), successfulRequests.Load())
+
+	require.NoError(t, settingsRepo.Set(currencyRefreshLastAttemptKey, time.Now().Add(-2*time.Hour).UTC().Format(time.RFC3339Nano)))
+	conversion, err := service.ConvertAmount(3, "USD", "SEK")
+	require.NoError(t, err)
+	assert.True(t, conversion.Stale)
+	assert.Equal(t, int32(1), successfulRequests.Load())
 }
 
 func TestCurrencyService_RetriesAfterCooldown(t *testing.T) {

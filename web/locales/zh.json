@@ -21,6 +21,7 @@
   "common.reminders_disabled": "提醒已禁用",
   "common.add_subscription": "添加订阅",
   "common.copied": "已复制！",
+  "currency.rate_from": "汇率日期：",
   "status.active": "活跃",
   "status.cancelled": "已取消",
   "status.paused": "已暂停",

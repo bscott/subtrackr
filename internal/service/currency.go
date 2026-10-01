@@ -21,6 +21,7 @@ import (
 const (
 	fixerURL                      = "https://data.fixer.io/api/latest"
 	currencyRefreshLastAttemptKey = "currency_refresh_last_attempt"
+	currencyRefreshFailuresKey    = "currency_refresh_failures"
 )
 
 // CurrencyInfo holds metadata for a supported currency
@@ -231,15 +232,15 @@ func (s *CurrencyService) cachedExchangeRate(fromCurrency, toCurrency string) (*
 
 	if fromCurrency == "EUR" {
 		targetRate, err := s.eurRate(toCurrency)
-		if err != nil {
-			return nil, fmt.Errorf("exchange rate for %s to %s not available: %w", fromCurrency, toCurrency, err)
+		if err != nil || targetRate.Rate <= 0 {
+			return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
 		}
 		return &exchangeRateQuote{Rate: targetRate.Rate, Date: targetRate.Date, Stale: targetRate.IsStale()}, nil
 	}
 
 	if toCurrency == "EUR" {
 		sourceRate, err := s.eurRate(fromCurrency)
-		if err != nil || sourceRate.Rate == 0 {
+		if err != nil || sourceRate.Rate <= 0 {
 			return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
 		}
 		return &exchangeRateQuote{Rate: 1 / sourceRate.Rate, Date: sourceRate.Date, Stale: sourceRate.IsStale()}, nil
@@ -248,11 +249,11 @@ func (s *CurrencyService) cachedExchangeRate(fromCurrency, toCurrency string) (*
 	// Free Fixer.io plans provide EUR-based legs, so derive cross-rates as
 	// EUR-to-target divided by EUR-to-source.
 	sourceRate, err := s.eurRate(fromCurrency)
-	if err != nil || sourceRate.Rate == 0 {
+	if err != nil || sourceRate.Rate <= 0 {
 		return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
 	}
 	targetRate, err := s.eurRate(toCurrency)
-	if err != nil {
+	if err != nil || targetRate.Rate <= 0 {
 		return nil, fmt.Errorf("exchange rate for %s to %s not available", fromCurrency, toCurrency)
 	}
 
@@ -366,11 +367,35 @@ func (s *CurrencyService) refreshAllowed() (bool, error) {
 	}
 	lastAttemptAt, err := time.Parse(time.RFC3339Nano, lastAttemptValue)
 	if err != nil {
-		return false, fmt.Errorf("invalid currency refresh timestamp: %w", err)
+		log.Printf("Warning: invalid currency refresh timestamp; allowing a new attempt: %v", err)
+		return true, nil
 	}
-	// Use the last attempt, not the last success, so quota and outage failures do
-	// not trigger another Fixer request on every page load.
-	return !time.Now().Before(lastAttemptAt.Add(24 * time.Hour)), nil
+	// Permit one earlier retry after a failed request. Subsequent failures use
+	// the normal daily cooldown to stay within Fixer's free monthly quota.
+	cooldown := 24 * time.Hour
+	failures, err := s.settingsRepo.Get(currencyRefreshFailuresKey)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, err
+	}
+	if failures == "1" {
+		cooldown = time.Hour
+	}
+	return !time.Now().Before(lastAttemptAt.Add(cooldown)), nil
+}
+
+func (s *CurrencyService) recordRefreshFailure() {
+	failures, err := s.settingsRepo.Get(currencyRefreshFailuresKey)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Printf("Warning: failed to read currency refresh failure count: %v", err)
+		return
+	}
+	count := "1"
+	if failures == "1" || failures == "2" {
+		count = "2"
+	}
+	if err := s.settingsRepo.Set(currencyRefreshFailuresKey, count); err != nil {
+		log.Printf("Warning: failed to record currency refresh failure: %v", err)
+	}
 }
 
 func (s *CurrencyService) refreshRates(ignoreCooldown bool) error {
@@ -392,8 +417,12 @@ func (s *CurrencyService) refreshRates(ignoreCooldown bool) error {
 	}
 
 	if err := s.fetchAndCacheRates(); err != nil {
+		s.recordRefreshFailure()
 		log.Printf("Warning: failed to refresh exchange rates: %v", err)
 		return err
+	}
+	if err := s.settingsRepo.Set(currencyRefreshFailuresKey, "0"); err != nil {
+		log.Printf("Warning: failed to reset currency refresh failure count: %v", err)
 	}
 	return nil
 }
