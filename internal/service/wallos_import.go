@@ -94,6 +94,7 @@ var symbolToCurrency = map[string]string{
 	"NT$":  "TWD",
 	"Mex$": "MXN",
 	"zł":   "PLN",
+	"₫":    "VND",
 }
 
 // Parse reads a Wallos export and returns the mapped subscriptions along with
