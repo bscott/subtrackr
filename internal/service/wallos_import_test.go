@@ -156,7 +156,19 @@ func TestWallosImport_ParsePrice_Unit(t *testing.T) {
 		{"£8.50", 8.50, "GBP", false},
 		{"15.99", 15.99, "", false}, // no symbol -> default currency
 		{"$1,234.56", 1234.56, "USD", false},
-		{"1.234,56 €", 1234.56, "", false}, // trailing symbol not detected -> empty currency, amount still parsed
+		{"1.234,56 €", 1234.56, "EUR", false},
+		{"9,99 €", 9.99, "EUR", false},
+		{"$1,234", 1234, "USD", false},
+		{"$1,234,567.89", 1234567.89, "USD", false},
+		{"1,234,567", 1234567, "", false},
+		{"€1.234", 1234, "EUR", false},
+		{"₫100000", 100000, "VND", false},
+		{"₫ 100.000", 100000, "VND", false},
+		{"100.000 ₫", 100000, "VND", false},
+		{"1.000.000 ₫", 1000000, "VND", false},
+		{"₩12,000", 12000, "KRW", false},
+		{"15.9", 15.9, "", false},
+		{"12 kr", 12, "", false}, // ambiguous symbol stays unmapped
 		{"", 0, "", true},
 		{"abc", 0, "", true},
 	}

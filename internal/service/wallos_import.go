@@ -167,13 +167,17 @@ func parseWallosPrice(raw string) (float64, string, error) {
 
 	// Identify the leading currency symbol (everything before the first digit,
 	// sign, or decimal separator).
-	numStart := strings.IndexFunc(s, func(r rune) bool {
-		return (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ','
-	})
+	numStart := strings.IndexFunc(s, isPriceNumRune)
 	currency := ""
 	if numStart > 0 {
 		symbol := strings.TrimSpace(s[:numStart])
 		if code, ok := symbolToCurrency[symbol]; ok {
+			currency = code
+		}
+	}
+	// Fall back to a trailing symbol, as in "9,99 €" or "100.000 ₫".
+	if numEnd := strings.LastIndexFunc(s, isPriceNumRune); currency == "" && numEnd >= 0 {
+		if code, ok := symbolToCurrency[strings.TrimSpace(s[numEnd+1:])]; ok {
 			currency = code
 		}
 	}
@@ -184,14 +188,13 @@ func parseWallosPrice(raw string) (float64, string, error) {
 		numPart = s[numStart:]
 	}
 	numPart = strings.Map(func(r rune) rune {
-		if (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ',' {
+		if isPriceNumRune(r) {
 			return r
 		}
 		return -1
 	}, numPart)
 
-	// Normalise decimal separator: if both separators are present, assume the
-	// last one is the decimal point and the other is a thousands separator.
+	// Normalise "." / "," separators into a plain "." decimal form.
 	numPart = normaliseDecimal(numPart)
 	if numPart == "" {
 		return 0, "", fmt.Errorf("no numeric value in %q", raw)
@@ -204,26 +207,39 @@ func parseWallosPrice(raw string) (float64, string, error) {
 	return val, currency, nil
 }
 
-// normaliseDecimal converts a numeric string that may use "," as either a
-// thousands or decimal separator into a plain "." decimal form.
+// isPriceNumRune reports whether r can be part of a price's numeric portion.
+func isPriceNumRune(r rune) bool {
+	return (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ','
+}
+
+// normaliseDecimal converts a numeric string that may use "." or "," as either a
+// thousands or decimal separator into a plain "." decimal form:
+//   - both present: the last one is the decimal point ("1.234,56", "1,234.56")
+//   - one kind repeated: it groups thousands ("1.000.000", "1,234,567")
+//   - one occurrence followed by exactly three digits: it groups thousands
+//     ("100.000 ₫", "$1,234"); prices with three decimal places are not
+//     expected in Wallos exports
+//   - otherwise it is the decimal point ("15.99", "9,99")
 func normaliseDecimal(s string) string {
 	lastDot := strings.LastIndex(s, ".")
 	lastComma := strings.LastIndex(s, ",")
-	switch {
-	case lastComma == -1:
-		return s // only dots (or none): already fine
-	case lastDot == -1:
-		// Only commas present: treat the last comma as the decimal separator,
-		// drop any earlier commas (thousands separators).
-		s = strings.ReplaceAll(s[:lastComma], ",", "") + "." + s[lastComma+1:]
+	if lastDot == -1 && lastComma == -1 {
 		return s
-	case lastComma > lastDot:
-		// "1.234,56" -> comma is decimal
-		return strings.ReplaceAll(s[:lastComma], ".", "") + "." + s[lastComma+1:]
-	default:
-		// "1,234.56" -> dot is decimal
-		return strings.ReplaceAll(s[:lastDot], ",", "") + "." + s[lastDot+1:]
 	}
+	if lastDot != -1 && lastComma != -1 {
+		dec := max(lastDot, lastComma)
+		intPart := strings.NewReplacer(".", "", ",", "").Replace(s[:dec])
+		return intPart + "." + s[dec+1:]
+	}
+
+	sep, last := ".", lastDot
+	if lastComma != -1 {
+		sep, last = ",", lastComma
+	}
+	if strings.Count(s, sep) > 1 || len(s)-last-1 == 3 {
+		return strings.ReplaceAll(s, sep, "")
+	}
+	return s[:last] + "." + s[last+1:]
 }
 
 // parseWallosCycle maps a Wallos "Payment Cycle" string to a SubTrackr schedule
