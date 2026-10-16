@@ -29,6 +29,13 @@ type calendarTestEvent struct {
 	Type           string  `json:"type"`
 }
 
+// calendarTestNoticeRenewalDate returns a fixed UTC midday renewal date 30 days
+// out, so calendar and iCal dates don't depend on the machine's local timezone.
+func calendarTestNoticeRenewalDate() time.Time {
+	d := time.Now().UTC().AddDate(0, 0, 30)
+	return time.Date(d.Year(), d.Month(), d.Day(), 12, 0, 0, 0, time.UTC)
+}
+
 func newCalendarCurrencyTestRouter(t *testing.T, withRate bool, noticeDays ...int) *gin.Engine {
 	t.Helper()
 	t.Setenv("FIXER_API_KEY", "")
@@ -61,7 +68,7 @@ func newCalendarCurrencyTestRouter(t *testing.T, withRate bool, noticeDays ...in
 	notice := 0
 	if len(noticeDays) > 0 {
 		notice = noticeDays[0]
-		renewalDate = time.Now().AddDate(0, 0, 30)
+		renewalDate = calendarTestNoticeRenewalDate()
 	}
 	_, err = subscriptionService.Create(&models.Subscription{
 		Name:                   "Foreign subscription",
@@ -135,33 +142,52 @@ func TestCalendar_UsesOriginalCurrencyWhenRateIsMissing(t *testing.T) {
 
 func TestCalendar_KeepsCancellationEventsAlongsideConvertedCosts(t *testing.T) {
 	router := newCalendarCurrencyTestRouter(t, true, 7)
+	wantRenewal := calendarTestNoticeRenewalDate()
+	wantCancelBy := wantRenewal.AddDate(0, 0, -7)
+
 	eventsByDate := getCalendarTestEvents(t, router)
 	require.Len(t, eventsByDate, 2)
-	var renewalDate, cancelDate time.Time
 	for date, events := range eventsByDate {
 		require.Len(t, events, 1)
 		assert.InDelta(t, 30, events[0].Cost, 0.001)
 		assert.Equal(t, "kr", events[0].CurrencySymbol)
-		parsed, err := time.Parse("2006-01-02", date)
-		require.NoError(t, err)
 		switch events[0].Type {
 		case "renewal":
-			renewalDate = parsed
+			assert.Equal(t, wantRenewal.Format("2006-01-02"), date)
 		case "cancel_by":
-			cancelDate = parsed
+			assert.Equal(t, wantCancelBy.Format("2006-01-02"), date)
 		default:
 			t.Fatalf("unexpected calendar event type %q", events[0].Type)
 		}
 	}
-	require.False(t, renewalDate.IsZero())
-	require.False(t, cancelDate.IsZero())
-	assert.Equal(t, renewalDate.AddDate(0, 0, -7), cancelDate)
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/export/ical", nil))
 	require.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, 2, strings.Count(recorder.Body.String(), "BEGIN:VEVENT"))
-	assert.Contains(t, recorder.Body.String(), "SUMMARY:Foreign subscription Renewal")
-	assert.Contains(t, recorder.Body.String(), "SUMMARY:Cancel Foreign subscription by today")
-	assert.Contains(t, recorder.Body.String(), "DTSTART:"+cancelDate.Format("20060102"))
+	body := recorder.Body.String()
+	assert.Equal(t, 2, strings.Count(body, "BEGIN:VEVENT"))
+
+	cancelEvent := findICalEvent(t, body, "UID:subtrackr-cancelby-")
+	assert.Contains(t, cancelEvent, "\r\nDTSTART:"+wantCancelBy.Format("20060102T150000Z")+"\r\n")
+	assert.Contains(t, cancelEvent, "\r\nSUMMARY:Cancel Foreign subscription by today\r\n")
+
+	renewalEvent := findICalEvent(t, body, "UID:subtrackr-1-")
+	assert.Contains(t, renewalEvent, "\r\nDTSTART:"+wantRenewal.Format("20060102T150000Z")+"\r\n")
+	assert.Contains(t, renewalEvent, "\r\nSUMMARY:Foreign subscription Renewal\r\n")
+}
+
+// findICalEvent returns the single VEVENT block whose properties include a line
+// starting with uidPrefix.
+func findICalEvent(t *testing.T, ical, uidPrefix string) string {
+	t.Helper()
+	var match string
+	for _, block := range strings.Split(ical, "BEGIN:VEVENT")[1:] {
+		block = block[:strings.Index(block, "END:VEVENT")]
+		if strings.Contains(block, "\r\n"+uidPrefix) {
+			require.Empty(t, match, "more than one VEVENT matches %q", uidPrefix)
+			match = block
+		}
+	}
+	require.NotEmpty(t, match, "no VEVENT matches %q", uidPrefix)
+	return match
 }
