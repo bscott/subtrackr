@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"subtrackr/internal/models"
+	"subtrackr/internal/service"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,8 +18,9 @@ func renderAnalyticsTemplate(t *testing.T, stats *models.Stats) string {
 	t.Helper()
 
 	tmpl, err := template.New("analytics.html").Funcs(template.FuncMap{
-		"t":   func(_ interface{}, key string) string { return key },
-		"mul": func(a, b float64) float64 { return a * b },
+		"t":            func(_ interface{}, key string) string { return key },
+		"mul":          func(a, b float64) float64 { return a * b },
+		"formatAmount": service.FormatAmount,
 		"div": func(a, b float64) float64 {
 			if b == 0 {
 				return 0
@@ -32,6 +34,7 @@ func renderAnalyticsTemplate(t *testing.T, stats *models.Stats) string {
 	require.NoError(t, tmpl.ExecuteTemplate(&output, "analytics.html", map[string]interface{}{
 		"Title":          "Analytics",
 		"Lang":           "en",
+		"Currency":       "SEK",
 		"CurrencySymbol": "kr",
 		"Stats":          stats,
 	}))
@@ -42,8 +45,9 @@ func renderDashboardTemplate(t *testing.T, stats *models.Stats) string {
 	t.Helper()
 
 	tmpl, err := template.New("dashboard.html").Funcs(template.FuncMap{
-		"t":   func(_ interface{}, key string) string { return key },
-		"mul": func(a, b float64) float64 { return a * b },
+		"t":            func(_ interface{}, key string) string { return key },
+		"mul":          func(a, b float64) float64 { return a * b },
+		"formatAmount": service.FormatAmount,
 		"div": func(a, b float64) float64 {
 			if b == 0 {
 				return 0
@@ -59,6 +63,7 @@ func renderDashboardTemplate(t *testing.T, stats *models.Stats) string {
 	require.NoError(t, tmpl.ExecuteTemplate(&output, "dashboard.html", map[string]interface{}{
 		"Title":          "Dashboard",
 		"Lang":           "en",
+		"Currency":       "SEK",
 		"CurrencySymbol": "kr",
 		"Stats":          stats,
 		"Subscriptions":  []SubscriptionWithConversion{},
@@ -158,4 +163,64 @@ func TestDashboardTemplate_GroupsCurrenciesWithoutPercentageBarsWhenConversionIs
 	assert.Contains(t, output, "Foreign")
 	assert.Contains(t, output, "Local")
 	assert.NotContains(t, output, "style=\"width:")
+}
+
+func TestAggregateTemplates_UseCurrencyDecimals(t *testing.T) {
+	stats := &models.Stats{
+		ActiveSubscriptions: 2,
+		ConversionComplete:  false,
+		TotalsByCurrency: map[string]models.CurrencyTotals{
+			"VND": {
+				TotalMonthlySpend:   220000,
+				TotalAnnualSpend:    2640000,
+				ActiveSubscriptions: 1,
+			},
+			"USD": {
+				TotalMonthlySpend:   3,
+				TotalAnnualSpend:    36,
+				ActiveSubscriptions: 1,
+			},
+		},
+		CategorySpendingByCurrency: map[string]map[string]float64{
+			"Streaming": {"VND": 220000, "USD": 3},
+		},
+	}
+
+	for _, output := range []string{renderDashboardTemplate(t, stats), renderAnalyticsTemplate(t, stats)} {
+		assert.Contains(t, output, "220000 VND")
+		assert.Contains(t, output, "2640000 VND")
+		assert.NotContains(t, output, "220000.00")
+		assert.Contains(t, output, "3.00 USD")
+	}
+}
+
+func TestDashboardTemplate_UsesSubscriptionCurrencyDecimals(t *testing.T) {
+	tmpl, err := template.New("dashboard.html").Funcs(template.FuncMap{
+		"t":             func(_ interface{}, key string) string { return key },
+		"mul":           func(a, b float64) float64 { return a * b },
+		"formatAmount":  service.FormatAmount,
+		"div":           func(a, b float64) float64 { return a / b },
+		"statusLabel":   func(_ interface{}, status string) string { return status },
+		"scheduleLabel": func(_ interface{}, schedule string, _ int) string { return schedule },
+	}).ParseFiles(filepath.Join("..", "..", "templates", "dashboard.html"))
+	require.NoError(t, err)
+
+	var output bytes.Buffer
+	require.NoError(t, tmpl.ExecuteTemplate(&output, "dashboard.html", map[string]interface{}{
+		"Lang":           "en",
+		"Currency":       "USD",
+		"CurrencySymbol": "$",
+		"Stats":          &models.Stats{ConversionComplete: true},
+		"Subscriptions": []SubscriptionWithConversion{{
+			Subscription:          &models.Subscription{Name: "Netflix", Cost: 1490, OriginalCurrency: "JPY", Status: "Active", Schedule: "Monthly"},
+			ConvertedCost:         9.95,
+			DisplayCurrency:       "USD",
+			DisplayCurrencySymbol: "$",
+			ShowConversion:        true,
+		}},
+	}))
+
+	assert.Contains(t, output.String(), "$9.95")
+	assert.Contains(t, output.String(), "JPY 1490")
+	assert.NotContains(t, output.String(), "1490.00")
 }

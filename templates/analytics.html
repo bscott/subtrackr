@@ -177,10 +177,10 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{{t .Lang "analytics.total_monthly_spend"}}</h3>
         {{if .Stats.ConversionComplete}}
-        <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
+        <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{formatAmount .Stats.TotalMonthlySpend .Currency}}</p>
         {{else}}
         {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
-        <p class="text-2xl font-bold text-primary">{{printf "%.2f" $totals.TotalMonthlySpend}} {{$currency}}</p>
+        <p class="text-2xl font-bold text-primary">{{formatAmount $totals.TotalMonthlySpend $currency}} {{$currency}}</p>
         {{end}}{{end}}
         {{end}}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Across {{.Stats.ActiveSubscriptions}} active subscriptions</p>
@@ -189,10 +189,10 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{{t .Lang "analytics.total_annual_spend"}}</h3>
         {{if .Stats.ConversionComplete}}
-        <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalAnnualSpend}}</p>
+        <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{formatAmount .Stats.TotalAnnualSpend .Currency}}</p>
         {{else}}
         {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
-        <p class="text-2xl font-bold text-success">{{printf "%.2f" $totals.TotalAnnualSpend}} {{$currency}}</p>
+        <p class="text-2xl font-bold text-success">{{formatAmount $totals.TotalAnnualSpend $currency}} {{$currency}}</p>
         {{end}}{{end}}
         {{end}}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "analytics.projected_yearly"}}</p>
@@ -201,13 +201,13 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <h3 class="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">{{t .Lang "analytics.annual_savings"}}</h3>
         {{if .Stats.ConversionComplete}}
-        <p class="text-2xl font-bold text-danger">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalSaved}}</p>
+        <p class="text-2xl font-bold text-danger">{{.CurrencySymbol}}{{formatAmount .Stats.TotalSaved .Currency}}</p>
         {{else if .Stats.CancelledSubscriptions}}
         {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.CancelledSubscriptions}}
-        <p class="text-2xl font-bold text-danger">{{printf "%.2f" $totals.TotalSaved}} {{$currency}}</p>
+        <p class="text-2xl font-bold text-danger">{{formatAmount $totals.TotalSaved $currency}} {{$currency}}</p>
         {{end}}{{end}}
         {{else}}
-        <p class="text-2xl font-bold text-danger">{{.CurrencySymbol}}0.00</p>
+        <p class="text-2xl font-bold text-danger">{{.CurrencySymbol}}{{formatAmount 0.0 .Currency}}</p>
         {{end}}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">From {{.Stats.CancelledSubscriptions}} cancelled subscriptions</p>
     </div>
@@ -231,7 +231,7 @@
                         <div class="h-2 rounded-full transition-all duration-300" 
                              style="width: {{printf "%.0f" (div (mul $amount 100.0) $.Stats.TotalMonthlySpend)}}%; background-color: #3b82f6;"></div>
                     </div>
-                    <span class="text-sm font-medium text-gray-900 dark:text-white w-16 text-right">{{$.CurrencySymbol}}{{printf "%.2f" $amount}}</span>
+                    <span class="text-sm font-medium text-gray-900 dark:text-white w-16 text-right">{{$.CurrencySymbol}}{{formatAmount $amount $.Currency}}</span>
                 </div>
             </div>
             {{end}}
@@ -244,7 +244,7 @@
                 </div>
                 <div class="text-right">
                     {{range $currency, $amount := $amounts}}
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{printf "%.2f" $amount}} {{$currency}}</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{formatAmount $amount $currency}} {{$currency}}</div>
                     {{end}}
                 </div>
             </div>
@@ -290,10 +290,10 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="text-center p-4 bg-blue-50 dark:bg-blue-900/50 rounded-lg transition-colors duration-200">
             {{if .Stats.ConversionComplete}}
-            <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{printf "%.2f" (div .Stats.TotalMonthlySpend 30)}}</p>
+            <p class="text-2xl font-bold text-primary">{{.CurrencySymbol}}{{formatAmount (div .Stats.TotalMonthlySpend 30) .Currency}}</p>
             {{else}}
             {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
-            <p class="text-2xl font-bold text-primary">{{printf "%.2f" (div $totals.TotalMonthlySpend 30)}} {{$currency}}</p>
+            <p class="text-2xl font-bold text-primary">{{formatAmount (div $totals.TotalMonthlySpend 30) $currency}} {{$currency}}</p>
             {{end}}{{end}}
             {{end}}
             <p class="text-sm text-gray-600 dark:text-gray-300">{{t .Lang "analytics.avg_daily_cost"}}</p>
@@ -301,10 +301,10 @@
         
         <div class="text-center p-4 bg-green-50 dark:bg-green-900/50 rounded-lg transition-colors duration-200">
             {{if .Stats.ConversionComplete}}
-            <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{printf "%.2f" .Stats.TotalMonthlySpend}}</p>
+            <p class="text-2xl font-bold text-success">{{.CurrencySymbol}}{{formatAmount .Stats.TotalMonthlySpend .Currency}}</p>
             {{else}}
             {{range $currency, $totals := .Stats.TotalsByCurrency}}{{if $totals.ActiveSubscriptions}}
-            <p class="text-2xl font-bold text-success">{{printf "%.2f" $totals.TotalMonthlySpend}} {{$currency}}</p>
+            <p class="text-2xl font-bold text-success">{{formatAmount $totals.TotalMonthlySpend $currency}} {{$currency}}</p>
             {{end}}{{end}}
             {{end}}
             <p class="text-sm text-gray-600 dark:text-gray-300">{{t .Lang "analytics.total_monthly_cost"}}</p>

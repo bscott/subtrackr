@@ -150,3 +150,34 @@ func TestCurrencySymbolForSubscription(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatAmount(t *testing.T) {
+	tests := []struct {
+		amount   float64
+		code     string
+		expected string
+	}{
+		{9.99, "USD", "9.99"},
+		{10, "EUR", "10.00"},
+		{220000, "VND", "220000"},
+		{1500.4, "JPY", "1500"},
+		{1500.6, "KRW", "1501"},
+		{12.5, "XYZ", "12.50"},
+		{0, "VND", "0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.code, func(t *testing.T) {
+			assert.Equal(t, tt.expected, FormatAmount(tt.amount, tt.code))
+		})
+	}
+}
+
+func TestZeroDecimalCurrenciesAreBuiltin(t *testing.T) {
+	for code := range zeroDecimalCurrencies {
+		_, ok := currencyInfoMap[code]
+		assert.True(t, ok, "%s should be a builtin currency", code)
+		assert.Equal(t, 0, CurrencyDecimals(code))
+	}
+	assert.Equal(t, 2, CurrencyDecimals("USD"))
+}

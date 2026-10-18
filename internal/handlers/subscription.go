@@ -348,6 +348,7 @@ func (h *SubscriptionHandler) Dashboard(c *gin.Context) {
 		"CurrentPage":    "dashboard",
 		"Stats":          stats,
 		"Subscriptions":  enrichedSubs,
+		"Currency":       h.settingsService.GetCurrency(),
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 		"Lang":           h.activeLang(),
@@ -396,6 +397,7 @@ func (h *SubscriptionHandler) Analytics(c *gin.Context) {
 		"Title":          "Analytics",
 		"CurrentPage":    "analytics",
 		"Stats":          stats,
+		"Currency":       h.settingsService.GetCurrency(),
 		"CurrencySymbol": h.settingsService.GetCurrencySymbol(),
 		"DarkMode":       h.settingsService.IsDarkModeEnabled(),
 		"Lang":           h.activeLang(),
@@ -417,6 +419,7 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 		Name           string  `json:"name"`
 		Cost           float64 `json:"cost"`
 		CurrencySymbol string  `json:"currency_symbol"`
+		Decimals       int     `json:"decimals"`
 		ID             uint    `json:"id"`
 		IconURL        string  `json:"icon_url"`
 		Type           string  `json:"type"`
@@ -430,7 +433,7 @@ func (h *SubscriptionHandler) Calendar(c *gin.Context) {
 
 	eventsByDate := make(map[string][]Event)
 	for _, sub := range h.enrichWithCurrencyConversion(calendarSubscriptions) {
-		event := Event{Name: sub.Name, Cost: sub.ConvertedCost, CurrencySymbol: sub.DisplayCurrencySymbol, ID: sub.ID, IconURL: sub.IconURL, Type: "renewal"}
+		event := Event{Name: sub.Name, Cost: sub.ConvertedCost, CurrencySymbol: sub.DisplayCurrencySymbol, Decimals: service.CurrencyDecimals(sub.DisplayCurrency), ID: sub.ID, IconURL: sub.IconURL, Type: "renewal"}
 		dateKey := sub.RenewalDate.Format("2006-01-02")
 		eventsByDate[dateKey] = append(eventsByDate[dateKey], event)
 		if cancelBy := sub.CancelByDate(); cancelBy != nil {
@@ -540,11 +543,13 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 			uid := fmt.Sprintf("subtrackr-%d-%d@subtrackr", sub.ID, sub.RenewalDate.Unix())
 
 			summary := fmt.Sprintf("%s Renewal", sub.Name)
+			subCurrency := h.settingsService.GetCurrency()
 			subCurrencySymbol := h.settingsService.GetCurrencySymbol()
-			if sub.OriginalCurrency != "" && sub.OriginalCurrency != h.settingsService.GetCurrency() {
+			if sub.OriginalCurrency != "" && sub.OriginalCurrency != subCurrency {
+				subCurrency = sub.OriginalCurrency
 				subCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 			}
-			description := fmt.Sprintf("Subscription: %s\\nCost: %s%.2f\\nSchedule: %s", sub.Name, subCurrencySymbol, sub.Cost, sub.DisplaySchedule())
+			description := fmt.Sprintf("Subscription: %s\\nCost: %s%s\\nSchedule: %s", sub.Name, subCurrencySymbol, service.FormatAmount(sub.Cost, subCurrency), sub.DisplaySchedule())
 			if sub.URL != "" {
 				description += fmt.Sprintf("\\nURL: %s", sub.URL)
 			}

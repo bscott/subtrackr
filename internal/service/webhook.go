@@ -124,10 +124,11 @@ func (w *WebhookService) SendHighCostAlert(subscription *models.Subscription) er
 	}
 
 	currencySymbol := currencySymbolForSubscription(subscription, w.settingsService)
+	currencyCode := currencyCodeForSubscription(subscription, w.settingsService)
 	payload := &WebhookPayload{
 		Event:        "high_cost_alert",
 		Title:        fmt.Sprintf("High Cost Alert: %s", subscription.Name),
-		Message:      fmt.Sprintf("A new high-cost subscription has been added: %s at %s%.2f %s", subscription.Name, currencySymbol, subscription.Cost, subscription.Schedule),
+		Message:      fmt.Sprintf("A new high-cost subscription has been added: %s at %s%s %s", subscription.Name, currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.Schedule),
 		Subscription: subscriptionToWebhook(subscription, w.settingsService),
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
 	}
