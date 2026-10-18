@@ -611,9 +611,8 @@
                             <span class="text-sm text-gray-600 dark:text-gray-400">{{.CurrencySymbol}}</span>
                             <input type="number" 
                                    name="high_cost_threshold"
-                                   value="{{printf "%.2f" .HighCostThreshold}}"
+                                   value="{{formatAmount .HighCostThreshold .Currency}}"
                                    min="0"
-                                   max="10000"
                                    step="0.01"
                                    hx-post="/api/settings/notifications/threshold"
                                    hx-trigger="change"
