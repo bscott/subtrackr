@@ -163,6 +163,7 @@ func TestWallosImport_ParsePrice_Unit(t *testing.T) {
 		{"100.000 ₫", 100000, "VND", false},
 		{"1.000.000 ₫", 1000000, "VND", false},
 		{"₩1,000", 1000, "KRW", false},
+		{"₩0.125", 0.125, "KRW", false}, // zero integer part stays a decimal
 		{"$1,234,567", 1234567, "USD", false},
 		{"€1.000.000,50", 1000000.50, "EUR", false},
 		{"$1.5", 1.5, "USD", false},

@@ -230,10 +230,12 @@ func normaliseDecimal(s string, zeroDecimal bool) string {
 // normaliseSingleSeparator handles numbers that use only one kind of separator.
 // A repeated separator can only be thousands grouping ("1.000.000"). A single
 // one is the decimal point ("15.99", "9,99"), except for zero-decimal
-// currencies, where exactly three trailing digits mean grouping ("100.000").
+// currencies, where exactly three trailing digits after a non-zero integer
+// part mean grouping ("100.000", but not "0.125").
 func normaliseSingleSeparator(s, sep string, zeroDecimal bool) string {
 	parts := strings.Split(s, sep)
-	if len(parts) == 2 && !(zeroDecimal && len(parts[1]) == 3) {
+	grouped := zeroDecimal && len(parts[1]) == 3 && strings.TrimLeft(parts[0], "-0") != ""
+	if len(parts) == 2 && !grouped {
 		return parts[0] + "." + parts[1]
 	}
 	for _, group := range parts[1:] {
