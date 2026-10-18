@@ -17,3 +17,20 @@ test('calendar shows subscription names as text, not markup', async ({ page, req
     await request.delete(`/api/subscriptions/${subscription.id}`);
   }
 });
+
+test('calendar escapes subscription icon URLs', async ({ page, request }) => {
+  const renewal = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+  const subscription = await seedSubscription(request, {
+    icon_url: '"><img src=x onerror="window.__iconXSS=1">',
+    renewal_date: renewal.toISOString().slice(0, 10),
+  });
+  try {
+    await page.goto(`/calendar?year=${renewal.getUTCFullYear()}&month=${renewal.getUTCMonth() + 1}`);
+    const event = page.locator('#calendar-grid button', { hasText: subscription.name });
+    await expect(event).toBeVisible();
+    await expect(event.locator('img')).toHaveCount(1);
+    expect(await page.evaluate(() => window.__iconXSS)).toBeUndefined();
+  } finally {
+    await request.delete(`/api/subscriptions/${subscription.id}`);
+  }
+});

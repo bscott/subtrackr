@@ -1550,28 +1550,40 @@
     </script>
     <script>
 // --- Category Management Vanilla JS ---
+// escapeHTML makes a value safe to interpolate into markup, both as text and
+// inside a quoted attribute.
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[ch]);
+}
+
 function renderCategories(categories) {
     const list = document.getElementById('categories-list');
     if (!categories.length) {
         list.innerHTML = '<div class="text-center py-4 text-gray-500">No categories found.</div>';
         return;
     }
-    list.innerHTML = categories.map(cat => `
+    list.innerHTML = categories.map(cat => {
+        const id = Number(cat.id) || 0;
+        const name = escapeHTML(cat.name || '');
+        return `
         <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
             <div class="flex-1">
-                <span class="category-name text-sm font-medium text-gray-900" id="category-name-${cat.id}">${cat.name}</span>
-                <form id="edit-category-form-${cat.id}" class="hidden inline">
-                    <input type="text" name="name" value="${cat.name}" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                <span class="category-name text-sm font-medium text-gray-900" id="category-name-${id}">${name}</span>
+                <form id="edit-category-form-${id}" class="hidden inline">
+                    <input type="text" name="name" value="${name}" class="px-2 py-1 border border-gray-300 rounded text-sm">
                     <button type="submit" class="text-primary text-sm font-medium ml-2">Save</button>
-                    <button type="button" onclick="cancelEdit(${cat.id})" class="text-gray-500 text-sm ml-1">Cancel</button>
+                    <button type="button" onclick="cancelEdit(${id})" class="text-gray-500 text-sm ml-1">Cancel</button>
                 </form>
             </div>
             <div class="flex items-center space-x-2">
-                <button onclick="startEdit(${cat.id})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
-                <button onclick="deleteCategory(${cat.id})" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                <button onclick="startEdit(${id})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                <button onclick="deleteCategory(${id})" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     // Attach edit form listeners
     categories.forEach(cat => {
         const form = document.getElementById(`edit-category-form-${cat.id}`);
