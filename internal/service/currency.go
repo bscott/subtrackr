@@ -69,6 +69,7 @@ var BuiltinCurrencies = []CurrencyInfo{
 	{Code: "HUF", Symbol: "Ft", Name: "Hungarian Forint"},
 	{Code: "RON", Symbol: "lei", Name: "Romanian Leu"},
 	{Code: "UAH", Symbol: "₴", Name: "Ukrainian Hryvnia"},
+	{Code: "VND", Symbol: "₫", Name: "Vietnamese Dong"},
 }
 
 // currencyInfoMap provides O(1) lookup by code
@@ -92,6 +93,27 @@ func GetCurrencyInfo(code string) CurrencyInfo {
 		return info
 	}
 	return CurrencyInfo{Code: code, Symbol: code, Name: code}
+}
+
+// zeroDecimalCurrencies lists the ISO 4217 currencies without a minor unit,
+// whose amounts are shown as whole numbers
+var zeroDecimalCurrencies = map[string]bool{
+	"JPY": true,
+	"KRW": true,
+	"VND": true,
+}
+
+// CurrencyDecimals returns the number of fraction digits shown for a currency
+func CurrencyDecimals(code string) int {
+	if zeroDecimalCurrencies[code] {
+		return 0
+	}
+	return 2
+}
+
+// FormatAmount formats an amount with the number of decimals its currency uses
+func FormatAmount(amount float64, code string) string {
+	return fmt.Sprintf("%.*f", CurrencyDecimals(code), amount)
 }
 
 // GetAvailableCurrencies returns all supported currencies

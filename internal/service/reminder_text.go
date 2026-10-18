@@ -43,10 +43,11 @@ func buildRenewalReminderContent(sub *models.Subscription, daysUntil int, settin
 // Pushover and Telegram.
 func renewalReminderMessage(sub *models.Subscription, content renewalReminderContent, settings *SettingsService) string {
 	currencySymbol := currencySymbolForSubscription(sub, settings)
+	currencyCode := currencyCodeForSubscription(sub, settings)
 	message := content.Header + "\n\n" + content.Lead + "\n\n"
 	message += "Subscription Details:\n"
-	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, sub.Cost, sub.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, sub.MonthlyCost())
+	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(sub.Cost, currencyCode), sub.DisplaySchedule())
+	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(sub.MonthlyCost(), currencyCode))
 	if sub.Category.Name != "" {
 		message += fmt.Sprintf("Category: %s\n", sub.Category.Name)
 	}

@@ -156,12 +156,13 @@ func (t *TelegramService) SendHighCostAlert(subscription *models.Subscription) e
 
 	// Get currency symbol - use subscription's own currency if it differs from preferred
 	currencySymbol := currencySymbolForSubscription(subscription, t.settingsService)
+	currencyCode := currencyCodeForSubscription(subscription, t.settingsService)
 
 	// Build message
 	message := "⚠️ High Cost Alert\n\n"
 	message += fmt.Sprintf("Subscription: %s\n", subscription.Name)
-	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, subscription.MonthlyCost())
+	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.DisplaySchedule())
+	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
 	if subscription.Category.Name != "" {
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
 	}
@@ -198,6 +199,7 @@ func (t *TelegramService) SendCancellationReminder(subscription *models.Subscrip
 
 	// Get currency symbol - use subscription's own currency if it differs from preferred
 	currencySymbol := currencySymbolForSubscription(subscription, t.settingsService)
+	currencyCode := currencyCodeForSubscription(subscription, t.settingsService)
 
 	// Build message
 	daysText := "days"
@@ -207,8 +209,8 @@ func (t *TelegramService) SendCancellationReminder(subscription *models.Subscrip
 	message := "⚠️ Cancellation Reminder\n\n"
 	message += fmt.Sprintf("Your subscription %s will end in %d %s.\n\n", subscription.Name, daysUntilCancellation, daysText)
 	message += "Subscription Details:\n"
-	message += fmt.Sprintf("Cost: %s%.2f %s\n", currencySymbol, subscription.Cost, subscription.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%.2f\n", currencySymbol, subscription.MonthlyCost())
+	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.DisplaySchedule())
+	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
 	if subscription.Category.Name != "" {
 		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
 	}

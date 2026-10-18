@@ -29,6 +29,10 @@ type calendarTestEvent struct {
 	Type           string  `json:"type"`
 }
 
+// calendarTestRenewalDate is a fixed UTC timestamp, so calendar keys and iCal
+// dates don't depend on the machine's timezone or the current date.
+var calendarTestRenewalDate = time.Date(2099, time.March, 15, 12, 0, 0, 0, time.UTC)
+
 func newCalendarCurrencyTestRouter(t *testing.T, withRate bool, noticeDays ...int) *gin.Engine {
 	t.Helper()
 	t.Setenv("FIXER_API_KEY", "")
@@ -57,11 +61,10 @@ func newCalendarCurrencyTestRouter(t *testing.T, withRate bool, noticeDays ...in
 
 	categoryService := service.NewCategoryService(repository.NewCategoryRepository(db))
 	subscriptionService := service.NewSubscriptionService(repository.NewSubscriptionRepository(db), categoryService)
-	renewalDate := time.Now().AddDate(0, 0, 1)
+	renewalDate := calendarTestRenewalDate
 	notice := 0
 	if len(noticeDays) > 0 {
 		notice = noticeDays[0]
-		renewalDate = time.Now().AddDate(0, 0, 30)
 	}
 	_, err = subscriptionService.Create(&models.Subscription{
 		Name:                   "Foreign subscription",
@@ -153,15 +156,33 @@ func TestCalendar_KeepsCancellationEventsAlongsideConvertedCosts(t *testing.T) {
 			t.Fatalf("unexpected calendar event type %q", events[0].Type)
 		}
 	}
-	require.False(t, renewalDate.IsZero())
-	require.False(t, cancelDate.IsZero())
-	assert.Equal(t, renewalDate.AddDate(0, 0, -7), cancelDate)
+	assert.Equal(t, time.Date(2099, time.March, 15, 0, 0, 0, 0, time.UTC), renewalDate)
+	assert.Equal(t, time.Date(2099, time.March, 8, 0, 0, 0, 0, time.UTC), cancelDate)
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/export/ical", nil))
 	require.Equal(t, http.StatusOK, recorder.Code)
-	assert.Equal(t, 2, strings.Count(recorder.Body.String(), "BEGIN:VEVENT"))
-	assert.Contains(t, recorder.Body.String(), "SUMMARY:Foreign subscription Renewal")
-	assert.Contains(t, recorder.Body.String(), "SUMMARY:Cancel Foreign subscription by today")
-	assert.Contains(t, recorder.Body.String(), "DTSTART:"+cancelDate.Format("20060102"))
+	ical := recorder.Body.String()
+	assert.Equal(t, 2, strings.Count(ical, "BEGIN:VEVENT"))
+	assert.Contains(t, ical, "SUMMARY:Foreign subscription Renewal")
+
+	cancelEvent := findICalEvent(t, ical, "UID:subtrackr-cancelby-")
+	assert.Contains(t, cancelEvent, "\r\nDTSTART:20990308T120000Z\r\n")
+	assert.Contains(t, cancelEvent, "\r\nSUMMARY:Cancel Foreign subscription by today\r\n")
+}
+
+// findICalEvent returns the VEVENT block containing marker, failing the test
+// unless exactly one event matches.
+func findICalEvent(t *testing.T, ical, marker string) string {
+	t.Helper()
+	var match string
+	for _, block := range strings.Split(ical, "BEGIN:VEVENT")[1:] {
+		event, _, _ := strings.Cut(block, "END:VEVENT")
+		if strings.Contains(event, marker) {
+			require.Empty(t, match, "more than one VEVENT contains %q", marker)
+			match = event
+		}
+	}
+	require.NotEmpty(t, match, "no VEVENT contains %q", marker)
+	return match
 }

@@ -94,6 +94,7 @@ var symbolToCurrency = map[string]string{
 	"NT$":  "TWD",
 	"Mex$": "MXN",
 	"zł":   "PLN",
+	"₫":    "VND",
 }
 
 // Parse reads a Wallos export and returns the mapped subscriptions along with
@@ -157,24 +158,23 @@ func (s *WallosImportService) Parse(data []byte) ([]models.Subscription, []strin
 }
 
 // parseWallosPrice extracts the numeric amount and (best-effort) currency code
-// from a Wallos price string such as "$15.99", "€9,99" or "15.99".
+// from a Wallos price string such as "$15.99", "€9,99", "100.000 ₫" or "15.99".
 func parseWallosPrice(raw string) (float64, string, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return 0, "", fmt.Errorf("empty price")
 	}
 
-	// Identify the leading currency symbol (everything before the first digit,
-	// sign, or decimal separator).
-	numStart := strings.IndexFunc(s, func(r rune) bool {
-		return (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ','
-	})
+	// Identify the currency symbol: everything before the first digit, sign, or
+	// decimal separator, falling back to everything after the last one.
+	numStart := strings.IndexFunc(s, isWallosNumberRune)
+	numEnd := strings.LastIndexFunc(s, isWallosNumberRune)
 	currency := ""
 	if numStart > 0 {
-		symbol := strings.TrimSpace(s[:numStart])
-		if code, ok := symbolToCurrency[symbol]; ok {
-			currency = code
-		}
+		currency = symbolToCurrency[strings.TrimSpace(s[:numStart])]
+	}
+	if currency == "" && numEnd >= 0 && numEnd+1 < len(s) {
+		currency = symbolToCurrency[strings.TrimSpace(s[numEnd+1:])]
 	}
 
 	// Keep only the numeric portion.
@@ -183,15 +183,13 @@ func parseWallosPrice(raw string) (float64, string, error) {
 		numPart = s[numStart:]
 	}
 	numPart = strings.Map(func(r rune) rune {
-		if (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ',' {
+		if isWallosNumberRune(r) {
 			return r
 		}
 		return -1
 	}, numPart)
 
-	// Normalise decimal separator: if both separators are present, assume the
-	// last one is the decimal point and the other is a thousands separator.
-	numPart = normaliseDecimal(numPart)
+	numPart = normaliseDecimal(numPart, CurrencyDecimals(currency) == 0)
 	if numPart == "" {
 		return 0, "", fmt.Errorf("no numeric value in %q", raw)
 	}
@@ -203,19 +201,23 @@ func parseWallosPrice(raw string) (float64, string, error) {
 	return val, currency, nil
 }
 
-// normaliseDecimal converts a numeric string that may use "," as either a
-// thousands or decimal separator into a plain "." decimal form.
-func normaliseDecimal(s string) string {
+func isWallosNumberRune(r rune) bool {
+	return (r >= '0' && r <= '9') || r == '-' || r == '.' || r == ','
+}
+
+// normaliseDecimal converts a numeric string that may use "." or "," as either
+// a thousands or decimal separator into a plain "." decimal form. zeroDecimal
+// reports whether the currency has no minor unit (e.g. VND, JPY, KRW).
+func normaliseDecimal(s string, zeroDecimal bool) string {
 	lastDot := strings.LastIndex(s, ".")
 	lastComma := strings.LastIndex(s, ",")
 	switch {
-	case lastComma == -1:
-		return s // only dots (or none): already fine
-	case lastDot == -1:
-		// Only commas present: treat the last comma as the decimal separator,
-		// drop any earlier commas (thousands separators).
-		s = strings.ReplaceAll(s[:lastComma], ",", "") + "." + s[lastComma+1:]
+	case lastDot == -1 && lastComma == -1:
 		return s
+	case lastComma == -1:
+		return normaliseSingleSeparator(s, ".", zeroDecimal)
+	case lastDot == -1:
+		return normaliseSingleSeparator(s, ",", zeroDecimal)
 	case lastComma > lastDot:
 		// "1.234,56" -> comma is decimal
 		return strings.ReplaceAll(s[:lastComma], ".", "") + "." + s[lastComma+1:]
@@ -223,6 +225,25 @@ func normaliseDecimal(s string) string {
 		// "1,234.56" -> dot is decimal
 		return strings.ReplaceAll(s[:lastDot], ",", "") + "." + s[lastDot+1:]
 	}
+}
+
+// normaliseSingleSeparator handles numbers that use only one kind of separator.
+// A repeated separator can only be thousands grouping ("1.000.000"). A single
+// one is the decimal point ("15.99", "9,99"), except for zero-decimal
+// currencies, where exactly three trailing digits after a non-zero integer
+// part mean grouping ("100.000", but not "0.125").
+func normaliseSingleSeparator(s, sep string, zeroDecimal bool) string {
+	parts := strings.Split(s, sep)
+	grouped := zeroDecimal && len(parts[1]) == 3 && strings.TrimLeft(parts[0], "-0") != ""
+	if len(parts) == 2 && !grouped {
+		return parts[0] + "." + parts[1]
+	}
+	for _, group := range parts[1:] {
+		if len(group) != 3 {
+			return s // not a valid grouping; let ParseFloat reject it
+		}
+	}
+	return strings.Join(parts, "")
 }
 
 // parseWallosCycle maps a Wallos "Payment Cycle" string to a SubTrackr schedule

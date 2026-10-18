@@ -106,9 +106,10 @@ func main() {
 
 	// Create template functions
 	router.SetFuncMap(template.FuncMap{
-		"add": func(a, b float64) float64 { return a + b },
-		"sub": func(a, b float64) float64 { return a - b },
-		"mul": func(a, b float64) float64 { return a * b },
+		"add":          func(a, b float64) float64 { return a + b },
+		"sub":          func(a, b float64) float64 { return a - b },
+		"mul":          func(a, b float64) float64 { return a * b },
+		"formatAmount": service.FormatAmount,
 		"div": func(a, b float64) float64 {
 			if b == 0 {
 				return 0
@@ -272,9 +273,10 @@ func loadTemplates(catalog *i18n.Catalog) *template.Template {
 		},
 		"statusLabel":   statusLabelFunc(catalog),
 		"scheduleLabel": scheduleLabelFunc(catalog),
-		"add": func(a, b float64) float64 { return a + b },
-		"sub": func(a, b float64) float64 { return a - b },
-		"mul": func(a, b float64) float64 { return a * b },
+		"add":           func(a, b float64) float64 { return a + b },
+		"sub":           func(a, b float64) float64 { return a - b },
+		"mul":           func(a, b float64) float64 { return a * b },
+		"formatAmount":  service.FormatAmount,
 		"div": func(a, b float64) float64 {
 			if b == 0 {
 				log.Printf("Warning: Division by zero attempted in template")

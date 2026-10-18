@@ -20,6 +20,14 @@ func currencySymbolForSubscription(subscription *models.Subscription, settings *
 	return settings.GetCurrencySymbol()
 }
 
+// currencyCodeForSubscription returns the currency code matching currencySymbolForSubscription.
+func currencyCodeForSubscription(subscription *models.Subscription, settings *SettingsService) string {
+	if subscription.OriginalCurrency != "" {
+		return subscription.OriginalCurrency
+	}
+	return settings.GetCurrency()
+}
+
 // EmailService handles sending emails via SMTP
 type EmailService struct {
 	settingsService *SettingsService
@@ -182,6 +190,7 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 
 	// Get currency symbol - use subscription's own currency if it differs from preferred
 	currencySymbol := currencySymbolForSubscription(subscription, e.settingsService)
+	currencyCode := currencyCodeForSubscription(subscription, e.settingsService)
 
 	// Build email body
 	tmpl := `
@@ -208,8 +217,8 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.DisplaySchedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.Cost .Currency}} {{.Subscription.DisplaySchedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.MonthlyCost .Currency}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .FormattedRenewalDate}}<div class="detail-row"><span class="label">Next Renewal:</span> {{.FormattedRenewalDate}}</div>{{end}}
 			{{if .Subscription.URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.Subscription.URL}}">{{.Subscription.URL}}</a></div>{{end}}
@@ -226,6 +235,7 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 	type AlertData struct {
 		Subscription        *models.Subscription
 		CurrencySymbol      string
+		Currency            string
 		FormattedRenewalDate string
 	}
 
@@ -237,10 +247,11 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 	data := AlertData{
 		Subscription:        subscription,
 		CurrencySymbol:      currencySymbol,
+		Currency:            currencyCode,
 		FormattedRenewalDate: formattedRenewal,
 	}
 
-	t, err := template.New("highCostAlert").Parse(tmpl)
+	t, err := template.New("highCostAlert").Funcs(template.FuncMap{"formatAmount": FormatAmount}).Parse(tmpl)
 	if err != nil {
 		return fmt.Errorf("failed to parse email template: %w", err)
 	}
@@ -250,7 +261,7 @@ func (e *EmailService) SendHighCostAlert(subscription *models.Subscription) erro
 		return fmt.Errorf("failed to execute email template: %w", err)
 	}
 
-	subject := fmt.Sprintf("High Cost Alert: %s - %s%.2f/month", subscription.Name, currencySymbol, subscription.MonthlyCost())
+	subject := fmt.Sprintf("High Cost Alert: %s - %s%s/month", subscription.Name, currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
 	return e.SendEmail(subject, buf.String())
 }
 
@@ -264,6 +275,7 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 
 	// Get currency symbol - use subscription's own currency if it differs from preferred
 	currencySymbol := currencySymbolForSubscription(subscription, e.settingsService)
+	currencyCode := currencyCodeForSubscription(subscription, e.settingsService)
 
 	// Build email body
 	tmpl := `
@@ -290,8 +302,8 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.DisplaySchedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.Cost .Currency}} {{.Subscription.DisplaySchedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.MonthlyCost .Currency}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .FormattedRenewalDate}}<div class="detail-row"><span class="label">Renewal Date:</span> {{.FormattedRenewalDate}}</div>{{end}}
 			{{if .FormattedCancelByDate}}<div class="detail-row"><span class="label">Cancel By:</span> {{.FormattedCancelByDate}}</div>{{end}}
@@ -310,6 +322,7 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 		Subscription          *models.Subscription
 		DaysUntilRenewal      int
 		CurrencySymbol        string
+		Currency              string
 		FormattedRenewalDate  string
 		FormattedCancelByDate string
 	}
@@ -328,11 +341,12 @@ func (e *EmailService) SendRenewalReminder(subscription *models.Subscription, da
 		Subscription:          subscription,
 		DaysUntilRenewal:      daysUntilRenewal,
 		CurrencySymbol:        currencySymbol,
+		Currency:              currencyCode,
 		FormattedRenewalDate:  formattedRenewal,
 		FormattedCancelByDate: formattedCancelBy,
 	}
 
-	t, err := template.New("renewalReminder").Parse(tmpl)
+	t, err := template.New("renewalReminder").Funcs(template.FuncMap{"formatAmount": FormatAmount}).Parse(tmpl)
 	if err != nil {
 		return fmt.Errorf("failed to parse email template: %w", err)
 	}
@@ -363,6 +377,7 @@ func (e *EmailService) SendCancellationReminder(subscription *models.Subscriptio
 
 	// Get currency symbol - use subscription's own currency if it differs from preferred
 	currencySymbol := currencySymbolForSubscription(subscription, e.settingsService)
+	currencyCode := currencyCodeForSubscription(subscription, e.settingsService)
 
 	// Build email body
 	tmpl := `
@@ -389,8 +404,8 @@ func (e *EmailService) SendCancellationReminder(subscription *models.Subscriptio
 		<div class="subscription-details">
 			<h3>Subscription Details</h3>
 			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
-			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" .Subscription.Cost}} {{.Subscription.DisplaySchedule}}</div>
-			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{printf "%.2f" (.Subscription.MonthlyCost)}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.Cost .Currency}} {{.Subscription.DisplaySchedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.MonthlyCost .Currency}}</div>
 			{{if and .Subscription.Category .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
 			{{if .FormattedCancellationDate}}<div class="detail-row"><span class="label">Cancellation Date:</span> {{.FormattedCancellationDate}}</div>{{end}}
 			{{if .Subscription.URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.Subscription.URL}}">{{.Subscription.URL}}</a></div>{{end}}
@@ -408,6 +423,7 @@ func (e *EmailService) SendCancellationReminder(subscription *models.Subscriptio
 		Subscription               *models.Subscription
 		DaysUntilCancellation      int
 		CurrencySymbol             string
+		Currency                   string
 		FormattedCancellationDate  string
 	}
 
@@ -420,10 +436,11 @@ func (e *EmailService) SendCancellationReminder(subscription *models.Subscriptio
 		Subscription:              subscription,
 		DaysUntilCancellation:     daysUntilCancellation,
 		CurrencySymbol:            currencySymbol,
+		Currency:                  currencyCode,
 		FormattedCancellationDate: formattedCancellation,
 	}
 
-	t, err := template.New("cancellationReminder").Parse(tmpl)
+	t, err := template.New("cancellationReminder").Funcs(template.FuncMap{"formatAmount": FormatAmount}).Parse(tmpl)
 	if err != nil {
 		return fmt.Errorf("failed to parse email template: %w", err)
 	}
