@@ -269,6 +269,14 @@
         const month = parseInt({{.Month}}) || new Date().getMonth() + 1;
         const cancelByLabel = "{{t .Lang "calendar.cancel_by"}}";
 
+        // escapeHTML makes a value safe to interpolate into the cell markup,
+        // both as text and inside a quoted attribute.
+        function escapeHTML(value) {
+            return String(value).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[ch]);
+        }
+
         console.log('Calendar initialized:', { year, month, eventsCount: Object.keys(eventsByDate).length });
         
         // Render calendar grid
@@ -309,15 +317,15 @@
                 if (hasEvents) {
                     content += '<div class="space-y-1">';
                     events.forEach(event => {
-                        const eventName = (event.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        const eventId = event.id || 0;
+                        const eventName = escapeHTML(event.name || '');
+                        const eventId = Number(event.id) || 0;
                         const iconURL = event.icon_url || '';
-                        const currencySymbol = event.currency_symbol || '';
+                        const currencySymbol = escapeHTML(event.currency_symbol || '');
                         const hasIcon = iconURL && iconURL.trim() !== '';
                         
                         let iconHtml = '';
                         if (hasIcon) {
-                            const safeIconURL = iconURL.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                            const safeIconURL = escapeHTML(iconURL);
                             iconHtml = `<img src="${safeIconURL}" alt="${eventName}" class="w-3 h-3 rounded mr-1.5 flex-shrink-0 inline-block" style="object-fit: contain;" onerror="this.style.display='none';">`;
                         }
                         
@@ -326,7 +334,7 @@
                         const buttonClass = isCancelBy
                             ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60'
                             : 'bg-blue-100 dark:bg-gray-700 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-gray-600';
-                        const safeCancelByLabel = cancelByLabel.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        const safeCancelByLabel = escapeHTML(cancelByLabel);
                         const eventTitle = isCancelBy
                             ? `${safeCancelByLabel}: ${eventName} - ${currencySymbol}${cost}`
                             : `${eventName} - ${currencySymbol}${cost}`;
