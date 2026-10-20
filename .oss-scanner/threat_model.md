@@ -47,8 +47,10 @@ Routes that are reachable without a session when auth is on (see `isPublicRoute`
 4. Responses from outbound services: exchange-rate API (`currency.go`, fixer.io), SMTP servers, Pushover,
    Telegram, and operator-configured webhook endpoints.
 5. The iCal subscription token in `/ical/:token`: unauthenticated by design, protected only by the token.
-6. Environment variables (`DATABASE_PATH`, `PORT`, `GIN_MODE`, `FIXER_API_KEY`, `PUSHOVER_*`, `TELEGRAM_*`):
-   operator-controlled, trusted.
+6. Environment variables (`DATABASE_PATH`, `PORT`, `GIN_MODE`, `FIXER_API_KEY`): operator-controlled, trusted.
+   SMTP, Pushover, Telegram, webhook and OIDC credentials are not env vars: they are stored in the settings
+   table and entered through `/api/settings/*`. The matching GET endpoints deliberately return only
+   `has_*` flags or blank the password; anything that returns a stored secret is a finding.
 
 ## What we want to hear about (rough severity rubric)
 
