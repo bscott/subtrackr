@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="/static/css/themes.css">
     <script src="/static/js/themes.js"></script>
     <script src="/static/js/mobile-menu.js"></script>
+    <script src="/static/js/escape-html.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
     <div class="flex flex-col min-h-screen">
@@ -268,14 +269,6 @@
         const year = parseInt({{.Year}}) || new Date().getFullYear();
         const month = parseInt({{.Month}}) || new Date().getMonth() + 1;
         const cancelByLabel = "{{t .Lang "calendar.cancel_by"}}";
-
-        // escapeHTML makes a value safe to interpolate into the cell markup,
-        // both as text and inside a quoted attribute.
-        function escapeHTML(value) {
-            return String(value).replace(/[&<>"']/g, ch => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            })[ch]);
-        }
 
         console.log('Calendar initialized:', { year, month, eventsCount: Object.keys(eventsByDate).length });
         

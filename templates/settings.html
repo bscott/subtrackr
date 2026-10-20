@@ -30,6 +30,7 @@
     <link rel="stylesheet" href="/static/css/themes.css">
     <script src="/static/js/themes.js"></script>
     <script src="/static/js/mobile-menu.js"></script>
+    <script src="/static/js/escape-html.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
     <div class="flex flex-col min-h-screen">
@@ -1550,14 +1551,6 @@
     </script>
     <script>
 // --- Category Management Vanilla JS ---
-// escapeHTML makes a value safe to interpolate into markup, both as text and
-// inside a quoted attribute.
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, ch => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[ch]);
-}
-
 function renderCategories(categories) {
     const list = document.getElementById('categories-list');
     if (!categories.length) {
@@ -1586,12 +1579,13 @@ function renderCategories(categories) {
     }).join('');
     // Attach edit form listeners
     categories.forEach(cat => {
-        const form = document.getElementById(`edit-category-form-${cat.id}`);
+        const id = Number(cat.id) || 0;
+        const form = document.getElementById(`edit-category-form-${id}`);
         if (form) {
             form.onsubmit = function(e) {
                 e.preventDefault();
                 const name = form.elements['name'].value;
-                fetch(`/api/categories/${cat.id}`, {
+                fetch(`/api/categories/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name })
