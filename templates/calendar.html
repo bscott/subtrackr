@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="/static/css/themes.css">
     <script src="/static/js/themes.js"></script>
     <script src="/static/js/mobile-menu.js"></script>
+    <script src="/static/js/escape-html.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
     <div class="flex flex-col min-h-screen">
@@ -309,15 +310,15 @@
                 if (hasEvents) {
                     content += '<div class="space-y-1">';
                     events.forEach(event => {
-                        const eventName = (event.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        const eventId = event.id || 0;
+                        const eventName = escapeHTML(event.name || '');
+                        const eventId = Number(event.id) || 0;
                         const iconURL = event.icon_url || '';
-                        const currencySymbol = event.currency_symbol || '';
+                        const currencySymbol = escapeHTML(event.currency_symbol || '');
                         const hasIcon = iconURL && iconURL.trim() !== '';
                         
                         let iconHtml = '';
                         if (hasIcon) {
-                            const safeIconURL = iconURL.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                            const safeIconURL = escapeHTML(iconURL);
                             iconHtml = `<img src="${safeIconURL}" alt="${eventName}" class="w-3 h-3 rounded mr-1.5 flex-shrink-0 inline-block" style="object-fit: contain;" onerror="this.style.display='none';">`;
                         }
                         
@@ -326,7 +327,7 @@
                         const buttonClass = isCancelBy
                             ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60'
                             : 'bg-blue-100 dark:bg-gray-700 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-gray-600';
-                        const safeCancelByLabel = cancelByLabel.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        const safeCancelByLabel = escapeHTML(cancelByLabel);
                         const eventTitle = isCancelBy
                             ? `${safeCancelByLabel}: ${eventName} - ${currencySymbol}${cost}`
                             : `${eventName} - ${currencySymbol}${cost}`;

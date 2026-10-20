@@ -325,7 +325,6 @@ func loadTemplates(catalog *i18n.Catalog) *template.Template {
 		"templates/settings.html",
 		"templates/subscription-form.html",
 		"templates/subscription-list.html",
-		"templates/categories-list.html",
 		"templates/api-keys-list.html",
 		"templates/smtp-message.html",
 		"templates/form-errors.html",

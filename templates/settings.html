@@ -30,6 +30,7 @@
     <link rel="stylesheet" href="/static/css/themes.css">
     <script src="/static/js/themes.js"></script>
     <script src="/static/js/mobile-menu.js"></script>
+    <script src="/static/js/escape-html.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
     <div class="flex flex-col min-h-screen">
@@ -611,9 +612,8 @@
                             <span class="text-sm text-gray-600 dark:text-gray-400">{{.CurrencySymbol}}</span>
                             <input type="number" 
                                    name="high_cost_threshold"
-                                   value="{{printf "%.2f" .HighCostThreshold}}"
+                                   value="{{formatAmount .HighCostThreshold .Currency}}"
                                    min="0"
-                                   max="10000"
                                    step="0.01"
                                    hx-post="/api/settings/notifications/threshold"
                                    hx-trigger="change"
@@ -1557,30 +1557,35 @@ function renderCategories(categories) {
         list.innerHTML = '<div class="text-center py-4 text-gray-500">No categories found.</div>';
         return;
     }
-    list.innerHTML = categories.map(cat => `
+    list.innerHTML = categories.map(cat => {
+        const id = Number(cat.id) || 0;
+        const name = escapeHTML(cat.name || '');
+        return `
         <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
             <div class="flex-1">
-                <span class="category-name text-sm font-medium text-gray-900" id="category-name-${cat.id}">${cat.name}</span>
-                <form id="edit-category-form-${cat.id}" class="hidden inline">
-                    <input type="text" name="name" value="${cat.name}" class="px-2 py-1 border border-gray-300 rounded text-sm">
+                <span class="category-name text-sm font-medium text-gray-900" id="category-name-${id}">${name}</span>
+                <form id="edit-category-form-${id}" class="hidden inline">
+                    <input type="text" name="name" value="${name}" class="px-2 py-1 border border-gray-300 rounded text-sm">
                     <button type="submit" class="text-primary text-sm font-medium ml-2">Save</button>
-                    <button type="button" onclick="cancelEdit(${cat.id})" class="text-gray-500 text-sm ml-1">Cancel</button>
+                    <button type="button" onclick="cancelEdit(${id})" class="text-gray-500 text-sm ml-1">Cancel</button>
                 </form>
             </div>
             <div class="flex items-center space-x-2">
-                <button onclick="startEdit(${cat.id})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
-                <button onclick="deleteCategory(${cat.id})" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
+                <button onclick="startEdit(${id})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                <button onclick="deleteCategory(${id})" class="text-red-600 hover:text-red-800 text-sm font-medium">Delete</button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     // Attach edit form listeners
     categories.forEach(cat => {
-        const form = document.getElementById(`edit-category-form-${cat.id}`);
+        const id = Number(cat.id) || 0;
+        const form = document.getElementById(`edit-category-form-${id}`);
         if (form) {
             form.onsubmit = function(e) {
                 e.preventDefault();
                 const name = form.elements['name'].value;
-                fetch(`/api/categories/${cat.id}`, {
+                fetch(`/api/categories/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name })

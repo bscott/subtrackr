@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -230,7 +231,9 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 
 	case "threshold":
 		thresholdStr := c.PostForm("high_cost_threshold")
-		if threshold, err := strconv.ParseFloat(thresholdStr, 64); err == nil && threshold >= 0 && threshold <= 10000 {
+		// No upper bound: the threshold is in the instance currency, and amounts
+		// in currencies like VND or KRW are routinely far above 10000.
+		if threshold, err := strconv.ParseFloat(thresholdStr, 64); err == nil && threshold >= 0 && !math.IsInf(threshold, 0) {
 			err := h.service.SetFloatSetting("high_cost_threshold", threshold)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -238,7 +241,7 @@ func (h *SettingsHandler) UpdateNotificationSetting(c *gin.Context) {
 			}
 			c.JSON(http.StatusOK, gin.H{"threshold": threshold})
 		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid threshold value (must be between 0 and 10000)"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid threshold value (must be a number of 0 or more)"})
 		}
 
 	case "cancellation":
