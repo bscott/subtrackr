@@ -1,14 +1,37 @@
 package database
 
 import (
+	"fmt"
 	"log"
 	"subtrackr/internal/models"
 
 	"gorm.io/gorm"
 )
 
-// RunMigrations executes all database migrations
+// RunMigrations executes all database migrations.
+//
+// Schema changes can rebuild a table (create a copy, drop the original,
+// rename). They run on one pinned connection with foreign keys off, as SQLite
+// requires, so dropping subscriptions neither fails on nor cascade-deletes
+// rows in subscription_tags. The connection gets its previous setting back
+// before it returns to the pool.
 func RunMigrations(db *gorm.DB) error {
+	return db.Connection(func(conn *gorm.DB) error {
+		// A fresh session keeps one statement's error from sticking to the next.
+		conn = conn.Session(&gorm.Session{})
+		var foreignKeys int
+		if err := conn.Raw("PRAGMA foreign_keys").Scan(&foreignKeys).Error; err != nil {
+			return err
+		}
+		if err := conn.Exec("PRAGMA foreign_keys = OFF").Error; err != nil {
+			return err
+		}
+		defer conn.Exec(fmt.Sprintf("PRAGMA foreign_keys = %d", foreignKeys))
+		return runMigrations(conn)
+	})
+}
+
+func runMigrations(db *gorm.DB) error {
 	// Auto-migrate non-problematic models first
 	err := db.AutoMigrate(&models.Category{}, &models.Settings{}, &models.APIKey{}, &models.ExchangeRate{}, &models.Tag{})
 	if err != nil {
