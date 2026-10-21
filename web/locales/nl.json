@@ -204,6 +204,7 @@
   "settings.telegram_configuration": "Telegram-configuratie",
   "settings.telegram_bot_token": "Bot-token",
   "settings.telegram_bot_token_placeholder": "Je Telegram-bot-token",
+  "settings.token_saved_placeholder": "Token opgeslagen – laat leeg om te behouden",
   "settings.telegram_bot_token_help": "Maak een bot aan en haal een token op bij",
   "settings.telegram_chat_id": "Chat-ID",
   "settings.telegram_chat_id_placeholder": "Je Telegram-chat-ID",

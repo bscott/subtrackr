@@ -204,6 +204,7 @@
   "settings.telegram_configuration": "Telegram Configuration",
   "settings.telegram_bot_token": "Bot Token",
   "settings.telegram_bot_token_placeholder": "Your Telegram Bot Token",
+  "settings.token_saved_placeholder": "Token saved — leave blank to keep it",
   "settings.telegram_bot_token_help": "Create a bot and get a token from",
   "settings.telegram_chat_id": "Chat ID",
   "settings.telegram_chat_id_placeholder": "Your Telegram Chat ID",

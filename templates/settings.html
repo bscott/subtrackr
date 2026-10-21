@@ -718,7 +718,7 @@
                             </div>
                             <div>
                                 <label for="pushover_app_token" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.pushover_app_token"}}</label>
-                                <input type="text" id="pushover_app_token" name="pushover_app_token" placeholder="{{t .Lang "settings.pushover_app_token_placeholder"}}" value="{{if .PushoverConfig}}{{.PushoverConfig.AppToken}}{{end}}"
+                                <input type="text" id="pushover_app_token" name="pushover_app_token" placeholder="{{if and .PushoverConfig .PushoverConfig.AppToken}}{{t .Lang "settings.token_saved_placeholder"}}{{else}}{{t .Lang "settings.pushover_app_token_placeholder"}}{{end}}" value=""
                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.pushover_app_token_help"}} <a href="https://pushover.net/apps/build" target="_blank" class="text-primary hover:underline">pushover.net/apps</a></p>
                             </div>
@@ -807,7 +807,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
                                 <label for="telegram_bot_token" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.telegram_bot_token"}}</label>
-                                <input type="text" id="telegram_bot_token" name="telegram_bot_token" placeholder="{{t .Lang "settings.telegram_bot_token_placeholder"}}" value="{{if .TelegramConfig}}{{.TelegramConfig.BotToken}}{{end}}"
+                                <input type="text" id="telegram_bot_token" name="telegram_bot_token" placeholder="{{if and .TelegramConfig .TelegramConfig.BotToken}}{{t .Lang "settings.token_saved_placeholder"}}{{else}}{{t .Lang "settings.telegram_bot_token_placeholder"}}{{end}}" value=""
                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.telegram_bot_token_help"}} <a href="https://t.me/BotFather" target="_blank" class="text-primary hover:underline">@BotFather</a></p>
                             </div>

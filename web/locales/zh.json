@@ -194,6 +194,7 @@
   "settings.telegram_configuration": "Telegram 配置",
   "settings.telegram_bot_token": "机器人令牌",
   "settings.telegram_bot_token_placeholder": "你的 Telegram 机器人令牌",
+  "settings.token_saved_placeholder": "令牌已保存 — 留空以保留",
   "settings.telegram_bot_token_help": "创建机器人并从以下地址获取令牌",
   "settings.telegram_chat_id": "聊天 ID",
   "settings.telegram_chat_id_placeholder": "你的 Telegram 聊天 ID",

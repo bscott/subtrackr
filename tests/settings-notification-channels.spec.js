@@ -81,10 +81,6 @@ test.describe('Pushover', () => {
   });
 
   test('does not render the saved app token back into the page', async ({ page }) => {
-    // App bug, unrelated to HTMX: settings.html renders PushoverConfig.AppToken
-    // into the input's value. Saving also requires the token every time, so the
-    // fix needs a "leave blank to keep" rule like the OIDC client secret.
-    test.fail();
     const token = `a-secret-${Date.now()}`;
     await page.goto('/settings');
     await page.locator('#pushover_user_key').fill('u-e2e-user-key');
@@ -207,9 +203,6 @@ test.describe('Telegram', () => {
   });
 
   test('does not render the saved bot token back into the page', async ({ page }) => {
-    // App bug, unrelated to HTMX: settings.html renders TelegramConfig.BotToken
-    // into the input's value. Saving also requires the token every time.
-    test.fail();
     const token = `987654:secret-${Date.now()}`;
     await page.goto('/settings');
     await page.locator('#telegram_bot_token').fill(token);
