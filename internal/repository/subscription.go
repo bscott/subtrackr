@@ -243,12 +243,6 @@ func (r *SubscriptionRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Subscription{}, id).Error
 }
 
-func (r *SubscriptionRepository) Count() int64 {
-	var count int64
-	r.db.Model(&models.Subscription{}).Count(&count)
-	return count
-}
-
 func (r *SubscriptionRepository) GetActiveSubscriptions() ([]models.Subscription, error) {
 	var subscriptions []models.Subscription
 	if err := r.db.Preload("Category").Preload("Tags").Where("status = ?", "Active").Find(&subscriptions).Error; err != nil {

@@ -14,10 +14,6 @@ func NewTagService(repo *repository.TagRepository) *TagService {
 	return &TagService{repo: repo}
 }
 
-func (s *TagService) GetAll() ([]models.Tag, error) {
-	return s.repo.GetAll()
-}
-
 // ParseTagsInput splits a comma-separated tag string into individual tag names.
 // Returns trimmed, non-empty names; case-insensitive deduplication happens
 // downstream in FindOrCreateByNames.

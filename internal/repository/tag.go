@@ -15,14 +15,6 @@ func NewTagRepository(db *gorm.DB) *TagRepository {
 	return &TagRepository{db: db}
 }
 
-func (r *TagRepository) GetAll() ([]models.Tag, error) {
-	var tags []models.Tag
-	if err := r.db.Order("name ASC").Find(&tags).Error; err != nil {
-		return nil, err
-	}
-	return tags, nil
-}
-
 // FindOrCreateByNames takes a slice of raw tag names and returns the corresponding Tag rows,
 // creating any that don't exist yet. Whitespace is trimmed and empty entries are dropped.
 // Names are case-preserving but matched case-insensitively (lowercased for lookup).

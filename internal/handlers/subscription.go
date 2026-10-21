@@ -1532,11 +1532,6 @@ func (h *SubscriptionHandler) ClearAllData(c *gin.Context) {
 	})
 }
 
-// Helper function to format currency
-func formatCurrency(amount float64) string {
-	return fmt.Sprintf("$%.2f", amount)
-}
-
 // Helper function to format date pointers
 func formatDate(date *time.Time) string {
 	if date == nil {

@@ -190,15 +190,6 @@ func (s *CurrencyService) IsEnabled() bool {
 	return s.apiKey != ""
 }
 
-// GetExchangeRate retrieves exchange rate between two currencies
-func (s *CurrencyService) GetExchangeRate(fromCurrency, toCurrency string) (float64, error) {
-	quote, err := s.exchangeRate(fromCurrency, toCurrency)
-	if err != nil {
-		return 0, err
-	}
-	return quote.Rate, nil
-}
-
 // ConvertAmount converts an amount from one currency to another
 func (s *CurrencyService) ConvertAmount(amount float64, fromCurrency, toCurrency string) (Conversion, error) {
 	if fromCurrency == toCurrency {
@@ -447,20 +438,4 @@ func (s *CurrencyService) refreshRates(ignoreCooldown bool) error {
 		log.Printf("Warning: failed to reset currency refresh failure count: %v", err)
 	}
 	return nil
-}
-
-// RefreshRates updates all exchange rates from the API
-func (s *CurrencyService) RefreshRates() error {
-	if !s.IsEnabled() {
-		return fmt.Errorf("currency service not enabled")
-	}
-
-	// Fetch one full EUR snapshot because the free Fixer.io plan only supports
-	// EUR as its base; all cross-rates are derived from that single response.
-	if err := s.refreshRates(true); err != nil {
-		return fmt.Errorf("failed to refresh rates: %w", err)
-	}
-
-	// Clean up old rates (keep last 7 days)
-	return s.repo.DeleteStaleRates(7 * 24 * time.Hour)
 }

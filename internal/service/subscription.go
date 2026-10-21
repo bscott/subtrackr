@@ -105,10 +105,6 @@ func (s *SubscriptionService) Duplicate(id uint) (*models.Subscription, []string
 	return created, tagNames, nil
 }
 
-func (s *SubscriptionService) Count() int64 {
-	return s.repo.Count()
-}
-
 func (s *SubscriptionService) GetStats(currencyService *CurrencyService, displayCurrency string) (*models.Stats, error) {
 	activeSubscriptions, err := s.repo.GetActiveSubscriptions()
 	if err != nil {

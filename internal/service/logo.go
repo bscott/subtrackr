@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -62,114 +61,5 @@ func (s *LogoService) FetchLogoFromURL(websiteURL string) (string, error) {
 	faviconURL := fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=64", url.QueryEscape(domain))
 
 	return faviconURL, nil
-}
-
-// GetLogoURL returns the logo URL for a subscription
-// Returns the stored IconURL if available, otherwise tries to fetch from URL
-func (s *LogoService) GetLogoURL(iconURL, websiteURL string) string {
-	// If icon URL is already set, return it
-	if iconURL != "" {
-		return iconURL
-	}
-
-	// If no website URL, return empty
-	if websiteURL == "" {
-		return ""
-	}
-
-	// Try to fetch logo from website URL
-	fetchedURL, err := s.FetchLogoFromURL(websiteURL)
-	if err != nil {
-		return ""
-	}
-
-	return fetchedURL
-}
-
-// ValidateLogoURL checks if a logo URL is accessible
-func (s *LogoService) ValidateLogoURL(logoURL string) bool {
-	if logoURL == "" {
-		return false
-	}
-
-	resp, err := s.httpClient.Head(logoURL)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	// Check if response is successful (2xx) and is an image
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
-// FetchAndValidateLogo fetches a logo and validates it's accessible
-func (s *LogoService) FetchAndValidateLogo(websiteURL string) (string, error) {
-	logoURL, err := s.FetchLogoFromURL(websiteURL)
-	if err != nil {
-		return "", err
-	}
-
-	// Validate the logo URL (check if it's accessible)
-	if !s.ValidateLogoURL(logoURL) {
-		// Still return the URL even if validation fails
-		// The browser will handle broken images gracefully
-		return logoURL, nil
-	}
-
-	return logoURL, nil
-}
-
-// ExtractDomain extracts the domain from a URL string
-// This is a helper method that reuses the domain extraction logic from FetchLogoFromURL
-func (s *LogoService) ExtractDomain(websiteURL string) string {
-	if websiteURL == "" {
-		return ""
-	}
-
-	// Normalize URL - add https:// if no protocol is specified
-	normalizedURL := strings.TrimSpace(websiteURL)
-	if !strings.HasPrefix(normalizedURL, "http://") && !strings.HasPrefix(normalizedURL, "https://") {
-		normalizedURL = "https://" + normalizedURL
-	}
-
-	parsedURL, err := url.Parse(normalizedURL)
-	if err != nil {
-		return ""
-	}
-
-	domain := parsedURL.Hostname()
-	if domain == "" {
-		// If hostname is empty, try using the path as domain
-		if parsedURL.Path != "" {
-			domain = strings.TrimPrefix(parsedURL.Path, "/")
-		} else {
-			return ""
-		}
-	}
-
-	domain = strings.TrimPrefix(domain, "www.")
-	domain = strings.TrimSuffix(domain, "/")
-	return domain
-}
-
-// DownloadLogo downloads a logo from a URL and returns the image data
-// This is for future use if we want to store logos locally
-func (s *LogoService) DownloadLogo(logoURL string) ([]byte, error) {
-	resp, err := s.httpClient.Get(logoURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download logo: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to download logo: status %d", resp.StatusCode)
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read logo data: %w", err)
-	}
-
-	return data, nil
 }
 
