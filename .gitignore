@@ -88,6 +88,10 @@ docker-data/
 .beads/daemon.pid
 .beads/daemon.lock
 .beads/export-state/
+.beads/dolt-monitor.pid
+.beads/dolt-server.port
+.beads/dolt-server.activity
+.beads/backup/
 
 # Project-specific
 # - plans/ : local planning docs only
