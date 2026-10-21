@@ -111,3 +111,4 @@ CleanShot*.png
 
 # Playwright E2E server database (see playwright.config.js)
 test-data/
+test-data-isolated/
