@@ -224,10 +224,6 @@ test.describe('backup and restore', () => {
   });
 
   test('restoring keeps reminders turned off', async ({ page, request }) => {
-    // BUG: same GORM `default:true` problem as the Wallos import: a backup
-    // entry with "reminder_enabled": false is restored with reminders on.
-    // Remove test.fail() once restored reminders stay off.
-    test.fail();
     const backup = { version: '1.0', subscriptions: [{
       name: 'Quiet Sub', cost: 3, schedule: 'Monthly', status: 'Active', original_currency: 'USD',
       reminder_enabled: false, category: { name: 'General' },
@@ -293,11 +289,6 @@ test.describe('Wallos import', () => {
   });
 
   test('entries with notifications disabled import with reminders off', async ({ page, request }) => {
-    // BUG: the Wallos parser maps "Notifications": "Disabled" to
-    // ReminderEnabled=false, but the model's `gorm:"default:true"` makes GORM
-    // insert true for the false zero value, so reminders end up on.
-    // Remove test.fail() once imported reminders stay off.
-    test.fail();
     await importWallos(page, jsonFile('wallos.json', wallosExport), 'merge');
     await expect(page.locator('#wallos-message')).toHaveText('Successfully imported 3 subscriptions from Wallos');
     const adobe = (await allSubscriptions(request)).find((s) => s.name === 'Adobe CC');

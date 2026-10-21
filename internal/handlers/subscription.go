@@ -1314,8 +1314,8 @@ func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
 	defer file.Close()
 
 	var backup struct {
-		Version       string                `json:"version"`
-		Subscriptions []models.Subscription `json:"subscriptions"`
+		Version       string            `json:"version"`
+		Subscriptions []json.RawMessage `json:"subscriptions"`
 	}
 
 	decoder := json.NewDecoder(file)
@@ -1327,6 +1327,17 @@ func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
 	if len(backup.Subscriptions) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Backup file contains no subscriptions"})
 		return
+	}
+
+	// Parse every entry before replace mode deletes anything. Entries from
+	// backups without reminder_enabled keep reminders on.
+	subs := make([]models.Subscription, len(backup.Subscriptions))
+	for i, raw := range backup.Subscriptions {
+		subs[i].ReminderEnabled = true
+		if err := json.Unmarshal(raw, &subs[i]); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid backup file format"})
+			return
+		}
 	}
 
 	mode := c.PostForm("mode")
@@ -1360,7 +1371,7 @@ func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
 
 	imported := 0
 	var errors []string
-	for _, sub := range backup.Subscriptions {
+	for _, sub := range subs {
 		if sub.Category.Name != "" {
 			if catID, ok := categoryMap[sub.Category.Name]; ok {
 				sub.CategoryID = catID

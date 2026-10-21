@@ -70,11 +70,6 @@ test.describe('subscription form', () => {
   });
 
   test('unchecking reminders on create saves them disabled', async ({ page, request }) => {
-    // APP BUG (Go, unrelated to HTMX): the form posts reminder_enabled=false, but
-    // SubscriptionRepository.Create uses GORM Create and the `default:true` tag on
-    // Subscription.ReminderEnabled replaces the zero value, so reminders stay on.
-    // Editing works (see the next test). Remove test.fail() once the server is fixed.
-    test.fail();
     const name = uniqueName('Create No Reminder');
     const category = await createCategory(request);
     await gotoSubscriptions(page);

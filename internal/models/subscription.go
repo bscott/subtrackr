@@ -32,7 +32,7 @@ type Subscription struct {
 	ScheduleInterval               int        `json:"schedule_interval" gorm:"default:1"`
 	ShareCount                     int        `json:"share_count" gorm:"default:1"`              // Number of people splitting this subscription; 1 means not shared
 	CancellationNoticeDays         int        `json:"cancellation_notice_days" gorm:"default:0"` // Days before renewal the provider requires cancellation notice; 0 = none
-	ReminderEnabled                bool       `json:"reminder_enabled" gorm:"default:true"`
+	ReminderEnabled                bool       `json:"reminder_enabled"`                          // No gorm default: GORM would turn an explicit false into true on Create. Create paths default it to true.
 	DateCalculationVersion         int        `json:"date_calculation_version" gorm:"default:1"`
 	LastReminderSent               *time.Time `json:"last_reminder_sent" gorm:""`              // Tracks when the last reminder was sent
 	LastReminderRenewalDate        *time.Time `json:"last_reminder_renewal_date" gorm:""`      // Tracks which renewal date the last reminder was for

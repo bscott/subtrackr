@@ -109,6 +109,7 @@ func main() {
 			URL:              input.URL,
 			Notes:            input.Notes,
 			CategoryID:       input.CategoryID,
+			ReminderEnabled:  true,
 
 			CancellationNoticeDays: models.ClampCancellationNoticeDays(input.CancellationNoticeDays),
 		}
