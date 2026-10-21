@@ -12,7 +12,6 @@ test('language selector switches nav to Spanish', async ({ page, request }) => {
   // Nav should be Spanish
   await expect(page.getByRole('link', { name: /Suscripciones/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Panel/ })).toBeVisible();
-  await page.screenshot({ path: 'screenshots/v0.6.0-spanish.png', fullPage: true });
 });
 
 test('settings page shows language selector with options', async ({ request, page }) => {
@@ -26,5 +25,4 @@ test('settings page shows language selector with options', async ({ request, pag
   expect(options).toContain('Español');
   expect(options).toContain('Deutsch');
   expect(options).toContain('Nederlands');
-  await page.screenshot({ path: 'screenshots/v0.6.0-language-selector.png', fullPage: false });
 });
