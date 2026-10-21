@@ -7,11 +7,16 @@ test('language selector switches nav to Spanish', async ({ page, request }) => {
     data: { lang: 'es' },
   });
 
-  await page.goto('/subscriptions');
-  await page.waitForLoadState('networkidle');
-  // Nav should be Spanish
-  await expect(page.getByRole('link', { name: /Suscripciones/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Panel/ })).toBeVisible();
+  try {
+    await page.goto('/subscriptions');
+    await page.waitForLoadState('networkidle');
+    // Nav should be Spanish
+    await expect(page.getByRole('link', { name: /Suscripciones/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Panel/ })).toBeVisible();
+  } finally {
+    // Language is global server state; restore it so parallel specs see English.
+    await request.post('/api/settings/language', { data: { lang: 'en' } });
+  }
 });
 
 test('settings page shows language selector with options', async ({ request, page }) => {
