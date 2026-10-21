@@ -104,3 +104,6 @@ CleanShot*.png
 
 # Dolt database files (added by bd init)
 .dolt/
+
+# Playwright E2E server database (see playwright.config.js)
+test-data/

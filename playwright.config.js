@@ -29,7 +29,11 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        /* Optional: reuse a preinstalled Chrome instead of `npx playwright install`. */
+        launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined },
+      },
     },
 
     {
@@ -65,8 +69,8 @@ module.exports = defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'go run .',
-    url: 'http://localhost:8082',
+    command: 'rm -rf test-data && mkdir -p test-data && PORT=8082 DATABASE_PATH=./test-data/e2e.db go run ./cmd/server',
+    url: 'http://localhost:8082/healthz',
     reuseExistingServer: !process.env.CI,
   },
 });
