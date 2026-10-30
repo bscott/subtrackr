@@ -457,3 +457,82 @@ func (e *EmailService) SendCancellationReminder(subscription *models.Subscriptio
 	subject := fmt.Sprintf("Cancellation Reminder: %s ends in %d %s", subscription.Name, daysUntilCancellation, daysText)
 	return e.SendEmail(subject, buf.String())
 }
+
+// SendToCancelReminder sends an email reminder to cancel a subscription.
+func (e *EmailService) SendToCancelReminder(subscription *models.Subscription, daysLeft int) error {
+	subject, body, err := e.renderToCancelReminder(subscription, daysLeft)
+	if err != nil {
+		return err
+	}
+	return e.SendEmail(subject, body)
+}
+
+func (e *EmailService) renderToCancelReminder(subscription *models.Subscription, daysLeft int) (string, string, error) {
+	tmpl := `
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<style>
+		body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+		.container { max-width: 600px; margin: 0 auto; padding: 20px; }
+		.reminder { background-color: #fff3cd; border: 1px solid #856404; border-radius: 5px; padding: 15px; margin: 20px 0; }
+		.subscription-details { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+		.detail-row { margin: 10px 0; }
+		.label { font-weight: bold; }
+		.footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h2>Subscription Reminder to Cancel</h2>
+		<div class="reminder">
+			<strong>🚫 Reminder:</strong> {{.Content.Lead}}
+		</div>
+		<div class="subscription-details">
+			<h3>Subscription Details</h3>
+			<div class="detail-row"><span class="label">Name:</span> {{.Subscription.Name}}</div>
+			<div class="detail-row"><span class="label">Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.Cost .Currency}} {{.Subscription.DisplaySchedule}}</div>
+			<div class="detail-row"><span class="label">Monthly Cost:</span> {{.CurrencySymbol}}{{formatAmount .Subscription.MonthlyCost .Currency}}</div>
+			{{if .Subscription.Category.Name}}<div class="detail-row"><span class="label">Category:</span> {{.Subscription.Category.Name}}</div>{{end}}
+			{{if .Content.CancelBy}}<div class="detail-row"><span class="label">Cancel By:</span> {{.Content.CancelBy}}</div>{{end}}
+			<div class="detail-row"><span class="label">Renewal Date:</span> {{.Content.Renewal}}</div>
+			{{if .Content.URL}}<div class="detail-row"><span class="label">URL:</span> <a href="{{.Content.URL}}">{{.Content.URL}}</a></div>{{end}}
+		</div>
+		<div class="footer">
+			<p>This is an automated reminder from SubTrackr, sent because this subscription is marked to cancel.</p>
+			<p>You can turn it off by editing the subscription.</p>
+		</div>
+	</div>
+</body>
+</html>
+`
+
+	content := buildToCancelReminderContent(subscription, daysLeft, e.settingsService)
+	data := struct {
+		Subscription   *models.Subscription
+		Content        toCancelReminderContent
+		CurrencySymbol string
+		Currency       string
+	}{subscription, content, currencySymbolForSubscription(subscription, e.settingsService), currencyCodeForSubscription(subscription, e.settingsService)}
+
+	t, err := template.New("toCancelReminder").Funcs(template.FuncMap{"formatAmount": FormatAmount}).Parse(tmpl)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse email template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		return "", "", fmt.Errorf("failed to execute email template: %w", err)
+	}
+	return content.Title, buf.String(), nil
+}
+
+// Name identifies the channel in delivery reports and logs.
+func (e *EmailService) Name() string { return "email" }
+
+// IsConfigured reports whether an SMTP server and recipient have been saved.
+func (e *EmailService) IsConfigured() bool {
+	config, err := e.settingsService.GetSMTPConfig()
+	return err == nil && config.Host != "" && config.To != ""
+}

@@ -154,26 +154,7 @@ func (t *TelegramService) SendHighCostAlert(subscription *models.Subscription) e
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol - use subscription's own currency if it differs from preferred
-	currencySymbol := currencySymbolForSubscription(subscription, t.settingsService)
-	currencyCode := currencyCodeForSubscription(subscription, t.settingsService)
-
-	// Build message
-	message := "⚠️ High Cost Alert\n\n"
-	message += fmt.Sprintf("Subscription: %s\n", subscription.Name)
-	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
-	if subscription.Category.Name != "" {
-		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
-	}
-	if subscription.RenewalDate != nil {
-		message += fmt.Sprintf("Next Renewal: %s\n", subscription.RenewalDate.Format(t.settingsService.GetGoDateFormatLong()))
-	}
-	if subscription.URL != "" {
-		message += fmt.Sprintf("URL: %s", subscription.URL)
-	}
-
-	title := fmt.Sprintf("High Cost Alert: %s", subscription.Name)
+	title, message := highCostAlertText(subscription, t.settingsService)
 	return t.SendNotification(title, message)
 }
 
@@ -197,30 +178,21 @@ func (t *TelegramService) SendCancellationReminder(subscription *models.Subscrip
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol - use subscription's own currency if it differs from preferred
-	currencySymbol := currencySymbolForSubscription(subscription, t.settingsService)
-	currencyCode := currencyCodeForSubscription(subscription, t.settingsService)
-
-	// Build message
-	daysText := "days"
-	if daysUntilCancellation == 1 {
-		daysText = "day"
-	}
-	message := "⚠️ Cancellation Reminder\n\n"
-	message += fmt.Sprintf("Your subscription %s will end in %d %s.\n\n", subscription.Name, daysUntilCancellation, daysText)
-	message += "Subscription Details:\n"
-	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
-	if subscription.Category.Name != "" {
-		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
-	}
-	if subscription.CancellationDate != nil {
-		message += fmt.Sprintf("Cancellation Date: %s\n", subscription.CancellationDate.Format(t.settingsService.GetGoDateFormatLong()))
-	}
-	if subscription.URL != "" {
-		message += fmt.Sprintf("URL: %s", subscription.URL)
-	}
-
-	title := fmt.Sprintf("Cancellation Reminder: %s", subscription.Name)
+	title, message := cancellationReminderText(subscription, daysUntilCancellation, t.settingsService)
 	return t.SendNotification(title, message)
+}
+
+// SendToCancelReminder sends a Telegram reminder to cancel a subscription.
+func (t *TelegramService) SendToCancelReminder(subscription *models.Subscription, daysLeft int) error {
+	content := buildToCancelReminderContent(subscription, daysLeft, t.settingsService)
+	return t.SendNotification(content.Title, toCancelReminderMessage(subscription, content, t.settingsService))
+}
+
+// Name identifies the channel in delivery reports and logs.
+func (t *TelegramService) Name() string { return "telegram" }
+
+// IsConfigured reports whether a bot token and chat ID have been saved.
+func (t *TelegramService) IsConfigured() bool {
+	config, err := t.settingsService.GetTelegramConfig()
+	return err == nil && config.BotToken != "" && config.ChatID != ""
 }

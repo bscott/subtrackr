@@ -1,4 +1,4 @@
-<div id="subscription-list" class="overflow-x-auto" data-sort-spec="{{.SortSpec}}">
+<div id="subscription-list" class="overflow-x-auto" data-sort-spec="{{.SortSpec}}" hx-sync="queue last">
     {{if .Subscriptions}}
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-800">
@@ -85,6 +85,9 @@
                                 {{if not .ReminderEnabled}}
                                 <span title="{{t $.Lang "common.reminders_disabled"}}" class="inline-flex text-gray-400 dark:text-gray-500"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/><line x1="3" y1="3" x2="21" y2="21" stroke-width="2" stroke-linecap="round"/></svg></span>
                                 {{end}}
+                                {{if .ToCancel}}
+                                <span data-to-cancel title="{{t $.Lang "subscriptions.to_cancel_title"}}" class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-300">{{t $.Lang "subscriptions.to_cancel"}}</span>
+                                {{end}}
                                 {{if not .HasAutopaySetting}}
                                 <span data-autopay-state="unknown" class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-300">{{t $.Lang "subscriptions.payment_not_set"}}</span>
                                 {{else if .AutopayEnabled}}
@@ -110,7 +113,7 @@
                     </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900 dark:text-white">{{.Category.Name}}</div>
+                    <div class="text-sm text-gray-900 dark:text-white">{{if .Category.Name}}{{.Category.Name}}{{else}}{{t $.Lang "common.uncategorized"}}{{end}}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     {{if .ShowConversion}}
@@ -146,8 +149,14 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {{if .RenewalDate}}
                     {{fmtDate .RenewalDate $.GoDateFormat}}
-                    {{if and .CancelByDate (eq .Status "Active")}}
+                    {{if and .CancelByDate (or (eq .Status "Active") (eq .Status "Trial"))}}
                     <div data-cancel-by class="text-xs text-amber-700 dark:text-amber-300">{{t $.Lang "subscriptions.cancel_by"}} {{fmtDate .CancelByDate $.GoDateFormat}}</div>
+                    {{end}}
+                    {{if .ToCancelDeadlineMissed}}
+                    <div data-to-cancel-missed class="whitespace-normal max-w-48 text-xs text-red-700 dark:text-red-300">{{t $.Lang "subscriptions.to_cancel_missed"}}</div>
+                    {{end}}
+                    {{if and .ToCancel (eq .Status "Paused")}}
+                    <div data-to-cancel-paused class="whitespace-normal max-w-48 text-xs text-amber-700 dark:text-amber-300">{{t $.Lang "subscriptions.to_cancel_paused"}}</div>
                     {{end}}
                     {{else}}
                     <span class="text-gray-400 dark:text-gray-500">—</span>
@@ -177,7 +186,7 @@
                             hx-get="/form/subscription/{{.ID}}"
                             hx-target="#modal-content"
                             hx-trigger="click"
-                            onclick="document.getElementById('modal').classList.remove('hidden')"
+                            onclick="openModal(this)"
                             class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
                             title="{{t $.Lang "common.edit"}}">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,6 +196,7 @@
                         <button
                             hx-post="/api/subscriptions/{{.ID}}/duplicate"
                             hx-confirm="{{t $.Lang "subscriptions.duplicate_confirm"}}"
+                            hx-swap="none"
                             class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
                             title="{{t $.Lang "common.duplicate"}}">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -220,7 +230,7 @@
             hx-get="/form/subscription"
             hx-target="#modal-content"
             hx-trigger="click"
-            onclick="document.getElementById('modal').classList.remove('hidden')"
+            onclick="openModal(this)"
             class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 transition-colors duration-150">
             {{t .Lang "subscriptions.add_first"}}
         </button>

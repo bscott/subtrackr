@@ -125,48 +125,61 @@ document.addEventListener('click', function(event) {
 });
 
 function getSortRequestURL(detail) {
-    const path = (detail.xhr && detail.xhr.responseURL) || (detail.requestConfig && detail.requestConfig.path);
-    if (!path) return null;
+    const action = detail && detail.ctx && detail.ctx.request && detail.ctx.request.action;
+    if (!action) return null;
     try {
-        return new URL(path, window.location.origin);
+        return new URL(action, window.location.origin);
     } catch (error) {
         return null;
     }
 }
 
-document.addEventListener('htmx:beforeSwap', function(event) {
+function isSortRequest(url) {
+    return url !== null && url.pathname === '/api/subscriptions' && url.searchParams.has('sorts');
+}
+
+function isLatestSortRequest(url) {
+    return Number(url.searchParams.get('sort_request')) === latestSortRequestID;
+}
+
+document.addEventListener('htmx:before:swap', function(event) {
     const url = getSortRequestURL(event.detail);
-    if (!url || url.pathname !== '/api/subscriptions' || !url.searchParams.has('sorts')) return;
+    if (!isSortRequest(url)) return;
 
     const requestID = Number(url.searchParams.get('sort_request'));
     const responseSpec = serializeSortRules(parseSortSpec(url.searchParams.get('sorts') || ''));
     if (!Number.isInteger(requestID) || requestID !== latestSortRequestID || responseSpec !== pendingSortSpec) {
-        event.detail.shouldSwap = false;
+        event.preventDefault();
         return;
     }
     pendingSortSpec = null;
 });
 
-document.addEventListener('htmx:afterRequest', function(event) {
-    if (!event.detail.failed) return;
+// htmx:after:request only fires once a response arrives. An HTTP error for the
+// latest sort is never swapped (htmx-setup.js drops non-HTML responses), so
+// forget the pending spec here and build the next click on the rendered order.
+document.addEventListener('htmx:after:request', function(event) {
+    const ctx = event.detail.ctx;
+    if (!ctx || !ctx.response || ctx.response.status < 400) return;
     const url = getSortRequestURL(event.detail);
-    if (url && url.pathname === '/api/subscriptions' && url.searchParams.has('sorts') && Number(url.searchParams.get('sort_request')) === latestSortRequestID) {
+    if (isSortRequest(url) && isLatestSortRequest(url)) {
         pendingSortSpec = null;
     }
 });
 
-document.addEventListener('htmx:configRequest', function(event) {
-    const path = event.detail.path;
-    if (!path || !path.includes('/api/subscriptions')) return;
-
-    try {
-        const url = new URL(path, window.location.origin);
-        if (url.searchParams.has('sorts')) {
-            saveSortPreference(serializeSortRules(parseSortSpec(url.searchParams.get('sorts') || '')));
-        }
-    } catch (error) {
-        console.error('Failed to extract sort preference:', error);
+// Network failures, timeouts and aborts never produce a response; HTMX 4
+// reports them as htmx:error instead.
+document.addEventListener('htmx:error', function(event) {
+    const url = getSortRequestURL(event.detail);
+    if (isSortRequest(url) && isLatestSortRequest(url)) {
+        pendingSortSpec = null;
     }
+});
+
+document.addEventListener('htmx:config:request', function(event) {
+    const url = getSortRequestURL(event.detail);
+    if (!isSortRequest(url)) return;
+    saveSortPreference(serializeSortRules(parseSortSpec(url.searchParams.get('sorts') || '')));
 });
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -174,4 +187,4 @@ document.addEventListener('DOMContentLoaded', function() {
     applySavedSortPreference();
 });
 
-document.addEventListener('htmx:afterSwap', updateSortIndicators);
+document.addEventListener('htmx:after:swap', updateSortIndicators);

@@ -654,6 +654,7 @@ func (h *SettingsHandler) GetTheme(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"theme": theme,
+		"saved": err == nil,
 	})
 }
 
@@ -664,6 +665,12 @@ func (h *SettingsHandler) SavePushoverSettings(c *gin.Context) {
 	// Parse form data
 	config.UserKey = c.PostForm("pushover_user_key")
 	config.AppToken = c.PostForm("pushover_app_token")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.AppToken == "" {
+		if existing, err := h.service.GetPushoverConfig(); err == nil && existing != nil {
+			config.AppToken = existing.AppToken
+		}
+	}
 
 	// Validate required fields
 	if config.UserKey == "" || config.AppToken == "" {
@@ -697,6 +704,12 @@ func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
 	// Parse form data
 	config.UserKey = c.PostForm("pushover_user_key")
 	config.AppToken = c.PostForm("pushover_app_token")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.AppToken == "" {
+		if existing, err := h.service.GetPushoverConfig(); err == nil && existing != nil {
+			config.AppToken = existing.AppToken
+		}
+	}
 
 	// Validate required fields
 	if config.UserKey == "" || config.AppToken == "" {
@@ -909,6 +922,12 @@ func (h *SettingsHandler) SaveTelegramSettings(c *gin.Context) {
 	// Parse form data
 	config.BotToken = c.PostForm("telegram_bot_token")
 	config.ChatID = c.PostForm("telegram_chat_id")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.BotToken == "" {
+		if existing, err := h.service.GetTelegramConfig(); err == nil && existing != nil {
+			config.BotToken = existing.BotToken
+		}
+	}
 
 	// Validate required fields
 	if config.BotToken == "" || config.ChatID == "" {
@@ -942,6 +961,12 @@ func (h *SettingsHandler) TestTelegramConnection(c *gin.Context) {
 	// Parse form data
 	config.BotToken = c.PostForm("telegram_bot_token")
 	config.ChatID = c.PostForm("telegram_chat_id")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.BotToken == "" {
+		if existing, err := h.service.GetTelegramConfig(); err == nil && existing != nil {
+			config.BotToken = existing.BotToken
+		}
+	}
 
 	// Validate required fields
 	if config.BotToken == "" || config.ChatID == "" {
@@ -1143,11 +1168,12 @@ func (h *SettingsHandler) SetTheme(c *gin.Context) {
 
 	// Validate theme name
 	validThemes := map[string]bool{
-		"default":   true,
-		"dark":      true,
-		"christmas": true,
-		"midnight":  true,
-		"ocean":     true,
+		"default":      true,
+		"dark":         true,
+		"dark-classic": true,
+		"christmas":    true,
+		"midnight":     true,
+		"ocean":        true,
 	}
 
 	if !validThemes[req.Theme] {

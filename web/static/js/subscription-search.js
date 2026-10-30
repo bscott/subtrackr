@@ -31,9 +31,15 @@
     }
 
     document.addEventListener('DOMContentLoaded', initializeSubscriptionSearch);
-    document.addEventListener('htmx:afterSwap', (event) => {
-        if (event.detail.target && event.detail.target.id === 'subscription-list') {
+    // An outerHTML swap replaces #subscription-list, so look the list up by id
+    // instead of trusting the (now detached) swap target. Re-apply after settle
+    // too: settling restores the server-rendered attributes of id-matched
+    // elements such as #subscription-search-empty, undoing the after:swap pass.
+    function reapplyAfterListSwap() {
+        if (document.getElementById('subscription-list')) {
             applySubscriptionSearch();
         }
-    });
+    }
+    document.addEventListener('htmx:after:swap', reapplyAfterListSwap);
+    document.addEventListener('htmx:after:settle', reapplyAfterListSwap);
 })();

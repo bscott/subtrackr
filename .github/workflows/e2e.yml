@@ -1,0 +1,97 @@
+name: E2E
+
+# Browser end-to-end suite (Playwright) plus the Go MCP stdio integration test.
+# Each browser project runs in its own job so a failure in one engine does not
+# hide the others, and every job uploads its report, traces, screenshots and
+# videos whether it passed or failed. CI permits two retries; a retry that passes
+# is reported as flaky, so inspect flaky counts as well as the job status.
+# Tests that still fail after retries make the job fail.
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main, 'v[0-9]+.[0-9]+.[0-9]+' ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mcp:
+    name: MCP stdio (Go)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+      - name: MCP server integration test
+        run: go test -v -run TestMCPServerOverStdio ./cmd/mcp/
+
+  playwright:
+    name: Playwright (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          - project: firefox
+            browser: firefox
+          - project: webkit
+            browser: webkit
+          - project: isolated
+            browser: chromium
+          - project: mobile-chromium
+            browser: chromium
+          - project: mobile-webkit
+            browser: webkit
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Playwright
+        run: npm ci --no-audit --no-fund
+
+      - name: Test server isolation guards
+        run: node --test tests/helpers/server-process.test.cjs
+
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Build server (warms the Go build cache for the test servers)
+        run: go build ./...
+
+      - name: Run ${{ matrix.project }} project
+        env:
+          CI: 'true'
+        run: npx playwright test --project ${{ matrix.project }}
+
+      - name: Upload report and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.project }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
