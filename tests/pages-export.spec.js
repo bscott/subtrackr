@@ -30,7 +30,7 @@ test('CSV export is a quoted attachment with one record per subscription', async
     const { header, records } = csvRecords(await response.text());
     expect(header).toEqual(['ID', 'Name', 'Category', 'Cost', 'Currency', 'Schedule', 'Schedule Interval', 'Status',
       'Payment Method', 'Autopay', 'Account', 'Start Date', 'Renewal Date', 'Cancellation Date',
-      'Cancellation Notice Days', 'URL', 'Notes', 'Usage', 'Created At']);
+      'Cancellation Notice Days', 'URL', 'Notes', 'Usage', 'Created At', 'To Cancel', 'To Cancel Reminder Days']);
     for (const record of records) expect(Object.keys(record)).toHaveLength(header.length);
 
     const row = records.find(r => r.ID === String(quarterly.id));
@@ -118,9 +118,6 @@ test('iCal export has a recurring event per active subscription and a cancel-by 
 });
 
 test('iCal export escapes commas and semicolons in names', async ({ request }) => {
-  // BUG: SUMMARY/DESCRIPTION are written raw. RFC 5545 §3.3.11 requires "," and ";" in TEXT
-  // values to be escaped as "\," and "\;", so calendar clients can split or truncate these names.
-  test.fail();
   const data = fixtures(request);
   try {
     const category = await data.category(uniqueName('Export ical escaping'));
@@ -128,6 +125,26 @@ test('iCal export escapes commas and semicolons in names', async ({ request }) =
     const events = icalEvents(await (await request.get('/api/export/ical')).text());
     const event = events.find(e => e.UID?.startsWith(`subtrackr-${sub.id}-`));
     expect(event?.SUMMARY).toBe(`${sub.name.replace(/[,;]/g, m => `\\${m}`)} Renewal`);
+  } finally {
+    await data.cleanup();
+  }
+});
+
+test('iCal export keeps line breaks and backslashes inside text values', async ({ request }) => {
+  const data = fixtures(request);
+  try {
+    const category = await data.category(uniqueName('Calendar text'));
+    const sub = await data.subscription({
+      name: 'Gym\\Pool\r\nSUMMARY:Injected', category_id: String(category.id),
+      renewal_date: isoDate(daysFromNow(30)), cancellation_notice_days: '3',
+    });
+    const text = await (await request.get('/api/export/ical')).text();
+    expect(text).not.toContain('\r\nSUMMARY:Injected');
+    const events = icalEvents(text);
+    expect(events.find(e => e.UID?.startsWith(`subtrackr-${sub.id}-`)).SUMMARY)
+      .toBe('Gym\\\\Pool\\nSUMMARY:Injected Renewal');
+    expect(events.find(e => e.UID?.startsWith(`subtrackr-cancelby-${sub.id}-`)).SUMMARY)
+      .toBe('Cancel Gym\\\\Pool\\nSUMMARY:Injected by today');
   } finally {
     await data.cleanup();
   }

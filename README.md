@@ -52,6 +52,7 @@ Themes persist across all pages and are saved per user. Change themes anytime fr
 - 📈 **Analytics**: Visualize spending by category and track savings
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
 - 📱 **Pushover Notifications**: Receive push notifications on your mobile device
+- 🔔 **ntfy and Gotify Notifications**: Push to ntfy.sh or your own ntfy or Gotify server, including over HTTP on your LAN
 - 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
 - 🎨 **Beautiful Themes**: 5 stunning themes including a festive Christmas theme with snowfall animation
 - 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT, and CNY (with optional real-time conversion)
@@ -287,6 +288,35 @@ Receive push notifications on your mobile device via Pushover:
    - **High Cost Alerts**: Receive alerts when adding expensive subscriptions (uses the same threshold as email alerts)
 
 **Note**: Pushover notifications work alongside email notifications. Both will be sent when enabled, giving you multiple ways to stay informed about your subscriptions.
+
+### ntfy and Gotify Notifications
+
+Send the same renewal, cancellation and high-cost notifications to a self-hostable push server. Both work over HTTPS and over plain HTTP on your LAN.
+
+**ntfy** (Settings → ntfy Notifications):
+
+- **Server URL**: defaults to `https://ntfy.sh`; enter your own server if you host one
+- **Topic**: letters, digits, `-` and `_`. On a public server anyone who knows the topic can read it, so pick one that is hard to guess
+- **Access Token**: optional, for protected topics
+- **Priority**: 1 (min) to 5 (max)
+
+**Gotify** (Settings → Gotify Notifications):
+
+- **Server URL**: the address of your Gotify server
+- **Application Token**: create an application under Apps in Gotify
+- **Priority**: 0 to 10
+
+**Test Connection** sends a message using what is currently in the form without saving it. Saved tokens are never shown again: leave the field blank to keep a token. If you change the server URL you must enter the token again, so a saved token is never sent to a server it was not entered for.
+
+### To Cancel reminders
+
+Mark a subscription **To cancel** and choose a reminder 3, 5 or 14 days before its deadline. The deadline is the renewal date minus any cancellation notice period. Active and Trial subscriptions are eligible; Paused subscriptions retain the choice but do not send. Marking a subscription Cancelled clears it.
+
+This choice works independently of regular renewal reminders and suppresses the regular renewal message for that subscription. A reminder is recorded only when at least one configured channel accepts it. Failed delivery is retried on the next daily check while the deadline is still upcoming. After partial delivery, channels that failed are not retried separately.
+
+Missed deadlines are shown in the app and do not generate late reminders. If the notice period is as long as the billing cycle, the current deadline may already be missed. Active renewals roll forward automatically (on the renewal day); Trial dates remain fixed until edited. Choose a lead time that leaves time to act, rather than relying on a notification on the final day. The intent and delivery history survive backup/restore; duplicating a subscription starts a new reminder history.
+
+Date preferences include `MM/DD/YYYY`, `DD/MM/YYYY`, `YYYY-MM-DD` and `DD.MM.YYYY`. CSV and calendar exports keep their machine-readable date formats.
 
 ### Data Persistence
 

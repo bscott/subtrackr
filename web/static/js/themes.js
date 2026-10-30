@@ -117,9 +117,19 @@ const themes = {
     }
 };
 
-// Apply theme to document
+const DEFAULT_THEME = 'dark-classic';
+const THEME_STORAGE_KEY = 'subtrackr-theme';
+
+function isKnownTheme(themeName) {
+    return Object.prototype.hasOwnProperty.call(themes, themeName);
+}
+
+// Apply theme to document. Purely visual: nothing is stored or sent anywhere.
+// Fires "subtrackr:themechange" on document so page scripts (the settings
+// picker) can reflect the active theme.
 function applyTheme(themeName) {
-    const theme = themes[themeName] || themes['dark-classic'];
+    if (!isKnownTheme(themeName)) themeName = DEFAULT_THEME;
+    const theme = themes[themeName];
     const root = document.documentElement;
 
     // Set theme data attribute
@@ -150,49 +160,88 @@ function applyTheme(themeName) {
         disableSnowfall();
     }
 
-    // Save theme preference to localStorage AND server
-    localStorage.setItem('subtrackr-theme', themeName);
-    saveThemePreference(themeName);
+    document.dispatchEvent(new CustomEvent('subtrackr:themechange', { detail: { theme: themeName } }));
+    return themeName;
+}
+
+// The user picked a theme: apply it, remember it in this browser and save it
+// on the server so other browsers pick it up. This is the only place the
+// preference is written.
+let themeChoiceVersion = 0;
+function setTheme(themeName) {
+    themeChoiceVersion++;
+    const applied = applyTheme(themeName);
+    rememberTheme(applied);
+    return saveThemePreference(applied);
+}
+
+function rememberTheme(themeName) {
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, themeName);
+    } catch (err) {
+        // Storage can be unavailable (private mode, quota); the server copy still works.
+    }
 }
 
 // Save theme preference to server
 function saveThemePreference(themeName) {
-    fetch('/api/settings/theme', {
+    return fetch('/api/settings/theme', {
         method: 'POST',
+        keepalive: true,
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({ theme: themeName })
     })
-    .catch(err => console.error('Failed to save theme:', err));
+    .then(response => {
+        if (!response.ok) throw new Error('Theme save failed');
+    })
+    .catch(() => {
+        if (typeof showRequestError === 'function') {
+            showRequestError('Unable to save your theme. Please try again before leaving this page.');
+        }
+    });
 }
 
-// Get theme from localStorage or server
-function getStoredTheme() {
-    // First check localStorage for instant access
-    const localTheme = localStorage.getItem('subtrackr-theme');
-    if (localTheme) {
-        return Promise.resolve(localTheme);
+// Theme remembered in this browser, if any.
+function getLocalTheme() {
+    try {
+        const localTheme = localStorage.getItem(THEME_STORAGE_KEY);
+        return isKnownTheme(localTheme) ? localTheme : null;
+    } catch (err) {
+        return null;
     }
+}
 
-    // Fall back to server
-    return fetch('/api/settings/theme')
-        .then(response => response.json())
-        .then(data => {
-            const theme = data.theme || 'dark-classic';
-            localStorage.setItem('subtrackr-theme', theme);
-            return theme;
-        })
+// Theme saved on the server (the preference shared by every browser), or null
+// when it cannot be read.
+function fetchServerTheme() {
+    if (['/login', '/forgot-password', '/reset-password'].includes(location.pathname)) return Promise.resolve(null);
+    return fetch('/api/settings/theme', { headers: { 'Accept': 'application/json' } })
+        .then(response => (response.ok ? response.json() : null))
+        .then(data => (data && data.saved !== false && isKnownTheme(data.theme) ? data.theme : null))
         .catch(err => {
             console.error('Failed to load theme:', err);
-            return 'dark-classic';
+            return null;
         });
 }
 
-// Load saved theme on page load
+// Load saved theme on page load.
+//
+// theme-init.js has already applied the browser's remembered theme before
+// first paint. The server copy is the source of
+// truth: a choice made in another browser wins over a stale local value, and
+// nothing is written back during a plain page view.
 function loadSavedTheme() {
-    getStoredTheme().then(themeName => {
-        applyTheme(themeName);
+    const choiceVersion = themeChoiceVersion;
+    const localTheme = getLocalTheme();
+    applyTheme(localTheme || 'default');
+    return fetchServerTheme().then(serverTheme => {
+        if (!serverTheme || themeChoiceVersion !== choiceVersion) return;
+        if (serverTheme !== localTheme) {
+            applyTheme(serverTheme);
+            rememberTheme(serverTheme);
+        }
     });
 }
 

@@ -40,10 +40,7 @@ func newSubscriptionUpdateTestRouter(t *testing.T) (*gin.Engine, *service.Subscr
 		subscriptionService,
 		settingsService,
 		currencyService,
-		nil, // emailService — only used on high-cost transition
-		nil, // pushoverService
-		nil, // webhookService
-		nil, // telegramService
+		nil, // notifier — only used on high-cost transition
 		nil, // logoService — only used when a URL is set
 		categoryService,
 		nil, // tagService — only used when tags are submitted

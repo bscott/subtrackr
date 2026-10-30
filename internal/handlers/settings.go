@@ -654,6 +654,7 @@ func (h *SettingsHandler) GetTheme(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"theme": theme,
+		"saved": err == nil,
 	})
 }
 
@@ -1167,11 +1168,12 @@ func (h *SettingsHandler) SetTheme(c *gin.Context) {
 
 	// Validate theme name
 	validThemes := map[string]bool{
-		"default":   true,
-		"dark":      true,
-		"christmas": true,
-		"midnight":  true,
-		"ocean":     true,
+		"default":      true,
+		"dark":         true,
+		"dark-classic": true,
+		"christmas":    true,
+		"midnight":     true,
+		"ocean":        true,
 	}
 
 	if !validThemes[req.Theme] {

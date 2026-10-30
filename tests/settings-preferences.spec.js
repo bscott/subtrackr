@@ -274,11 +274,6 @@ test.describe('theme', () => {
   });
 
   test('the settings page highlights the saved theme after reload', async ({ page, request }) => {
-    // App bug, unrelated to HTMX: the DOMContentLoaded handler in settings.html
-    // marks document.querySelector('[data-theme="ocean"]') as active, which is
-    // <html data-theme="ocean"> rather than the theme card, so no card is
-    // highlighted once the theme is applied.
-    test.fail();
     const original = await serverTheme(request);
     try {
       await page.goto('/settings');
@@ -311,10 +306,6 @@ test.describe('theme', () => {
   });
 
   test('Dark Classic follows the user to a new browser', async ({ page, request, browser, baseURL }) => {
-    // App bug, unrelated to HTMX: SetTheme in internal/handlers/settings.go
-    // rejects "dark-classic" (400 Invalid theme name), so the choice is only
-    // kept in this browser's localStorage.
-    test.fail();
     const original = await serverTheme(request);
     try {
       await page.goto('/settings');

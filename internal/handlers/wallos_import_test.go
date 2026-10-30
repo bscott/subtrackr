@@ -50,10 +50,7 @@ func newWallosTestHandler(t *testing.T) (*gin.Engine, *service.SubscriptionServi
 		subscriptionService,
 		settingsService,
 		currencyService,
-		nil, // emailService
-		nil, // pushoverService
-		nil, // webhookService
-		nil, // telegramService
+		nil, // notifier
 		nil, // logoService
 		categoryService,
 		nil, // tagService

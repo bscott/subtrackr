@@ -618,3 +618,47 @@ func (s *SettingsService) GetTelegramConfig() (*models.TelegramConfig, error) {
 	}
 	return &config, nil
 }
+
+// SaveNtfyConfig saves ntfy configuration
+func (s *SettingsService) SaveNtfyConfig(config *models.NtfyConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("ntfy_config", string(data))
+}
+
+// GetNtfyConfig retrieves ntfy configuration
+func (s *SettingsService) GetNtfyConfig() (*models.NtfyConfig, error) {
+	data, err := s.repo.Get("ntfy_config")
+	if err != nil {
+		return nil, err
+	}
+	var config models.NtfyConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// SaveGotifyConfig saves Gotify configuration
+func (s *SettingsService) SaveGotifyConfig(config *models.GotifyConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("gotify_config", string(data))
+}
+
+// GetGotifyConfig retrieves Gotify configuration
+func (s *SettingsService) GetGotifyConfig() (*models.GotifyConfig, error) {
+	data, err := s.repo.Get("gotify_config")
+	if err != nil {
+		return nil, err
+	}
+	var config models.GotifyConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}

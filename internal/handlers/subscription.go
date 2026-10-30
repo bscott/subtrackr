@@ -40,29 +40,32 @@ type SubscriptionHandler struct {
 	service         *service.SubscriptionService
 	settingsService *service.SettingsService
 	currencyService *service.CurrencyService
-	emailService    *service.EmailService
-	pushoverService *service.PushoverService
-	webhookService  *service.WebhookService
-	telegramService *service.TelegramService
+	notifier        *service.NotificationDispatcher
 	logoService     *service.LogoService
 	categoryService *service.CategoryService
 	tagService      *service.TagService
 	i18nCatalog     *i18n.Catalog
 }
 
-func NewSubscriptionHandler(service *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, telegramService *service.TelegramService, logoService *service.LogoService, categoryService *service.CategoryService, tagService *service.TagService, i18nCatalog *i18n.Catalog) *SubscriptionHandler {
+func NewSubscriptionHandler(subscriptionService *service.SubscriptionService, settingsService *service.SettingsService, currencyService *service.CurrencyService, notifier *service.NotificationDispatcher, logoService *service.LogoService, categoryService *service.CategoryService, tagService *service.TagService, i18nCatalog *i18n.Catalog) *SubscriptionHandler {
 	return &SubscriptionHandler{
-		service:         service,
+		service:         subscriptionService,
 		settingsService: settingsService,
 		currencyService: currencyService,
-		emailService:    emailService,
-		pushoverService: pushoverService,
-		webhookService:  webhookService,
-		telegramService: telegramService,
+		notifier:        notifier,
 		logoService:     logoService,
 		categoryService: categoryService,
 		tagService:      tagService,
 		i18nCatalog:     i18nCatalog,
+	}
+}
+
+// sendHighCostAlert notifies every configured channel. Failures are logged
+// and never fail the request.
+func (h *SubscriptionHandler) sendHighCostAlert(sub *models.Subscription) {
+	report := h.notifier.SendHighCostAlert(sub)
+	if len(report.Failed) > 0 {
+		log.Printf("Failed to send high-cost alert for subscription %d on some channels: %s", sub.ID, report.FailureSummary())
 	}
 }
 
@@ -288,6 +291,32 @@ func parseCancellationNoticeDays(s string) int {
 		return 0
 	}
 	return models.ClampCancellationNoticeDays(v)
+}
+
+const invalidToCancelReminderDaysMessage = "To-cancel reminder days must be 3, 5, or 14."
+
+// parseToCancelReminderDays reads the posted lead time, reporting whether it is
+// supported. Empty means the default.
+func parseToCancelReminderDays(s string) (int, bool) {
+	if s == "" {
+		return models.DefaultToCancelReminderDays, true
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || !models.ValidToCancelReminderDays(v) {
+		return 0, false
+	}
+	return v, true
+}
+
+// respondSubscriptionFormError reports a rejected submission in the open form for
+// HTMX requests and as JSON for API clients.
+func respondSubscriptionFormError(c *gin.Context, message string) {
+	if c.GetHeader("HX-Request") != "" {
+		c.Header("HX-Retarget", "#form-errors")
+		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{"Error": message})
+		return
+	}
+	c.JSON(http.StatusBadRequest, gin.H{"error": message})
 }
 
 func lastPostedBool(c *gin.Context, name string) (bool, bool) {
@@ -549,9 +578,9 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 				subCurrency = sub.OriginalCurrency
 				subCurrencySymbol = service.CurrencySymbolForCode(sub.OriginalCurrency)
 			}
-			description := fmt.Sprintf("Subscription: %s\\nCost: %s%s\\nSchedule: %s", sub.Name, subCurrencySymbol, service.FormatAmount(sub.Cost, subCurrency), sub.DisplaySchedule())
+			description := fmt.Sprintf("Subscription: %s\nCost: %s%s\nSchedule: %s", sub.Name, subCurrencySymbol, service.FormatAmount(sub.Cost, subCurrency), sub.DisplaySchedule())
 			if sub.URL != "" {
-				description += fmt.Sprintf("\\nURL: %s", sub.URL)
+				description += fmt.Sprintf("\nURL: %s", sub.URL)
 			}
 
 			icalContent += "BEGIN:VEVENT\r\n"
@@ -559,8 +588,8 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 			icalContent += fmt.Sprintf("DTSTAMP:%s\r\n", dtStamp)
 			icalContent += fmt.Sprintf("DTSTART:%s\r\n", dtStart)
 			icalContent += fmt.Sprintf("DTEND:%s\r\n", dtEnd)
-			icalContent += fmt.Sprintf("SUMMARY:%s\r\n", summary)
-			icalContent += fmt.Sprintf("DESCRIPTION:%s\r\n", description)
+			icalContent += fmt.Sprintf("SUMMARY:%s\r\n", escapeICalText(summary))
+			icalContent += fmt.Sprintf("DESCRIPTION:%s\r\n", escapeICalText(description))
 			icalContent += "STATUS:CONFIRMED\r\n"
 			icalContent += "SEQUENCE:0\r\n"
 
@@ -599,10 +628,10 @@ func (h *SubscriptionHandler) generateICalContent(forSubscription bool) (string,
 				cancelDescription := fmt.Sprintf("Last day to cancel %s before it renews on %s (%d days notice required).",
 					sub.Name, sub.RenewalDate.Format("2006-01-02"), sub.CancellationNoticeDays)
 				if sub.URL != "" {
-					cancelDescription += fmt.Sprintf("\\nURL: %s", sub.URL)
+					cancelDescription += fmt.Sprintf("\nURL: %s", sub.URL)
 				}
-				icalContent += fmt.Sprintf("SUMMARY:Cancel %s by today\r\n", sub.Name)
-				icalContent += fmt.Sprintf("DESCRIPTION:%s\r\n", cancelDescription)
+				icalContent += fmt.Sprintf("SUMMARY:%s\r\n", escapeICalText("Cancel "+sub.Name+" by today"))
+				icalContent += fmt.Sprintf("DESCRIPTION:%s\r\n", escapeICalText(cancelDescription))
 				icalContent += "STATUS:CONFIRMED\r\n"
 				icalContent += "SEQUENCE:0\r\n"
 				icalContent += "END:VEVENT\r\n"
@@ -691,6 +720,9 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		telegramConfigured = true
 	}
 
+	ntfyConfig, ntfyConfigured := ntfySettingsView(h.settingsService)
+	gotifyConfig, gotifyConfigured := gotifySettingsView(h.settingsService)
+
 	// Get auth settings
 	authEnabled := h.settingsService.IsAuthEnabled()
 	authUsername, _ := h.settingsService.GetAuthUsername()
@@ -745,6 +777,10 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		"WebhookConfigured":            webhookConfigured,
 		"TelegramConfig":               telegramConfig,
 		"TelegramConfigured":           telegramConfigured,
+		"NtfyConfig":                   ntfyConfig,
+		"NtfyConfigured":               ntfyConfigured,
+		"GotifyConfig":                 gotifyConfig,
+		"GotifyConfigured":             gotifyConfigured,
 		"Lang":                         h.activeLang(),
 		"Languages":                    h.i18nCatalog.AvailableLanguages(),
 	})
@@ -834,6 +870,16 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 	subscription.CancellationDate = parseDatePtr(c.PostForm("cancellation_date"))
 	subscription.CancellationNoticeDays = parseCancellationNoticeDays(c.PostForm("cancellation_notice_days"))
 
+	if toCancel, posted := lastPostedBool(c, "to_cancel"); posted {
+		subscription.ToCancel = toCancel
+	}
+	reminderDays, valid := parseToCancelReminderDays(c.PostForm("to_cancel_reminder_days"))
+	if !valid {
+		respondSubscriptionFormError(c, invalidToCancelReminderDaysMessage)
+		return
+	}
+	subscription.ToCancelReminderDays = reminderDays
+
 	// Fetch logo synchronously before creation if URL is provided and icon_url is empty
 	h.fetchAndSetLogo(&subscription)
 
@@ -863,29 +909,12 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		}
 	}
 
-	// Send high-cost alert email and Pushover notification if applicable
+	// Send high-cost alerts through every configured channel if applicable
 	if h.isHighCostWithCurrency(created) {
 		// Reload subscription with category for email template
 		subscriptionWithCategory, err := h.service.GetByID(created.ID)
 		if err == nil && subscriptionWithCategory != nil {
-			// Send email notification
-			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				// Log error but don't fail the request
-				log.Printf("Failed to send high-cost alert email: %v", err)
-			}
-			// Send Pushover notification
-			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				// Log error but don't fail the request
-				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
-			}
-			// Send Webhook notification
-			if err := h.webhookService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				log.Printf("Failed to send high-cost alert webhook: %v", err)
-			}
-			// Send Telegram notification
-			if err := h.telegramService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				log.Printf("Failed to send high-cost alert Telegram notification: %v", err)
-			}
+			h.sendHighCostAlert(subscriptionWithCategory)
 		}
 	}
 
@@ -1053,6 +1082,17 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 			existing.LastReminderWindow = -1
 		}
 	}
+	if toCancel, posted := lastPostedBool(c, "to_cancel"); posted {
+		existing.ToCancel = toCancel
+	}
+	if val := c.PostForm("to_cancel_reminder_days"); val != "" {
+		reminderDays, valid := parseToCancelReminderDays(val)
+		if !valid {
+			respondSubscriptionFormError(c, invalidToCancelReminderDaysMessage)
+			return
+		}
+		existing.ToCancelReminderDays = reminderDays
+	}
 
 	// Fetch new logo if URL changed or URL is set but no icon
 	if urlChanged || (existing.URL != "" && existing.IconURL == "") {
@@ -1077,29 +1117,12 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 		}
 	}
 
-	// Send high-cost alert email and Pushover notification if subscription became high-cost (wasn't before, but is now)
+	// Send high-cost alerts if subscription became high-cost (wasn't before, but is now)
 	if updated != nil && !wasHighCost && h.isHighCostWithCurrency(updated) {
 		// Reload subscription with category for email template
 		subscriptionWithCategory, err := h.service.GetByID(updated.ID)
 		if err == nil && subscriptionWithCategory != nil {
-			// Send email notification
-			if err := h.emailService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				// Log error but don't fail the request
-				log.Printf("Failed to send high-cost alert email: %v", err)
-			}
-			// Send Pushover notification
-			if err := h.pushoverService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				// Log error but don't fail the request
-				log.Printf("Failed to send high-cost alert Pushover notification: %v", err)
-			}
-			// Send Webhook notification
-			if err := h.webhookService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				log.Printf("Failed to send high-cost alert webhook: %v", err)
-			}
-			// Send Telegram notification
-			if err := h.telegramService.SendHighCostAlert(subscriptionWithCategory); err != nil {
-				log.Printf("Failed to send high-cost alert Telegram notification: %v", err)
-			}
+			h.sendHighCostAlert(subscriptionWithCategory)
 		}
 	}
 
@@ -1188,6 +1211,7 @@ func (h *SubscriptionHandler) GetSubscriptionForm(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "subscription-form.html", gin.H{
+		"GoDateFormat":   h.settingsService.GetGoDateFormat(),
 		"Subscription":   subscription,
 		"IsEdit":         isEdit,
 		"CurrencySymbol": service.CurrencySymbolForCode(formCurrency),
@@ -1215,7 +1239,7 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 	defer writer.Flush()
 
 	// Write CSV header
-	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Schedule Interval", "Status", "Payment Method", "Autopay", "Account", "Start Date", "Renewal Date", "Cancellation Date", "Cancellation Notice Days", "URL", "Notes", "Usage", "Created At"}
+	header := []string{"ID", "Name", "Category", "Cost", "Currency", "Schedule", "Schedule Interval", "Status", "Payment Method", "Autopay", "Account", "Start Date", "Renewal Date", "Cancellation Date", "Cancellation Notice Days", "URL", "Notes", "Usage", "Created At", "To Cancel", "To Cancel Reminder Days"}
 	writer.Write(header)
 
 	// Write subscription data
@@ -1252,6 +1276,8 @@ func (h *SubscriptionHandler) ExportCSV(c *gin.Context) {
 			sub.Notes,
 			sub.Usage,
 			sub.CreatedAt.Format("2006-01-02 15:04:05"),
+			strconv.FormatBool(sub.ToCancel),
+			strconv.Itoa(sub.ToCancelReminderDays),
 		}
 		writer.Write(record)
 	}

@@ -6,7 +6,7 @@
 *.dylib
 *.test
 main
-server
+/server
 subtrackr
 
 # Go coverage / profile output

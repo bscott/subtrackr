@@ -16,7 +16,7 @@ type Subscription struct {
 	OriginalCurrency               string     `json:"original_currency" gorm:"size:3;default:'USD'"`
 	Schedule                       string     `json:"schedule" gorm:"not null" validate:"required,oneof=Monthly Annual Weekly Daily Quarterly"`
 	Status                         string     `json:"status" gorm:"not null" validate:"required,oneof=Active Cancelled Paused Trial"`
-	CategoryID                     uint       `json:"category_id"`
+	CategoryID                     uint       `json:"category_id"` // 0 means uncategorized, stored as NULL (see SubscriptionRepository)
 	Category                       Category   `json:"category" gorm:"foreignKey:CategoryID"`
 	Tags                           []Tag      `json:"tags" gorm:"many2many:subscription_tags;"`
 	PaymentMethod                  string     `json:"payment_method" gorm:""`
@@ -40,6 +40,10 @@ type Subscription struct {
 	LastCancellationReminderSent   *time.Time `json:"last_cancellation_reminder_sent" gorm:""` // Tracks when the last cancellation reminder was sent
 	LastCancellationReminderDate   *time.Time `json:"last_cancellation_reminder_date" gorm:""` // Tracks which cancellation date the last reminder was for
 	LastCancellationReminderWindow int        `json:"last_cancellation_reminder_window" gorm:"default:-1"`
+	ToCancel                       bool       `json:"to_cancel" gorm:"default:false"`           // The user intends to cancel; an opt-in of its own, independent of the renewal reminder settings
+	ToCancelReminderDays           int        `json:"to_cancel_reminder_days" gorm:"default:3"` // Days before the deadline to start reminding: 3, 5 or 14
+	LastToCancelReminderSent       *time.Time `json:"last_to_cancel_reminder_sent" gorm:""`     // Tracks when the last to-cancel reminder was delivered
+	LastToCancelReminderAnchor     *time.Time `json:"last_to_cancel_reminder_anchor" gorm:""`   // Tracks which deadline the last to-cancel reminder was for
 	CreatedAt                      time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt                      time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 }
@@ -105,6 +109,83 @@ func ClampCancellationNoticeDays(v int) int {
 		return 365
 	}
 	return v
+}
+
+// DefaultToCancelReminderDays is the reminder lead time when none has been chosen.
+const DefaultToCancelReminderDays = 3
+
+// ValidToCancelReminderDays reports whether v is a supported reminder lead time.
+func ValidToCancelReminderDays(v int) bool {
+	return v == 3 || v == 5 || v == 14
+}
+
+// NormalizeToCancel enforces the to-cancel invariants: the lead time is always
+// a supported value, a Cancelled subscription has no intent left to act on, and
+// withdrawing the intent forgets the delivered reminder so opting in again fires
+// again. All write paths apply it; the model hooks apply it as a final guarantee.
+func (s *Subscription) NormalizeToCancel() {
+	if !ValidToCancelReminderDays(s.ToCancelReminderDays) {
+		s.ToCancelReminderDays = DefaultToCancelReminderDays
+	}
+	if s.Status == "Cancelled" {
+		s.ToCancel = false
+	}
+	if !s.ToCancel {
+		s.LastToCancelReminderSent = nil
+		s.LastToCancelReminderAnchor = nil
+	}
+}
+
+// ToCancelDeadline returns the date a to-cancel reminder counts down to: the
+// cancel-by date when a notice period is set, otherwise the renewal date. A
+// cancel-by date already in the past stays the deadline. It never falls back to
+// the renewal date, because cancelling by then would no longer avoid the charge.
+func (s Subscription) ToCancelDeadline() *time.Time {
+	if cancelBy := s.CancelByDate(); cancelBy != nil {
+		return cancelBy
+	}
+	return s.RenewalDate
+}
+
+// ToCancelEligible reports whether the subscription is opted in, in a status
+// that can still be cancelled, and has a deadline to count down to.
+func (s Subscription) ToCancelEligible() bool {
+	return s.ToCancel && (s.Status == "Active" || s.Status == "Trial") && s.ToCancelDeadline() != nil
+}
+
+// ToCancelReminderDue returns the calendar days left until the deadline and
+// whether a reminder should be sent at now: the subscription is eligible, the
+// deadline is today or within the chosen lead time, and no reminder has been
+// delivered for this deadline. Once the deadline has passed nothing is due until
+// a renewal or an edit produces a new one.
+func (s Subscription) ToCancelReminderDue(now time.Time) (int, bool) {
+	if !s.ToCancelEligible() {
+		return 0, false
+	}
+	deadline := s.ToCancelDeadline()
+	daysLeft := calendarDaysUntil(*deadline, now)
+	if daysLeft < 0 || daysLeft > s.ToCancelReminderDays {
+		return daysLeft, false
+	}
+	if s.LastToCancelReminderAnchor != nil && s.LastToCancelReminderAnchor.Equal(*deadline) {
+		return daysLeft, false
+	}
+	return daysLeft, true
+}
+
+// ToCancelDeadlineMissed reports whether the subscription is opted in but this
+// cycle's deadline has already passed, so no reminder will be sent for it.
+func (s Subscription) ToCancelDeadlineMissed() bool {
+	return s.ToCancelEligible() && calendarDaysUntil(*s.ToCancelDeadline(), time.Now()) < 0
+}
+
+// calendarDaysUntil counts whole days between now's date and the target's date,
+// each read in its own location. Dates entered in the form are midnight UTC, so
+// comparing instants would call a deadline missed for most of its final day.
+func calendarDaysUntil(target, now time.Time) int {
+	ty, tm, td := target.Date()
+	ny, nm, nd := now.Date()
+	return int(time.Date(ty, tm, td, 0, 0, 0, 0, time.UTC).Sub(time.Date(ny, nm, nd, 0, 0, 0, 0, time.UTC)).Hours() / 24)
 }
 
 func (s *Subscription) effectiveInterval() int {
@@ -203,6 +284,7 @@ func (s *Subscription) IsHighCost(threshold float64) bool {
 // BeforeCreate hook to set renewal date for active subscriptions
 func (s *Subscription) BeforeCreate(tx *gorm.DB) error {
 	s.CancellationNoticeDays = ClampCancellationNoticeDays(s.CancellationNoticeDays)
+	s.NormalizeToCancel()
 	if s.Status == "Active" && s.RenewalDate == nil {
 		// Set renewal date based on schedule
 		s.calculateNextRenewalDate()
@@ -235,6 +317,7 @@ func (s *Subscription) AfterFind(tx *gorm.DB) error {
 // BeforeUpdate hook to recalculate renewal date when schedule changes, start date changes, or date passes
 func (s *Subscription) BeforeUpdate(tx *gorm.DB) error {
 	s.CancellationNoticeDays = ClampCancellationNoticeDays(s.CancellationNoticeDays)
+	s.NormalizeToCancel()
 	// Get the original values to check for schedule or start date changes
 	var original Subscription
 	if err := tx.Model(&Subscription{}).Where("id = ?", s.ID).First(&original).Error; err == nil {

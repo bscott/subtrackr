@@ -55,6 +55,9 @@ subtrackr-xyz/
 - **currency.go**: Currency conversion (Fixer.io integration)
 - **email.go**: Email notification service (SMTP)
 - **pushover.go**: Pushover notification service
+- **ntfy.go**, **gotify.go**: ntfy and Gotify channels, sharing the retry and redirect-free transport in **push_http.go**
+- **notification_dispatcher.go**: Sends a notification to every configured channel and reports what was delivered
+- **reminder_runner.go**: Scheduled reminder passes; a reminder is marked sent only when a configured channel delivered it
 
 #### 4. Models (`internal/models/`)
 - GORM models:
@@ -63,6 +66,7 @@ subtrackr-xyz/
   - `Settings`: Application settings (key-value store)
   - `SMTPConfig`: Email configuration
   - `PushoverConfig`: Pushover notification configuration
+  - `NtfyConfig`, `GotifyConfig`: ntfy and Gotify notification configuration
   - `APIKey`: API authentication keys
   - `ExchangeRate`: Currency exchange rates
 
@@ -237,12 +241,11 @@ This project uses versioned branches for releases. See `CLAUDE.md` for the compl
 
 #### Adding a New Notification Method
 1. Create notification config model in `internal/models/settings.go`
-2. Create notification service in `internal/service/` (e.g., `pushover.go`)
+2. Create notification service in `internal/service/` (e.g., `ntfy.go`) implementing `NotificationChannel` and `ToCancelReminderChannel`; a channel without the latter silently receives no to-cancel reminders, so add it to the compile-time list in `notification_dispatcher.go`
 3. Add config save/get methods to `SettingsService`
-4. Add handlers in `internal/handlers/settings.go`
-5. Add UI in `templates/settings.html`
-6. Update subscription handler to send notifications
-7. Update renewal reminder scheduler in `cmd/server/main.go`
+4. Add handlers in `internal/handlers/` (e.g., `settings_push.go`) that test with the submitted values rather than saving them
+5. Add UI in `templates/settings.html` and strings in all of `web/locales/`
+6. Register the channel with `NewNotificationDispatcher` in `cmd/server/main.go`; the subscription handler and reminder schedulers send through the dispatcher
 
 ### Environment Variables
 

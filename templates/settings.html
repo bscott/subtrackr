@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="/static/css/themes.css">
     <script src="/static/js/themes.js"></script>
     <script src="/static/js/mobile-menu.js"></script>
+    <script src="/static/js/modal.js"></script>
     <script src="/static/js/escape-html.js"></script>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
@@ -69,7 +70,7 @@
                         </a>
                     </nav>
                     <!-- Mobile Hamburger Button -->
-                    <button id="mobile-menu-button" class="md:hidden p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150" aria-label="{{t .Lang "nav.open_menu"}}">
+                    <button id="mobile-menu-button" aria-expanded="false" aria-controls="mobile-menu" class="md:hidden p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150" aria-label="{{t .Lang "nav.open_menu"}}">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
@@ -81,7 +82,7 @@
                         hx-get="/form/subscription"
                         hx-target="#modal-content"
                         hx-trigger="click"
-                        onclick="document.getElementById('modal').classList.remove('hidden')"
+                        onclick="openModal(this)"
                         class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 flex items-center transition-colors duration-150">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -112,7 +113,7 @@
             <!-- Backdrop -->
             <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onclick="closeMobileMenu()"></div>
             <!-- Menu Panel -->
-            <div class="fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out">
+            <div role="dialog" aria-modal="true" aria-label="{{t .Lang "nav.menu"}}" class="fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out">
                 <div class="flex flex-col h-full">
                     <!-- Menu Header -->
                     <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -152,7 +153,7 @@
                         </a>
                         <div class="pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
                             <button 
-                                onclick="closeMobileMenuAndThen(function() { document.getElementById('modal').classList.remove('hidden'); });"
+                                onclick="closeMobileMenuAndThen(function() { openModal(document.getElementById('mobile-menu-button')); });"
                                 hx-get="/form/subscription"
                                 hx-target="#modal-content"
                                 hx-trigger="click"
@@ -200,7 +201,7 @@
                 </div>
 
                 <div class="theme-selector" id="theme-selector">
-                    <div class="theme-option" data-theme="default" onclick="selectTheme('default')">
+                    <button type="button" class="theme-option" data-theme="default" aria-pressed="false" onclick="selectTheme('default')">
                         <div class="theme-name">Default</div>
                         <div class="theme-description">{{t .Lang "theme.default_desc"}}</div>
                         <div class="theme-preview">
@@ -208,9 +209,9 @@
                             <div class="theme-preview-color" style="background: #64748b;"></div>
                             <div class="theme-preview-color" style="background: #10b981;"></div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div class="theme-option" data-theme="dark" onclick="selectTheme('dark')">
+                    <button type="button" class="theme-option" data-theme="dark" aria-pressed="false" onclick="selectTheme('dark')">
                         <div class="theme-name">Dark</div>
                         <div class="theme-description">{{t .Lang "theme.dark_desc"}}</div>
                         <div class="theme-preview">
@@ -218,9 +219,9 @@
                             <div class="theme-preview-color" style="background: #3b82f6;"></div>
                             <div class="theme-preview-color" style="background: #10b981;"></div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div class="theme-option" data-theme="dark-classic" onclick="selectTheme('dark-classic')">
+                    <button type="button" class="theme-option" data-theme="dark-classic" aria-pressed="false" onclick="selectTheme('dark-classic')">
                         <div class="theme-name">Dark Classic</div>
                         <div class="theme-description">{{t .Lang "theme.dark_classic_desc"}}</div>
                         <div class="theme-preview">
@@ -228,9 +229,9 @@
                             <div class="theme-preview-color" style="background: #3b82f6;"></div>
                             <div class="theme-preview-color" style="background: #10b981;"></div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div class="theme-option" data-theme="christmas" onclick="selectTheme('christmas')">
+                    <button type="button" class="theme-option" data-theme="christmas" aria-pressed="false" onclick="selectTheme('christmas')">
                         <div class="theme-name">Christmas 🎄</div>
                         <div class="theme-description">{{t .Lang "theme.christmas_desc"}}</div>
                         <div class="theme-preview">
@@ -238,9 +239,9 @@
                             <div class="theme-preview-color" style="background: #165b33;"></div>
                             <div class="theme-preview-color" style="background: #ffd700;"></div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div class="theme-option" data-theme="midnight" onclick="selectTheme('midnight')">
+                    <button type="button" class="theme-option" data-theme="midnight" aria-pressed="false" onclick="selectTheme('midnight')">
                         <div class="theme-name">Midnight</div>
                         <div class="theme-description">{{t .Lang "theme.midnight_desc"}}</div>
                         <div class="theme-preview">
@@ -248,9 +249,9 @@
                             <div class="theme-preview-color" style="background: #8b5cf6;"></div>
                             <div class="theme-preview-color" style="background: #1e293b;"></div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div class="theme-option" data-theme="ocean" onclick="selectTheme('ocean')">
+                    <button type="button" class="theme-option" data-theme="ocean" aria-pressed="false" onclick="selectTheme('ocean')">
                         <div class="theme-name">Ocean</div>
                         <div class="theme-description">{{t .Lang "theme.ocean_desc"}}</div>
                         <div class="theme-preview">
@@ -258,32 +259,30 @@
                             <div class="theme-preview-color" style="background: #f0f9ff;"></div>
                             <div class="theme-preview-color" style="background: #06b6d4;"></div>
                         </div>
-                    </div>
+                    </button>
                 </div>
 
                 <script>
-                    function selectTheme(themeName) {
-                        // Remove active class from all options
+                    function markActiveTheme(themeName) {
                         document.querySelectorAll('.theme-option').forEach(opt => {
-                            opt.classList.remove('active');
+                            const active = opt.dataset.theme === themeName;
+                            opt.classList.toggle('active', active);
+                            opt.setAttribute('aria-pressed', active ? 'true' : 'false');
                         });
-
-                        // Add active class to selected theme
-                        document.querySelector(`[data-theme="${themeName}"]`).classList.add('active');
-
-                        // Apply theme
-                        applyTheme(themeName);
                     }
 
-                    // Load and mark current theme as active on page load
+                    function selectTheme(themeName) {
+                        // Apply, remember and save: setTheme() is the only writer.
+                        setTheme(themeName);
+                    }
+
+                    // Keep the highlighted card in step with whatever themes.js applies:
+                    // the local theme at load, the server's theme once fetched, and clicks.
+                    document.addEventListener('subtrackr:themechange', (event) => {
+                        markActiveTheme(event.detail.theme);
+                    });
                     document.addEventListener('DOMContentLoaded', () => {
-                        fetch('/api/settings/theme')
-                            .then(response => response.json())
-                            .then(data => {
-                                const themeName = data.theme || 'default';
-                                document.querySelector(`[data-theme="${themeName}"]`)?.classList.add('active');
-                            })
-                            .catch(err => console.error('Failed to load theme:', err));
+                        markActiveTheme(document.documentElement.getAttribute('data-theme'));
                     });
                 </script>
             </div>
@@ -841,6 +840,135 @@
                                 </button>
                                 <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
                                     {{t .Lang "settings.save_telegram"}}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ntfy Notifications -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">{{t .Lang "settings.ntfy_notifications"}}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">{{t .Lang "settings.ntfy_description"}}</p>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4 transition-colors duration-200">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">{{t .Lang "settings.ntfy_configuration"}}</h4>
+                    <form id="ntfy-form" hx-post="/api/settings/ntfy" hx-target="#ntfy-message" hx-swap="innerHTML">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="ntfy_server_url" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.ntfy_server_url"}}</label>
+                                <input type="text" inputmode="url" id="ntfy_server_url" name="ntfy_server_url" placeholder="https://ntfy.sh" value="{{.NtfyConfig.ServerURL}}" autocomplete="off" spellcheck="false"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.ntfy_server_url_help"}}</p>
+                            </div>
+                            <div>
+                                <label for="ntfy_topic" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.ntfy_topic"}}</label>
+                                <input type="text" id="ntfy_topic" name="ntfy_topic" placeholder="{{t .Lang "settings.ntfy_topic_placeholder"}}" value="{{.NtfyConfig.Topic}}" autocomplete="off" spellcheck="false"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.ntfy_topic_help"}}</p>
+                            </div>
+                            <div>
+                                <label for="ntfy_access_token" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.ntfy_access_token"}}</label>
+                                <input type="password" id="ntfy_access_token" name="ntfy_access_token" placeholder="{{if .NtfyConfig.HasAccessToken}}{{t .Lang "settings.token_saved_placeholder"}}{{else}}{{t .Lang "settings.ntfy_access_token_placeholder"}}{{end}}" value="" autocomplete="new-password"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.ntfy_access_token_help"}}</p>
+                                {{if .NtfyConfig.HasAccessToken}}
+                                <label class="inline-flex items-center mt-2 text-xs text-gray-600 dark:text-gray-300">
+                                    <input type="checkbox" id="ntfy_clear_token" name="ntfy_clear_token" value="on" class="mr-2 rounded border-gray-300 dark:border-gray-600">
+                                    {{t .Lang "settings.ntfy_clear_token"}}
+                                </label>
+                                {{end}}
+                            </div>
+                            <div>
+                                <label for="ntfy_priority" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.ntfy_priority"}}</label>
+                                <select id="ntfy_priority" name="ntfy_priority"
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                    <option value="1" {{if eq .NtfyConfig.Priority 1}}selected{{end}}>1 – {{t .Lang "settings.ntfy_priority_min"}}</option>
+                                    <option value="2" {{if eq .NtfyConfig.Priority 2}}selected{{end}}>2 – {{t .Lang "settings.ntfy_priority_low"}}</option>
+                                    <option value="3" {{if eq .NtfyConfig.Priority 3}}selected{{end}}>3 – {{t .Lang "settings.ntfy_priority_default"}}</option>
+                                    <option value="4" {{if eq .NtfyConfig.Priority 4}}selected{{end}}>4 – {{t .Lang "settings.ntfy_priority_high"}}</option>
+                                    <option value="5" {{if eq .NtfyConfig.Priority 5}}selected{{end}}>5 – {{t .Lang "settings.ntfy_priority_max"}}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <div id="ntfy-message"></div>
+                        </div>
+                        <div class="flex items-center justify-end">
+                            <div class="flex space-x-2">
+                                <button type="button"
+                                        id="test-ntfy-btn"
+                                        hx-post="/api/settings/ntfy/test"
+                                        hx-include="#ntfy-form"
+                                        hx-target="#ntfy-message"
+                                        hx-swap="innerHTML"
+                                        hx-indicator="#ntfy-spinner"
+                                        class="bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center transition-colors duration-150">
+                                    <svg id="ntfy-spinner" class="htmx-indicator animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    {{t .Lang "settings.test_connection"}}
+                                </button>
+                                <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
+                                    {{t .Lang "settings.save_ntfy"}}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Gotify Notifications -->
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-8">
+                <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">{{t .Lang "settings.gotify_notifications"}}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">{{t .Lang "settings.gotify_description"}}</p>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4 transition-colors duration-200">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">{{t .Lang "settings.gotify_configuration"}}</h4>
+                    <form id="gotify-form" hx-post="/api/settings/gotify" hx-target="#gotify-message" hx-swap="innerHTML">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="gotify_server_url" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.gotify_server_url"}}</label>
+                                <input type="text" inputmode="url" id="gotify_server_url" name="gotify_server_url" placeholder="{{t .Lang "settings.gotify_server_url_placeholder"}}" value="{{.GotifyConfig.ServerURL}}" autocomplete="off" spellcheck="false"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.gotify_server_url_help"}}</p>
+                            </div>
+                            <div>
+                                <label for="gotify_app_token" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.gotify_app_token"}}</label>
+                                <input type="password" id="gotify_app_token" name="gotify_app_token" placeholder="{{if .GotifyConfig.HasAppToken}}{{t .Lang "settings.token_saved_placeholder"}}{{else}}{{t .Lang "settings.gotify_app_token_placeholder"}}{{end}}" value="" autocomplete="new-password"
+                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.gotify_app_token_help"}}</p>
+                            </div>
+                            <div>
+                                <label for="gotify_priority" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">{{t .Lang "settings.gotify_priority"}}</label>
+                                <input type="number" id="gotify_priority" name="gotify_priority" min="0" max="10" step="1" value="{{.GotifyConfig.Priority}}"
+                                       class="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors duration-150">
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{t .Lang "settings.gotify_priority_help"}}</p>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <div id="gotify-message"></div>
+                        </div>
+                        <div class="flex items-center justify-end">
+                            <div class="flex space-x-2">
+                                <button type="button"
+                                        id="test-gotify-btn"
+                                        hx-post="/api/settings/gotify/test"
+                                        hx-include="#gotify-form"
+                                        hx-target="#gotify-message"
+                                        hx-swap="innerHTML"
+                                        hx-indicator="#gotify-spinner"
+                                        class="bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center transition-colors duration-150">
+                                    <svg id="gotify-spinner" class="htmx-indicator animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    {{t .Lang "settings.test_connection"}}
+                                </button>
+                                <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90">
+                                    {{t .Lang "settings.save_gotify"}}
                                 </button>
                             </div>
                         </div>
@@ -1418,7 +1546,7 @@
     </div>
 
     <!-- Modal -->
-    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4 transition-colors duration-200">
             <div id="modal-content">
                 <!-- Dynamic content loaded here -->
@@ -1429,12 +1557,6 @@
     <script>
         // Mobile menu functionality is handled by /static/js/mobile-menu.js
 
-        // Close modal when clicking outside
-        document.getElementById('modal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.classList.add('hidden');
-            }
-        });
 
         // Handle toggle button responses
         function updateToggle(response, toggleId) {

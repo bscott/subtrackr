@@ -55,9 +55,6 @@ test('calendar grid lays out the requested month and navigates across year bound
 });
 
 test('leading cells show the last days of the previous month', async ({ page }) => {
-  // BUG: calendar.html takes the previous month's length from `new Date(year, month - 2, 0)`,
-  // which is two months back, so December 2026 starts "30 31" (October) instead of "29 30" (November).
-  test.fail();
   await page.goto('/calendar?year=2026&month=12');
   const cells = page.locator('#calendar-grid > div');
   await expect(dayNumber(cells.nth(0))).toHaveText('29');

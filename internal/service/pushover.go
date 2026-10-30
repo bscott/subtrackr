@@ -14,12 +14,14 @@ import (
 // PushoverService handles sending notifications via Pushover
 type PushoverService struct {
 	settingsService *SettingsService
+	apiURL          string
 }
 
 // NewPushoverService creates a new Pushover service
 func NewPushoverService(settingsService *SettingsService) *PushoverService {
 	return &PushoverService{
 		settingsService: settingsService,
+		apiURL:          "https://api.pushover.net/1/messages.json",
 	}
 }
 
@@ -41,9 +43,6 @@ func (p *PushoverService) SendNotification(title, message string, priority int) 
 		return fmt.Errorf("Pushover not configured: user key and app token required")
 	}
 
-	// Pushover API endpoint
-	apiURL := "https://api.pushover.net/1/messages.json"
-
 	// Prepare form data
 	formData := url.Values{}
 	formData.Set("token", config.AppToken)
@@ -53,7 +52,7 @@ func (p *PushoverService) SendNotification(title, message string, priority int) 
 	formData.Set("priority", strconv.Itoa(priority))
 
 	// Create HTTP request
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBufferString(formData.Encode()))
+	req, err := http.NewRequest("POST", p.apiURL, bytes.NewBufferString(formData.Encode()))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -95,26 +94,7 @@ func (p *PushoverService) SendHighCostAlert(subscription *models.Subscription) e
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol - use subscription's own currency if it differs from preferred
-	currencySymbol := currencySymbolForSubscription(subscription, p.settingsService)
-	currencyCode := currencyCodeForSubscription(subscription, p.settingsService)
-
-	// Build message
-	message := "⚠️ High Cost Alert\n\n"
-	message += fmt.Sprintf("Subscription: %s\n", subscription.Name)
-	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
-	if subscription.Category.Name != "" {
-		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
-	}
-	if subscription.RenewalDate != nil {
-		message += fmt.Sprintf("Next Renewal: %s\n", subscription.RenewalDate.Format(p.settingsService.GetGoDateFormatLong()))
-	}
-	if subscription.URL != "" {
-		message += fmt.Sprintf("URL: %s", subscription.URL)
-	}
-
-	title := fmt.Sprintf("High Cost Alert: %s", subscription.Name)
+	title, message := highCostAlertText(subscription, p.settingsService)
 	// Priority 1 = high priority (with sound and vibration)
 	return p.SendNotification(title, message, 1)
 }
@@ -140,32 +120,22 @@ func (p *PushoverService) SendCancellationReminder(subscription *models.Subscrip
 		return nil // Silently skip if disabled
 	}
 
-	// Get currency symbol - use subscription's own currency if it differs from preferred
-	currencySymbol := currencySymbolForSubscription(subscription, p.settingsService)
-	currencyCode := currencyCodeForSubscription(subscription, p.settingsService)
-
-	// Build message
-	daysText := "days"
-	if daysUntilCancellation == 1 {
-		daysText = "day"
-	}
-	message := "⚠️ Cancellation Reminder\n\n"
-	message += fmt.Sprintf("Your subscription %s will end in %d %s.\n\n", subscription.Name, daysUntilCancellation, daysText)
-	message += "Subscription Details:\n"
-	message += fmt.Sprintf("Cost: %s%s %s\n", currencySymbol, FormatAmount(subscription.Cost, currencyCode), subscription.DisplaySchedule())
-	message += fmt.Sprintf("Monthly Cost: %s%s\n", currencySymbol, FormatAmount(subscription.MonthlyCost(), currencyCode))
-	if subscription.Category.Name != "" {
-		message += fmt.Sprintf("Category: %s\n", subscription.Category.Name)
-	}
-	if subscription.CancellationDate != nil {
-		message += fmt.Sprintf("Cancellation Date: %s\n", subscription.CancellationDate.Format(p.settingsService.GetGoDateFormatLong()))
-	}
-	if subscription.URL != "" {
-		message += fmt.Sprintf("URL: %s", subscription.URL)
-	}
-
-	title := fmt.Sprintf("Cancellation Reminder: %s", subscription.Name)
+	title, message := cancellationReminderText(subscription, daysUntilCancellation, p.settingsService)
 	// Priority 0 = normal priority
 	return p.SendNotification(title, message, 0)
 }
 
+// SendToCancelReminder sends a Pushover reminder to cancel a subscription.
+func (p *PushoverService) SendToCancelReminder(subscription *models.Subscription, daysLeft int) error {
+	content := buildToCancelReminderContent(subscription, daysLeft, p.settingsService)
+	return p.SendNotification(content.Title, toCancelReminderMessage(subscription, content, p.settingsService), 0)
+}
+
+// Name identifies the channel in delivery reports and logs.
+func (p *PushoverService) Name() string { return "pushover" }
+
+// IsConfigured reports whether a user key and app token have been saved.
+func (p *PushoverService) IsConfigured() bool {
+	config, err := p.settingsService.GetPushoverConfig()
+	return err == nil && config.UserKey != "" && config.AppToken != ""
+}

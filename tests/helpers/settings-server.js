@@ -1,4 +1,4 @@
-// Playwright fixtures that run settings specs against a private SubTrackr server.
+// Playwright fixtures that run specs against a private SubTrackr server.
 //
 // Settings are global server state. Several of them (currency, date format,
 // language, theme) change what every page renders, and the notification
@@ -6,66 +6,47 @@
 // the API once saved. Running these specs against the shared webServer would
 // make other specs flaky while they run in parallel, so each Playwright worker
 // that uses this `test` builds the current cmd/server and starts it on a free
-// port with its own SQLite database. `baseURL` (and so `page` and `request`)
-// points at that server.
+// port with its own SQLite database in a private temporary directory.
+// `baseURL` (and so `page` and `request`) points at that server.
+//
+// Specs that need extra server environment (for example an SSL_CERT_FILE) can
+// set it with `test.use({ isolatedServerEnv: { ... } })`.
 const base = require('@playwright/test');
-const { execFile, spawn } = require('child_process');
-const { promisify } = require('util');
 const fs = require('fs');
-const net = require('net');
-const os = require('os');
 const path = require('path');
-
-const repoRoot = path.resolve(__dirname, '..', '..');
-
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.unref();
-    srv.on('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const { port } = srv.address();
-      srv.close(() => resolve(port));
-    });
-  });
-}
-
-async function waitForHealthy(url, proc, logFile, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (proc.exitCode !== null) break;
-    try {
-      const res = await fetch(`${url}/healthz`);
-      if (res.ok) return;
-    } catch {
-      // not listening yet
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error(`isolated SubTrackr server did not become healthy:\n${fs.readFileSync(logFile, 'utf8')}`);
-}
+const {
+  buildServer, freePort, waitForHealthy, serverEnv, startServer, stopServer, prepareDataDir,
+} = require('./server-process');
 
 const test = base.test.extend({
-  isolatedServer: [async ({}, use) => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'subtrackr-settings-e2e-'));
-    const bin = path.join(dir, 'subtrackr');
-    await promisify(execFile)('go', ['build', '-o', bin, './cmd/server'], { cwd: repoRoot });
-    const port = await freePort();
+  isolatedServerEnv: [{}, { option: true, scope: 'worker' }],
+
+  isolatedServer: [async ({ isolatedServerEnv }, use) => {
+    const { dir } = prepareDataDir(undefined, 'worker');
     const logFile = path.join(dir, 'server.log');
-    const log = fs.openSync(logFile, 'a');
-    const proc = spawn(bin, [], {
-      cwd: repoRoot,
-      env: { ...process.env, PORT: String(port), DATABASE_PATH: path.join(dir, 'e2e.db') },
-      stdio: ['ignore', log, log],
-    });
-    const baseURL = `http://localhost:${port}`;
+    let proc;
     try {
-      await waitForHealthy(baseURL, proc, logFile, 60_000);
-      await use({ baseURL });
+      const bin = await buildServer(dir);
+      let port;
+      // freePort() picks a port that is free at that instant; with many workers
+      // (and their fake providers) starting at once, another process can grab it
+      // before Gin binds. Retry on that specific failure rather than failing the suite.
+      for (let attempt = 1; ; attempt++) {
+        port = await freePort();
+        fs.writeFileSync(logFile, '');
+        proc = startServer({ bin, logFile, env: serverEnv({ port, dbPath: path.join(dir, 'e2e.db'), extra: isolatedServerEnv }) });
+        try {
+          await waitForHealthy(`http://localhost:${port}`, proc, logFile, 60_000);
+          break;
+        } catch (err) {
+          const bindRace = proc.exitCode !== null && /address already in use/.test(fs.readFileSync(logFile, 'utf8'));
+          if (!bindRace || attempt >= 5) throw err;
+        }
+      }
+      const baseURL = `http://localhost:${port}`;
+      await use({ baseURL, port, dir, logFile, log: () => fs.readFileSync(logFile, 'utf8') });
     } finally {
-      proc.kill('SIGTERM');
-      await new Promise((r) => (proc.exitCode !== null ? r() : proc.once('exit', r)));
-      fs.closeSync(log);
+      if (proc) await stopServer(proc);
       fs.rmSync(dir, { recursive: true, force: true });
     }
   }, { scope: 'worker', timeout: 240_000 }],

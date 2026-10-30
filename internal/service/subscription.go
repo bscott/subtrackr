@@ -95,6 +95,8 @@ func (s *SubscriptionService) Duplicate(id uint) (*models.Subscription, []string
 	dup.LastCancellationReminderSent = nil
 	dup.LastCancellationReminderDate = nil
 	dup.LastCancellationReminderWindow = -1
+	dup.LastToCancelReminderSent = nil
+	dup.LastToCancelReminderAnchor = nil
 	dup.CreatedAt = time.Time{}
 	dup.UpdatedAt = time.Time{}
 
@@ -257,7 +259,9 @@ func (s *SubscriptionService) GetSubscriptionsNeedingReminders(windows []int) (m
 	result := make(map[*models.Subscription]int)
 	for i := range subscriptions {
 		sub := &subscriptions[i]
-		if sub.RenewalDate == nil || !sub.ReminderEnabled {
+		// A subscription the user intends to cancel gets the to-cancel reminder
+		// instead of a renewal message.
+		if sub.RenewalDate == nil || !sub.ReminderEnabled || sub.ToCancel {
 			continue
 		}
 
@@ -357,4 +361,49 @@ func (s *SubscriptionService) GetSubscriptionsNeedingCancellationReminders(windo
 	}
 
 	return result, nil
+}
+
+// ToCancelReminder is a to-cancel reminder that is due.
+type ToCancelReminder struct {
+	Subscription *models.Subscription
+	Deadline     time.Time
+	DaysLeft     int
+}
+
+// GetSubscriptionsNeedingToCancelReminders returns the to-cancel reminders due at
+// now, soonest deadline first. Unlike the renewal and cancellation queries it
+// reads no global settings: the per-subscription flag is the opt-in.
+func (s *SubscriptionService) GetSubscriptionsNeedingToCancelReminders(now time.Time) ([]ToCancelReminder, error) {
+	subscriptions, err := s.repo.GetToCancelSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+
+	var due []ToCancelReminder
+	for i := range subscriptions {
+		sub := &subscriptions[i]
+		if daysLeft, isDue := sub.ToCancelReminderDue(now); isDue {
+			due = append(due, ToCancelReminder{Subscription: sub, Deadline: *sub.ToCancelDeadline(), DaysLeft: daysLeft})
+		}
+	}
+	sort.SliceStable(due, func(i, j int) bool { return due[i].Deadline.Before(due[j].Deadline) })
+	return due, nil
+}
+
+// MarkRenewalReminderSent records a delivered renewal reminder unless the
+// subscription was edited since it was read, reporting whether it was recorded.
+func (s *SubscriptionService) MarkRenewalReminderSent(sub *models.Subscription, window int, sentAt time.Time) (bool, error) {
+	return s.repo.MarkRenewalReminderSent(sub, window, sentAt)
+}
+
+// MarkCancellationReminderSent records a delivered cancellation reminder unless
+// the subscription was edited since it was read, reporting whether it was recorded.
+func (s *SubscriptionService) MarkCancellationReminderSent(sub *models.Subscription, window int, sentAt time.Time) (bool, error) {
+	return s.repo.MarkCancellationReminderSent(sub, window, sentAt)
+}
+
+// MarkToCancelReminderSent records a delivered to-cancel reminder unless the
+// subscription was edited since it was read, reporting whether it was recorded.
+func (s *SubscriptionService) MarkToCancelReminderSent(sub *models.Subscription, deadline, sentAt time.Time) (bool, error) {
+	return s.repo.MarkToCancelReminderSent(sub, deadline, sentAt)
 }

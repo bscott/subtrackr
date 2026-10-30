@@ -3,6 +3,8 @@ package database
 import (
 	"fmt"
 	"log"
+	"regexp"
+	"strings"
 	"subtrackr/internal/models"
 
 	"gorm.io/gorm"
@@ -53,6 +55,7 @@ func runMigrations(db *gorm.DB) error {
 		migrateShareCount,
 		migrateReminderWindows,
 		migrateCancellationNoticeDays,
+		migrateToCancel,
 	}
 
 	for _, migration := range migrations {
@@ -64,6 +67,10 @@ func runMigrations(db *gorm.DB) error {
 	// Try to auto-migrate subscriptions after the category migration
 	// This might fail on existing databases but that's okay
 	db.AutoMigrate(&models.Subscription{})
+
+	if err := migrateUncategorizedSubscriptions(db); err != nil {
+		return err
+	}
 
 	// Ensure the subscription_tags join table exists (separate from Subscription/Tag tables
 	// so the many2many relation works regardless of column-order quirks on legacy schemas).
@@ -142,6 +149,94 @@ func migrateCategoriesToDynamic(db *gorm.DB) error {
 
 	log.Println("Migration completed: Categories converted to dynamic system")
 	return nil
+}
+
+// migrateUncategorizedSubscriptions stores uncategorized subscriptions as NULL.
+// Older releases declared category_id NOT NULL, which AutoMigrate does not relax.
+// Rows written before foreign keys were enforced can hold category_id 0 or the
+// ID of a deleted category. Both already read as having no category, but saving
+// such a row would now fail the foreign key.
+func migrateUncategorizedSubscriptions(db *gorm.DB) error {
+	var count int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name = 'category_id'").Scan(&count)
+	if count == 0 {
+		return nil
+	}
+
+	var notNull int64
+	db.Raw("SELECT COUNT(*) FROM pragma_table_info('subscriptions') WHERE name = 'category_id' AND \"notnull\" = 1").Scan(&notNull)
+	if notNull > 0 {
+		log.Println("Running migration: Allowing uncategorized subscriptions...")
+		if err := dropCategoryNotNull(db); err != nil {
+			return fmt.Errorf("make subscriptions.category_id nullable: %w", err)
+		}
+	}
+
+	result := db.Exec(`
+		UPDATE subscriptions SET category_id = NULL
+		WHERE category_id IS NOT NULL AND category_id NOT IN (SELECT id FROM categories)
+	`)
+	if result.Error != nil {
+		return fmt.Errorf("clear invalid subscription categories: %w", result.Error)
+	}
+	if result.RowsAffected > 0 {
+		log.Printf("Migration completed: %d subscriptions without a valid category marked uncategorized", result.RowsAffected)
+	}
+	return nil
+}
+
+var (
+	categoryNotNullPattern = regexp.MustCompile("(?i)([`\"\\[]?\\bcategory_id\\b[`\"\\]]?\\s+[^,]*?)\\s+NOT\\s+NULL")
+	subscriptionsDDLName   = regexp.MustCompile("(?i)^\\s*CREATE\\s+TABLE\\s+[`\"\\[]?subscriptions[`\"\\]]?")
+)
+
+// dropCategoryNotNull rebuilds subscriptions without NOT NULL on category_id, the
+// only way SQLite can change a column constraint. It edits the stored DDL rather
+// than using Migrator.AlterColumn, whose parser does not find the unquoted column
+// names in tables that pre-date GORM's quoting. The caller has foreign keys off.
+func dropCategoryNotNull(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var tableSQL string
+		if err := tx.Raw("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'subscriptions'").Scan(&tableSQL).Error; err != nil {
+			return err
+		}
+		// Preserve AUTOINCREMENT's high-water mark, including deleted IDs.
+		var sequence int64
+		if strings.Contains(strings.ToUpper(tableSQL), "AUTOINCREMENT") {
+			if err := tx.Raw("SELECT COALESCE(MAX(seq), 0) FROM sqlite_sequence WHERE name = 'subscriptions'").Scan(&sequence).Error; err != nil {
+				return err
+			}
+		}
+		rebuilt := categoryNotNullPattern.ReplaceAllString(tableSQL, "$1")
+		rebuilt = subscriptionsDDLName.ReplaceAllString(rebuilt, "CREATE TABLE subscriptions__rebuild")
+		if !strings.Contains(rebuilt, "subscriptions__rebuild") {
+			return fmt.Errorf("unexpected table definition: %s", tableSQL)
+		}
+
+		// Indexes and triggers go with the old table.
+		var dependents []string
+		if err := tx.Raw("SELECT sql FROM sqlite_master WHERE tbl_name = 'subscriptions' AND type IN ('index', 'trigger') AND sql IS NOT NULL").Scan(&dependents).Error; err != nil {
+			return err
+		}
+
+		statements := []string{
+			rebuilt,
+			"INSERT INTO subscriptions__rebuild SELECT * FROM subscriptions",
+			"DROP TABLE subscriptions",
+			"ALTER TABLE subscriptions__rebuild RENAME TO subscriptions",
+		}
+		for _, statement := range append(statements, dependents...) {
+			if err := tx.Exec(statement).Error; err != nil {
+				return err
+			}
+		}
+		if sequence > 0 {
+			if err := tx.Exec("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'subscriptions'", sequence).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // migrateCurrencyFields adds original_currency field to existing subscriptions
@@ -428,5 +523,25 @@ func migrateCancellationNoticeDays(db *gorm.DB) error {
 	}
 	db.Exec("UPDATE subscriptions SET cancellation_notice_days = 0 WHERE cancellation_notice_days IS NULL")
 
+	return nil
+}
+
+// migrateToCancel adds the to-cancel intent and its reminder state. Existing rows
+// are not opted in. Every query for these fields needs them, and the AutoMigrate
+// that follows ignores its errors, so a failure here stops startup. GORM adds the
+// columns itself so AutoMigrate sees no difference and does not rebuild the table.
+func migrateToCancel(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&models.Subscription{}) {
+		return nil // A new database gets these columns from AutoMigrate.
+	}
+	for _, field := range []string{"ToCancel", "ToCancelReminderDays", "LastToCancelReminderSent", "LastToCancelReminderAnchor"} {
+		if db.Migrator().HasColumn(&models.Subscription{}, field) {
+			continue
+		}
+		log.Printf("Running migration: Adding %s field...", field)
+		if err := db.Migrator().AddColumn(&models.Subscription{}, field); err != nil {
+			return fmt.Errorf("failed to add %s column: %w", field, err)
+		}
+	}
 	return nil
 }

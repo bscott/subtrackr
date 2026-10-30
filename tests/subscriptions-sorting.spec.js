@@ -313,6 +313,7 @@ test.describe('subscription list sorting', () => {
     await expectOrder(page, [fixture.C, fixture.B, fixture.A]);
     expect(await savedSortSpec(page)).toBe('');
     // The queued name:desc request was superseded rather than sent after the newest one.
-    expect(sent[sent.length - 1]).toBe('');
+    await expect.poll(() => sent[sent.length - 1]).toBe('');
+    expect(sent).toEqual(['name:asc', '']);
   });
 });
