@@ -9,7 +9,8 @@
     <link rel="apple-touch-icon" href="/static/images/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.json">
     <title>{{.Title}} - SubTrackr</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/js/lib/htmx-4.0.0/htmx.min.js" integrity="sha384-BvJpBiO8Kh31EqtJe5DRIeWrHWnCGkwytKs9NKFi86Hhw96dEqdEMzZDeK9iEGTc"></script>
+    <script src="/static/js/htmx-setup.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -339,7 +340,7 @@
                             hx-trigger="click"
                             class="w-full text-left text-xs px-2 py-1 rounded ${buttonClass} transition-colors cursor-pointer flex items-center justify-between"
                             title="${eventTitle}"
-                            onclick="setTimeout(function() { document.getElementById('modal').classList.remove('hidden'); }, 50);">
+                            onclick="document.getElementById('modal').classList.remove('hidden')">
                             <span class="flex items-center min-w-0 flex-1">
                                 ${iconHtml}<span class="truncate">${eventLabel}</span>
                             </span>
@@ -387,17 +388,6 @@
             });
         }
         
-        // Listen for HTMX afterSwap to show modal when content loads
-        if (typeof htmx !== 'undefined') {
-            document.body.addEventListener('htmx:afterSwap', function(evt) {
-                if (evt.detail.target.id === 'modal-content' && evt.detail.target.innerHTML.trim() !== '') {
-                    const modal = document.getElementById('modal');
-                    if (modal) {
-                        modal.classList.remove('hidden');
-                    }
-                }
-            });
-        }
     </script>
 </body>
 </html>

@@ -1,11 +1,9 @@
 // @ts-check
 // Settings page: SMTP, Pushover, Webhook and Telegram configuration.
 //
-// Tests marked test.fail() describe what users should see but currently do not.
-// The ones about error messages fail because HTMX 1.9 does not swap 4xx/5xx
-// responses, so the smtp-message.html error the handler returns never reaches
-// the page. They should start passing after the HTMX 4 upgrade; remove the
-// test.fail() then.
+// The error-message tests rely on HTMX 4 swapping 4xx/5xx responses: handlers
+// answer validation and connection failures with a 400 smtp-message.html
+// fragment, which HTMX 1.9 never put on the page.
 const http = require('http');
 const { test, expect } = require('./helpers/settings-server');
 
@@ -42,9 +40,6 @@ test.describe('SMTP', () => {
   });
 
   test('save with missing required fields shows the validation error', async ({ page }) => {
-    // Should pass after HTMX 4: the handler answers 400 with smtp-message.html,
-    // which HTMX 1.9 does not swap into #smtp-message.
-    test.fail();
     await page.goto('/settings');
     await page.locator('#smtp_host').fill('');
     await page.locator('#smtp_password').fill('');
@@ -53,9 +48,6 @@ test.describe('SMTP', () => {
   });
 
   test('Test connection shows the error for an unreachable server', async ({ page }) => {
-    // Should pass after HTMX 4: every failed SMTP test is a 400 response,
-    // which HTMX 1.9 does not swap into #smtp-message.
-    test.fail();
     await page.goto('/settings');
     await page.locator('#smtp_host').fill('127.0.0.1');
     await page.locator('#smtp_port').fill('1');
@@ -93,19 +85,17 @@ test.describe('Pushover', () => {
     expect(await page.content()).not.toContain(token);
   });
 
-  test('save with a missing app token shows the validation error', async ({ page }) => {
-    // Should pass after HTMX 4: 400 response is not swapped by HTMX 1.9.
-    test.fail();
+  test('save with a missing user key shows the validation error', async ({ page }) => {
+    // A blank app token keeps the saved one (the token is never rendered back into
+    // the form), so the user key is the field that can still be missing here.
     await page.goto('/settings');
-    await page.locator('#pushover_user_key').fill('u-e2e-user-key');
+    await page.locator('#pushover_user_key').fill('');
     await page.locator('#pushover_app_token').fill('');
     await page.locator('#pushover-form button[type="submit"]').click();
     await expect(page.locator('#pushover-message')).toContainText('User Key and App Token are required');
   });
 
   test('Test connection with missing fields shows the validation error', async ({ page }) => {
-    // Should pass after HTMX 4: 400 response is not swapped by HTMX 1.9.
-    test.fail();
     await page.goto('/settings');
     await page.locator('#pushover_user_key').fill('');
     await page.locator('#pushover_app_token').fill('');
@@ -169,8 +159,6 @@ test.describe('Webhook', () => {
   });
 
   test('save with a non-HTTP URL shows the validation error', async ({ page }) => {
-    // Should pass after HTMX 4: 400 response is not swapped by HTMX 1.9.
-    test.fail();
     await page.goto('/settings');
     await page.locator('#webhook_url').fill('ftp://example.test/hook');
     await page.locator('#webhook-form button[type="submit"]').click();
@@ -178,8 +166,6 @@ test.describe('Webhook', () => {
   });
 
   test('Test connection shows the error when the endpoint fails', async ({ page }) => {
-    // Should pass after HTMX 4: 400 response is not swapped by HTMX 1.9.
-    test.fail();
     await page.goto('/settings');
     // Port 1 on loopback refuses the connection immediately.
     await page.locator('#webhook_url').fill('http://127.0.0.1:1/hook');
@@ -216,8 +202,6 @@ test.describe('Telegram', () => {
   });
 
   test('save with a missing chat ID shows the validation error', async ({ page }) => {
-    // Should pass after HTMX 4: 400 response is not swapped by HTMX 1.9.
-    test.fail();
     await page.goto('/settings');
     await page.locator('#telegram_bot_token').fill('123456:e2e-bot-token');
     await page.locator('#telegram_chat_id').fill('');
@@ -226,8 +210,6 @@ test.describe('Telegram', () => {
   });
 
   test('Test connection with missing fields shows the validation error', async ({ page }) => {
-    // Should pass after HTMX 4: 400 response is not swapped by HTMX 1.9.
-    test.fail();
     await page.goto('/settings');
     await page.locator('#telegram_bot_token').fill('');
     await page.locator('#telegram_chat_id').fill('');

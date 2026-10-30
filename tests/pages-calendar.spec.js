@@ -163,6 +163,48 @@ test('clicking a renewal or cancel-by event opens that subscription in the edit 
   }
 });
 
+test('closing the modal before the form arrives keeps it closed', async ({ page, request }) => {
+  // The modal opens on click and nothing reopens it when the response lands, so a
+  // backdrop click while the form is still loading is final (it used to reappear).
+  const { year, month } = futureMonth(2);
+  const data = fixtures(request);
+  try {
+    const category = await data.category(uniqueName('Calendar race'));
+    const sub = await data.subscription({ name: uniqueName('Cal race'), category_id: String(category.id), cost: '9', renewal_date: isoDate(utcDate(year, month, 12)) });
+
+    await page.goto(`/calendar?year=${year}&month=${month}`);
+    const modal = page.locator('#modal');
+
+    let release = () => {};
+    const held = new Promise(resolve => { release = resolve; });
+    await page.route(`**/form/subscription/${sub.id}`, async route => {
+      const response = await route.fetch();
+      await held;
+      await route.fulfill({ response });
+    });
+
+    await dayCell(page, year, month, 12).locator('button', { hasText: sub.name }).click();
+    await expect(modal).toBeVisible();
+    await modal.click({ position: { x: 5, y: 5 } });
+    await expect(modal).toBeHidden();
+
+    const delivered = page.waitForResponse(r => new URL(r.url()).pathname === `/form/subscription/${sub.id}`);
+    release();
+    await delivered;
+    // The form is swapped into the closed modal, which stays closed.
+    await expect(page.locator('#modal-content #name')).toHaveValue(sub.name);
+    await page.waitForTimeout(300);
+    await expect(modal).toBeHidden();
+
+    // Opening it again shows the loaded form.
+    await dayCell(page, year, month, 12).locator('button', { hasText: sub.name }).click();
+    await expect(modal).toBeVisible();
+    await expect(page.locator('#modal-content #name')).toHaveValue(sub.name);
+  } finally {
+    await data.cleanup();
+  }
+});
+
 test('calendar export link downloads the iCal file', async ({ page }) => {
   await page.goto('/calendar');
   const downloadPromise = page.waitForEvent('download');

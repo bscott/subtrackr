@@ -1,5 +1,6 @@
 // Optional login, logout, and password reset. These change global server
-// state, so they run in the `isolated` project against its own server (:8083).
+// state, so they run in the `isolated` project against its own server
+// (E2E_ISOLATED_PORT, default :8083).
 const { test, expect } = require('@playwright/test');
 const { startSmtpSink } = require('./helpers/isolated-smtp-sink');
 
@@ -121,10 +122,8 @@ test('unauthenticated callers cannot change login settings', async ({ request })
 });
 
 test('a wrong password shows the login error and keeps the user out', async ({ page }) => {
-  // BUG (htmx 1.9.10): /api/auth/login answers a bad password with HTTP 401 and
-  // an error fragment for #login-error, but htmx 1.x does not swap 4xx
-  // responses, so nothing is shown. Remove test.fail() once the error renders.
-  test.fail();
+  // /api/auth/login answers a bad password with HTTP 401 and an error fragment
+  // for #login-error; HTMX 4 swaps it (HTMX 1.9 dropped 4xx responses).
   await page.goto('/login');
   await signIn(page, USERNAME, 'wrong-password');
   await expect(page.locator('#login-error')).toContainText('Invalid username or password');
@@ -158,10 +157,32 @@ test('the right password logs in and returns to the requested page', async ({ pa
   await expect(page).toHaveURL(/\/$/);
 });
 
-test('login ignores an off-site redirect target', async ({ page }) => {
+test('login ignores an off-site redirect target', async ({ page, baseURL }) => {
   await page.goto('/login?redirect=' + encodeURIComponent('https://evil.example/'));
   await signIn(page, USERNAME, PASSWORD);
-  await expect(page).toHaveURL(/localhost:8083\/$/);
+  await expect(page).toHaveURL(`${baseURL}/`);
+});
+
+test('an HTMX request after the session expires sends the page to login and back', async ({ page, context }) => {
+  await page.goto('/login?redirect=' + encodeURIComponent('/settings?section=e2e'));
+  await signIn(page, USERNAME, PASSWORD);
+  await expect(page).toHaveURL(/\/settings\?section=e2e$/);
+
+  // The session ends while the page is open (expiry, logout in another tab).
+  await context.clearCookies();
+  const toggle = page.waitForResponse(r => new URL(r.url()).pathname === '/api/settings/notifications/renewal');
+  await page.locator('#renewal-toggle').click();
+  const response = await toggle;
+  expect(response.status()).toBe(401);
+  expect(response.headers()['hx-redirect']).toBe('/login?redirect=%2Fsettings%3Fsection%3De2e');
+
+  // The whole page goes to the login screen; nothing is swapped into the settings page.
+  await expect(page).toHaveURL(/\/login\?redirect=%2Fsettings%3Fsection%3De2e$/);
+  await expect(page.getByRole('heading', { name: 'Sign in to SubTrackr' })).toBeVisible();
+  await expect(page.locator('#login-error')).toBeEmpty();
+
+  await signIn(page, USERNAME, PASSWORD);
+  await expect(page).toHaveURL(/\/settings\?section=e2e$/);
 });
 
 test('logout ends the session', async ({ page }) => {
@@ -213,11 +234,9 @@ test('a tampered reset token does not change the password', async ({ page }) => 
 });
 
 test('reset error messages are shown to the user', async ({ page }) => {
-  // BUG (htmx 1.9.10): /api/auth/reset-password answers validation failures
-  // (mismatch, too short, bad token) with HTTP 400 and an error fragment, but
-  // htmx 1.x does not swap 4xx responses, so the form just sits there.
-  // Remove test.fail() once the error renders.
-  test.fail();
+  // /api/auth/reset-password answers validation failures (mismatch, too short,
+  // bad token) with HTTP 400 and an error fragment, which HTMX 4 swaps in
+  // (HTMX 1.9 dropped 4xx responses, so the form just sat there).
   const token = await requestResetLink(page);
   await page.goto('/reset-password?token=' + encodeURIComponent(token));
   await page.getByLabel('New Password').fill(NEW_PASSWORD);

@@ -258,4 +258,61 @@ test.describe('subscription list sorting', () => {
     await clickSort(page, 'name', 'name:asc');
     await expectOrder(page, [fixture.A, fixture.B, fixture.C]);
   });
+
+  test('a sort request that fails on the network does not leave a pending sort behind', async ({ page, request }) => {
+    // HTMX 4 fires htmx:after:request only for responses; a dropped connection or
+    // timeout is reported as htmx:error. If sorting.js missed it, the click below
+    // would build on the lost name:asc request and ask for name:desc instead.
+    const fixture = await seedSortFixture(request);
+    await gotoSubscriptions(page);
+
+    await page.route(url => url.pathname === '/api/subscriptions' && url.searchParams.has('sorts'),
+      route => route.abort('connectionrefused'), { times: 1 });
+    const failed = page.waitForEvent('requestfailed', r => new URL(r.url()).searchParams.has('sorts'));
+    await sortButton(page, 'name').click();
+    await failed;
+    await page.waitForTimeout(300);
+
+    await expect(list(page).locator('tbody')).toBeVisible();
+    await expectSortSpec(page, '');
+    await expectIndicator(page, 'name', null);
+    await expectOrder(page, [fixture.C, fixture.B, fixture.A]);
+
+    await clickSort(page, 'name', 'name:asc');
+    await expectOrder(page, [fixture.A, fixture.B, fixture.C]);
+    await expectIndicator(page, 'name', 1);
+  });
+
+  test('a third quick click wins over a queued second one', async ({ page, request }) => {
+    const fixture = await seedSortFixture(request);
+    await gotoSubscriptions(page);
+
+    let releaseFirst = () => {};
+    const firstHeld = new Promise(resolve => { releaseFirst = resolve; });
+    const sent = [];
+    await page.route(url => url.pathname === '/api/subscriptions' && url.searchParams.has('sorts'), async route => {
+      sent.push(new URL(route.request().url()).searchParams.get('sorts'));
+      if (sent.length === 1) {
+        const response = await route.fetch();
+        await firstHeld;
+        await route.fulfill({ response });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // name:asc hangs, then name:desc and unsorted are clicked while it is in flight.
+    await sortButton(page, 'name').click();
+    await expect.poll(() => sent.length).toBe(1);
+    await sortButton(page, 'name').click();
+    await sortButton(page, 'name').click();
+    releaseFirst();
+
+    await expectSortSpec(page, '');
+    await expectIndicator(page, 'name', null);
+    await expectOrder(page, [fixture.C, fixture.B, fixture.A]);
+    expect(await savedSortSpec(page)).toBe('');
+    // The queued name:desc request was superseded rather than sent after the newest one.
+    expect(sent[sent.length - 1]).toBe('');
+  });
 });

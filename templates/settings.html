@@ -9,7 +9,8 @@
     <link rel="apple-touch-icon" href="/static/images/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.json">
     <title>{{.Title}} - SubTrackr</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/js/lib/htmx-4.0.0/htmx.min.js" integrity="sha384-BvJpBiO8Kh31EqtJe5DRIeWrHWnCGkwytKs9NKFi86Hhw96dEqdEMzZDeK9iEGTc"></script>
+    <script src="/static/js/htmx-setup.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -316,9 +317,10 @@
                     </button>
                 </form>
                 <script>
-                    document.body.addEventListener('htmx:afterRequest', function(event) {
-                        if (event.detail.pathInfo.requestPath === '/api/settings/base-url' && event.detail.successful) {
-                            var btn = event.detail.elt.querySelector('button[type="submit"]');
+                    document.addEventListener('htmx:after:request', function(event) {
+                        if (subtrackrHtmx.requestPath(event) === '/api/settings/base-url' && subtrackrHtmx.responseJSON(event)) {
+                            var form = event.detail.ctx.sourceElement;
+                            var btn = form && form.querySelector('button[type="submit"]');
                             if (btn) {
                                 var original = btn.textContent;
                                 btn.textContent = 'Saved!';
@@ -375,10 +377,12 @@
                 </div>
 
                 <script>
-                    document.body.addEventListener('htmx:afterRequest', function(event) {
-                        if (event.detail.pathInfo.requestPath === '/api/settings/ical/toggle') {
+                    document.addEventListener('htmx:after:request', function(event) {
+                        var path = subtrackrHtmx.requestPath(event);
+                        var data = subtrackrHtmx.responseJSON(event);
+                        if (!data) return;
+                        if (path === '/api/settings/ical/toggle') {
                             try {
-                                var data = JSON.parse(event.detail.xhr.responseText);
                                 var btn = document.getElementById('ical-toggle-btn');
                                 var section = document.getElementById('ical-url-section');
                                 var input = document.getElementById('ical-url-input');
@@ -402,9 +406,8 @@
                                 }
                             } catch(e) {}
                         }
-                        if (event.detail.pathInfo.requestPath === '/api/settings/ical/regenerate') {
+                        if (path === '/api/settings/ical/regenerate') {
                             try {
-                                var data = JSON.parse(event.detail.xhr.responseText);
                                 if (data.url) {
                                     document.getElementById('ical-url-input').value = data.url;
                                 }
@@ -446,9 +449,9 @@
                             </div>
                         </div>
                         <form id="restore-form" enctype="multipart/form-data" onsubmit="submitRestore(event)">
-                            <div class="flex items-center gap-3">
+                            <div class="flex flex-wrap items-center gap-3">
                                 <input type="file" name="backup_file" id="backup_file" accept=".json" required
-                                    class="text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-100 file:text-blue-700 dark:file:bg-blue-800 dark:file:text-blue-200 hover:file:bg-blue-200 dark:hover:file:bg-blue-700">
+                                    class="min-w-0 max-w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-100 file:text-blue-700 dark:file:bg-blue-800 dark:file:text-blue-200 hover:file:bg-blue-200 dark:hover:file:bg-blue-700">
                                 <select name="mode" class="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2">
                                     <option value="replace">{{t .Lang "settings.restore_replace"}}</option>
                                     <option value="merge">{{t .Lang "settings.restore_merge"}}</option>
@@ -469,9 +472,9 @@
                             </div>
                         </div>
                         <form id="wallos-form" enctype="multipart/form-data" onsubmit="submitWallosImport(event)">
-                            <div class="flex items-center gap-3">
+                            <div class="flex flex-wrap items-center gap-3">
                                 <input type="file" name="wallos_file" id="wallos_file" accept=".json" required
-                                    class="text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-100 file:text-blue-700 dark:file:bg-blue-800 dark:file:text-blue-200 hover:file:bg-blue-200 dark:hover:file:bg-blue-700">
+                                    class="min-w-0 max-w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-100 file:text-blue-700 dark:file:bg-blue-800 dark:file:text-blue-200 hover:file:bg-blue-200 dark:hover:file:bg-blue-700">
                                 <select name="mode" class="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2">
                                     <option value="merge">{{t .Lang "settings.restore_merge"}}</option>
                                     <option value="replace">{{t .Lang "settings.restore_replace"}}</option>
@@ -990,6 +993,7 @@
                                {{if eq .Code $.Currency}}checked{{end}}
                                hx-post="/api/settings/currency"
                                hx-trigger="change"
+                               hx-swap="none"
                                hx-vals='{"currency": "{{.Code}}"}'
                                class="mr-2 text-primary focus:ring-primary">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{.Symbol}} {{.Code}} ({{.Name}})</span>
@@ -1005,13 +1009,14 @@
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">{{t .Lang "settings.date_format"}}</h3>
                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">{{t .Lang "settings.date_format_description"}}</p>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label class="flex items-center cursor-pointer">
                         <input type="radio"
                                name="date_format"
                                value="MM/DD/YYYY"
                                {{if or (eq .DateFormat "MM/DD/YYYY") (eq .DateFormat "")}}checked{{end}}
                                hx-post="/api/settings/date-format"
+                               hx-swap="none"
                                hx-trigger="change"
                                hx-vals='{"date_format": "MM/DD/YYYY"}'
                                class="mr-2 text-primary focus:ring-primary">
@@ -1024,6 +1029,7 @@
                                value="DD/MM/YYYY"
                                {{if eq .DateFormat "DD/MM/YYYY"}}checked{{end}}
                                hx-post="/api/settings/date-format"
+                               hx-swap="none"
                                hx-trigger="change"
                                hx-vals='{"date_format": "DD/MM/YYYY"}'
                                class="mr-2 text-primary focus:ring-primary">
@@ -1033,9 +1039,23 @@
                     <label class="flex items-center cursor-pointer">
                         <input type="radio"
                                name="date_format"
+                               value="DD.MM.YYYY"
+                               {{if eq .DateFormat "DD.MM.YYYY"}}checked{{end}}
+                               hx-post="/api/settings/date-format"
+                               hx-swap="none"
+                               hx-trigger="change"
+                               hx-vals='{"date_format": "DD.MM.YYYY"}'
+                               class="mr-2 text-primary focus:ring-primary">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">DD.MM.YYYY (24.02.2026)</span>
+                    </label>
+
+                    <label class="flex items-center cursor-pointer">
+                        <input type="radio"
+                               name="date_format"
                                value="YYYY-MM-DD"
                                {{if eq .DateFormat "YYYY-MM-DD"}}checked{{end}}
                                hx-post="/api/settings/date-format"
+                               hx-swap="none"
                                hx-trigger="change"
                                hx-vals='{"date_format": "YYYY-MM-DD"}'
                                class="mr-2 text-primary focus:ring-primary">
@@ -1161,7 +1181,7 @@
                     <!-- Subscriptions -->
                     <div class="mb-4">
                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{{t .Lang "api_docs.section_subscriptions"}}</h4>
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto transition-colors duration-200">
                             <table class="min-w-full">
                                 <thead class="bg-gray-100 dark:bg-gray-600">
                                     <tr>
@@ -1204,7 +1224,7 @@
                     <!-- Statistics & Export -->
                     <div>
                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{{t .Lang "api_docs.section_stats_export"}}</h4>
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto transition-colors duration-200">
                             <table class="min-w-full">
                                 <thead class="bg-gray-100 dark:bg-gray-600">
                                     <tr>
@@ -1237,7 +1257,7 @@
                     <!-- iCal Subscription -->
                     <div>
                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{{t .Lang "api_docs.section_ical"}}</h4>
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto transition-colors duration-200">
                             <table class="min-w-full">
                                 <thead class="bg-gray-100 dark:bg-gray-600">
                                     <tr>
@@ -1261,7 +1281,7 @@
                     <div>
                         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">{{t .Lang "api_docs.section_mcp"}}</h4>
                         <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">{{t .Lang "api_docs.mcp_intro"}}</p>
-                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-hidden transition-colors duration-200 mb-3">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg overflow-x-auto transition-colors duration-200 mb-3">
                             <table class="min-w-full">
                                 <thead class="bg-gray-100 dark:bg-gray-600">
                                     <tr>
@@ -1434,24 +1454,18 @@
             }
         }
 
-        document.body.addEventListener('htmx:afterRequest', function(evt) {
-            const path = evt.detail.pathInfo.requestPath;
-            
-            // Only parse JSON for notification endpoints
-            if (path.includes('/api/settings/notifications/')) {
-                try {
-                    const response = JSON.parse(evt.detail.xhr.responseText);
-                    
-                    if (path === '/api/settings/notifications/renewal') {
-                        updateToggle(response, 'renewal-toggle');
-                    }
-                    
-                    if (path === '/api/settings/notifications/highcost') {
-                        updateToggle(response, 'highcost-toggle');
-                    }
-                } catch (e) {
-                    // Response is not JSON, ignore
-                }
+        const notificationToggles = {
+            '/api/settings/notifications/renewal': 'renewal-toggle',
+            '/api/settings/notifications/highcost': 'highcost-toggle',
+            '/api/settings/notifications/cancellation': 'cancellation-toggle'
+        };
+
+        document.addEventListener('htmx:after:request', function(evt) {
+            const toggleId = notificationToggles[subtrackrHtmx.requestPath(evt)];
+            if (!toggleId) return;
+            const response = subtrackrHtmx.responseJSON(evt);
+            if (response && typeof response.enabled === 'boolean') {
+                updateToggle(response, toggleId);
             }
         });
         function submitRestore(event) {

@@ -72,13 +72,9 @@ test.describe('subscription search', () => {
   });
 
   test('the "no matches" message survives a sort swap', async ({ page, request }) => {
-    // APP BUG with HTMX 1.9.10: subscription-search.js un-hides #subscription-search-empty
-    // in htmx:afterSwap, but HTMX's settle step then copies the server-rendered
-    // class="hidden" back onto that id-matched element (observed: visible at afterSwap,
-    // hidden at afterSettle). Rows stay filtered, so the user sees an empty table with no
-    // message. HTMX 4 changes swap/settle, so this may start passing after the upgrade;
-    // if Playwright then reports "expected to fail but passed", remove test.fail().
-    test.fail();
+    // HTMX's settle step copies the server-rendered class="hidden" back onto the
+    // id-matched #subscription-search-empty after htmx:after:swap, so
+    // subscription-search.js re-applies the filter on htmx:after:settle as well.
     const { prefix } = await seedSearchFixture(request);
     await gotoSubscriptions(page);
     await search(page).fill(`${prefix} nothing here`);
@@ -99,15 +95,22 @@ test.describe('subscription search', () => {
     // Hold the sort request that the reload issues so the search is typed before it swaps.
     let release = () => {};
     const held = new Promise(resolve => { release = resolve; });
+    let markRequested = () => {};
+    const requested = new Promise(resolve => { markRequested = resolve; });
     await page.route(url => url.pathname === '/api/subscriptions' && url.searchParams.has('sorts'), async route => {
+      markRequested();
       const response = await route.fetch();
       await held;
       await route.fulfill({ response });
     }, { times: 1 });
     const swapped = page.waitForResponse(r => new URL(r.url()).searchParams.get('sorts') === 'cost:asc');
 
-    await page.reload();
+    // Some engines hold the load event for the in-flight sort request, so only wait
+    // for the DOM, then make sure the race is real: the sort is pending while we type.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await requested;
     await search(page).fill(`${prefix} video`);
+    await expectShown(page, [beta], [alpha, gamma]);
     release();
     await swapped;
     await expectSortSpec(page, 'cost:asc');

@@ -848,10 +848,10 @@ func (h *SubscriptionHandler) CreateSubscription(c *gin.Context) {
 		if c.GetHeader("HX-Request") != "" {
 			c.Header("HX-Retarget", "#form-errors")
 			c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
-				"Error": err.Error(),
+				"Error": "Unable to create subscription. Check the selected category and try again.",
 			})
 		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unable to create subscription. Check the selected category and try again."})
 		}
 		return
 	}
@@ -908,12 +908,10 @@ func (h *SubscriptionHandler) DuplicateSubscription(c *gin.Context) {
 	created, tagNames, err := h.service.Duplicate(uint(id))
 	if err != nil {
 		log.Printf("Failed to duplicate subscription %d: %v", id, err)
-		if c.GetHeader("HX-Request") != "" {
-			c.Header("HX-Retarget", "#form-errors")
-			c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{"Error": err.Error()})
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		}
+		// Duplicate is a list action, so there may be no open form to retarget.
+		// The shared HTMX error handler presents this message without replacing
+		// the list or the button that initiated the request.
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to duplicate subscription. Please try again."})
 		return
 	}
 
@@ -1064,9 +1062,10 @@ func (h *SubscriptionHandler) UpdateSubscription(c *gin.Context) {
 	// Update subscription
 	updated, err := h.service.Update(uint(id), existing)
 	if err != nil {
+		log.Printf("Failed to update subscription %d: %v", id, err)
 		c.Header("HX-Retarget", "#form-errors")
 		c.HTML(http.StatusBadRequest, "form-errors.html", gin.H{
-			"Error": err.Error(),
+			"Error": "Unable to update subscription. Check the selected category and try again.",
 		})
 		return
 	}
@@ -1119,7 +1118,8 @@ func (h *SubscriptionHandler) DeleteSubscription(c *gin.Context) {
 
 	err = h.service.Delete(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to delete subscription %d: %v", id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to delete subscription. Please try again."})
 		return
 	}
 

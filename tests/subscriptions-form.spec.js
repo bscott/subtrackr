@@ -342,10 +342,8 @@ test.describe('subscription form server errors', () => {
   });
 
   test('a failed create shows the server error in the form', async ({ page, request }) => {
-    // BUG with HTMX 1.9.10: 4xx responses are not swapped, so the error fragment is
-    // dropped and the user sees nothing happen. HTMX 4 swaps 4xx/5xx by default, so this
-    // should start passing after the upgrade; then remove test.fail().
-    test.fail();
+    // HTMX 4 swaps 4xx responses, so the form-errors.html fragment reaches #form-errors
+    // (HTMX 1.9 dropped it and the user saw nothing happen).
     await openFilledCreate(page, request);
     await submitFailing(page);
     await expect(page.locator('#form-errors')).toContainText(serverError, { timeout: 2000 });
@@ -363,11 +361,69 @@ test.describe('subscription form server errors', () => {
   });
 
   test('a failed edit shows the server error in the form', async ({ page, request }) => {
-    // BUG with HTMX 1.9.10: see "a failed create shows the server error in the form".
-    test.fail();
     await openChangedEdit(page, request);
     await submitFailing(page);
     await expect(page.locator('#form-errors')).toContainText(serverError, { timeout: 2000 });
     await expect(modal(page)).toBeVisible();
+  });
+
+  test('a create the real server rejects shows its error in the form', async ({ page, request }) => {
+    // No mocked response: the category disappears between opening and submitting
+    // the form, so the handler answers 400 with form-errors.html and HX-Retarget.
+    const name = uniqueName('Create Rejected');
+    const category = await createCategory(request);
+    await gotoSubscriptions(page);
+    await openAddForm(page);
+    const f = form(page);
+    await f.locator('#name').fill(name);
+    await f.locator('#cost').fill('4.5');
+    await f.locator('#category_id').selectOption(String(category.id));
+    await f.locator('#schedule_combo').selectOption('Monthly_1');
+    await f.locator('#status').selectOption('Active');
+    expect((await request.delete(`/api/categories/${category.id}`)).ok()).toBeTruthy();
+
+    const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/subscriptions'
+      && r.request().method() === 'POST');
+    await markDocument(page);
+    await f.locator('button[type="submit"]').click();
+    expect((await response).status()).toBe(400);
+
+    await expect(page.locator('#form-errors')).toContainText('Unable to create subscription');
+    await expect(page.locator('#form-errors')).not.toContainText('FOREIGN KEY');
+    await expect(page.locator('#form-errors')).not.toContainText('{');
+    await expectNotReloaded(page);
+    await expect(modal(page)).toBeVisible();
+    await expect(f.locator('#name')).toHaveValue(name);
+    expect(await findSubscription(request, name)).toBeUndefined();
+  });
+
+  test('opening the form twice runs its script cleanly each time', async ({ page, request }) => {
+    // The form's inline script runs in the page's global scope on every load into
+    // the modal; a top-level let/const would throw "already been declared" on the
+    // second open and leave the form's helpers (category creation, autopay) dead.
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const categoryPosts = [];
+    page.on('request', r => {
+      if (new URL(r.url()).pathname === '/api/categories' && r.method() === 'POST') categoryPosts.push(r);
+    });
+
+    await gotoSubscriptions(page);
+    await openAddForm(page);
+    await page.locator('#modal-content button[type="button"]:visible', { hasText: anyLocale('common.cancel') }).click();
+    await expect(modal(page)).toBeHidden();
+    await openAddForm(page);
+
+    const categoryName = uniqueName('Inline Cat');
+    await page.locator('#add-category-btn').click();
+    await page.locator('#new-category-name').fill(categoryName);
+    await page.locator('#new-category-name').press('Enter');
+    await expect(form(page).locator('#category_id option:checked')).toHaveText(categoryName);
+
+    expect(errors).toEqual([]);
+    // One Enter, one category: the keydown listener is not registered once per open.
+    expect(categoryPosts).toHaveLength(1);
+    await request.delete(`/api/categories/${(await (await request.get('/api/categories')).json())
+      .find(c => c.name === categoryName).id}`);
   });
 });

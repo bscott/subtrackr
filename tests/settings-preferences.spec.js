@@ -78,11 +78,6 @@ test.describe('notification preferences', () => {
   });
 
   test('cancellation reminder toggle updates as soon as it is clicked', async ({ page, request }) => {
-    // App bug, unrelated to HTMX: the htmx:afterRequest listener in settings.html
-    // only updates #renewal-toggle and #highcost-toggle, so the cancellation
-    // toggle keeps its old look until the page is reloaded. When porting the
-    // listener to HTMX 4, handle /api/settings/notifications/cancellation too.
-    test.fail();
     const original = (await notificationSettings(request)).cancellation_reminders;
     const toggle = page.locator('#cancellation-toggle');
     try {
