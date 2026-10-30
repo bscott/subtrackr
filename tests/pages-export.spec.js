@@ -1,6 +1,7 @@
 // @ts-check
 // Data export: CSV, JSON, iCal and backup downloads, from the API and from the page links.
 // cancellation-notice.spec.js already checks the CSV notice column; this covers the rest of the formats.
+const fs = require('fs');
 const { test, expect } = require('@playwright/test');
 const { uniqueName, daysFromNow, isoDate, fixtures, csvRecords, icalEvents } = require('./helpers/pages');
 
@@ -180,12 +181,20 @@ test('backup is an attachment with subscriptions and current stats', async ({ re
 
 test('settings page export and backup links download files', async ({ page }) => {
   await page.goto('/settings');
-  for (const [href, filename] of [['/api/export/csv', 'subscriptions.csv'], ['/api/export/json', 'subscriptions.json'], ['/api/backup', 'subtrackr-backup.json']]) {
+  const downloads = [
+    ['/api/export/csv', 'subscriptions.csv', (body) => expect(body).toMatch(/^ID,Name,Category,/)],
+    ['/api/export/json', 'subscriptions.json', (body) => expect(Array.isArray(JSON.parse(body).subscriptions)).toBe(true)],
+    ['/api/backup', 'subtrackr-backup.json', (body) => expect(JSON.parse(body).version).toBe('1.0')],
+  ];
+  for (const [href, filename, checkBody] of downloads) {
     const link = page.locator(`a[href="${href}"]`);
     await expect(link).toHaveCount(1);
     const downloadPromise = page.waitForEvent('download');
     await link.click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe(filename);
+    checkBody(fs.readFileSync(await download.path(), 'utf8'));
+    // The file is saved; the browser must not navigate away to show it.
+    await expect(page).toHaveURL(/\/settings$/);
   }
 });

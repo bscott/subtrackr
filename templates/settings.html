@@ -292,10 +292,10 @@
                 <h3 class="text-base font-medium text-gray-900 dark:text-white mb-4">{{t .Lang "settings.export_data"}}</h3>
                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">{{t .Lang "settings.export_data_description"}}</p>
                 <div class="flex space-x-3">
-                    <a href="/api/export/csv" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 inline-block transition-colors duration-150">
+                    <a href="/api/export/csv" download class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 inline-block transition-colors duration-150">
                         {{t .Lang "settings.export_csv"}}
                     </a>
-                    <a href="/api/export/json" class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 inline-block transition-colors duration-150">
+                    <a href="/api/export/json" download class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 inline-block transition-colors duration-150">
                         {{t .Lang "settings.export_json"}}
                     </a>
                 </div>
@@ -435,7 +435,7 @@
                             <h4 class="text-sm font-medium text-yellow-900 dark:text-yellow-200">{{t .Lang "settings.backup_data"}}</h4>
                             <p class="text-sm text-yellow-800 dark:text-yellow-300">{{t .Lang "settings.create_backup_description"}}</p>
                         </div>
-                        <a href="/api/backup" class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-yellow-700 inline-block">
+                        <a href="/api/backup" download class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-yellow-700 inline-block">
                             {{t .Lang "settings.create_backup"}}
                         </a>
                     </div>

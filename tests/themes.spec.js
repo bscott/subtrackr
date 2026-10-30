@@ -52,11 +52,15 @@ async function expectTheme(page, name, label) {
     await expect.poll(() => page.locator('body').evaluate((el) => getComputedStyle(el).color), { message: `${label}: body text colour` })
       .toBe(expected.textColor);
   }
-  const background = await pageBackground(page);
-  const lum = luminance(background);
-  expect(lum, `${label}: readable page background (${background})`).not.toBeNull();
-  if (expected.dark) expect(lum, `${label}: dark background, got ${background}`).toBeLessThan(0.35);
-  else expect(lum, `${label}: light background, got ${background}`).toBeGreaterThan(0.75);
+  // Pages fade between themes (transition-colors), and a slow browser can still
+  // be fading long after network idle, so wait for the colour to arrive.
+  await expect(async () => {
+    const background = await pageBackground(page);
+    const lum = luminance(background);
+    expect(lum, `${label}: readable page background (${background})`).not.toBeNull();
+    if (expected.dark) expect(lum, `${label}: dark background, got ${background}`).toBeLessThan(0.35);
+    else expect(lum, `${label}: light background, got ${background}`).toBeGreaterThan(0.75);
+  }).toPass({ timeout: 5_000 });
 }
 
 test.beforeAll(async ({ playwright, baseURL }) => {
