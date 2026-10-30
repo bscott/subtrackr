@@ -172,8 +172,8 @@
         <main class="flex-1 p-4">
             <div class="max-w-7xl mx-auto">
                 <!-- Calendar Header -->
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-4">
+                <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center justify-between mb-6">
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-4">
                         <a href="/calendar?year={{.PrevMonth.Year}}&month={{printf "%d" (int .PrevMonth.Month)}}" 
                            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

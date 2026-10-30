@@ -168,6 +168,10 @@ test('an HTMX request after the session expires sends the page to login and back
   await signIn(page, USERNAME, PASSWORD);
   await expect(page).toHaveURL(/\/settings\?section=e2e$/);
 
+  // Let initial HTMX settings loads finish before expiring the session, so
+  // the toggle below is the request that observes expiry.
+  await page.waitForLoadState('networkidle');
+
   // The session ends while the page is open (expiry, logout in another tab).
   await context.clearCookies();
   const toggle = page.waitForResponse(r => new URL(r.url()).pathname === '/api/settings/notifications/renewal');

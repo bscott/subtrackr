@@ -9,7 +9,7 @@ const screenshotDir = path.resolve(__dirname, '..', '..', 'test-results', 'ux-sc
 async function saveScreenshot(page, name, options = {}) {
   fs.mkdirSync(screenshotDir, { recursive: true });
   const file = path.join(screenshotDir, `${name}.png`);
-  await page.screenshot({ path: file, fullPage: true, ...options });
+  await page.screenshot({ path: file, fullPage: true, scale: 'css', ...options });
   return file;
 }
 
