@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -15,27 +16,54 @@ import (
 // Schema changes can rebuild a table (create a copy, drop the original,
 // rename). They run on one pinned connection with foreign keys off, as SQLite
 // requires, so dropping subscriptions neither fails on nor cascade-deletes
-// rows in subscription_tags. The connection gets its previous setting back
-// before it returns to the pool.
+// rows in subscription_tags. legacy_alter_table keeps the rename from rejecting
+// a user's view or trigger that names the dropped table. The connection gets its
+// previous settings back before it returns to the pool.
 func RunMigrations(db *gorm.DB) error {
 	return db.Connection(func(conn *gorm.DB) error {
 		// A fresh session keeps one statement's error from sticking to the next.
 		conn = conn.Session(&gorm.Session{})
-		var foreignKeys int
-		if err := conn.Raw("PRAGMA foreign_keys").Scan(&foreignKeys).Error; err != nil {
-			return err
-		}
-		if err := conn.Exec("PRAGMA foreign_keys = OFF").Error; err != nil {
-			return err
-		}
-		defer conn.Exec(fmt.Sprintf("PRAGMA foreign_keys = %d", foreignKeys))
-		return runMigrations(conn)
+		return withPragma(conn, "foreign_keys", 0, func() error {
+			return withPragma(conn, "legacy_alter_table", 1, func() error {
+				return runMigrations(conn)
+			})
+		})
 	})
+}
+
+// withPragma runs fn with a connection setting changed. SQLite ignores some
+// settings without an error, so both the change and the restore are read back:
+// a pooled connection left without foreign key enforcement must not go unnoticed.
+func withPragma(conn *gorm.DB, name string, value int, fn func() error) (err error) {
+	var previous int
+	if err := conn.Raw("PRAGMA " + name).Scan(&previous).Error; err != nil {
+		return err
+	}
+	set := func(want int) error {
+		if err := conn.Exec(fmt.Sprintf("PRAGMA %s = %d", name, want)).Error; err != nil {
+			return err
+		}
+		var got int
+		if err := conn.Raw("PRAGMA " + name).Scan(&got).Error; err != nil {
+			return err
+		}
+		if got != want {
+			return fmt.Errorf("PRAGMA %s is %d, want %d", name, got, want)
+		}
+		return nil
+	}
+	if err := set(value); err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, set(previous)) }()
+	return fn()
 }
 
 func runMigrations(db *gorm.DB) error {
 	// Auto-migrate non-problematic models first
-	err := db.AutoMigrate(&models.Category{}, &models.Settings{}, &models.APIKey{}, &models.ExchangeRate{}, &models.Tag{})
+	err := preservingSchemaMetadata(db, func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&models.Category{}, &models.Settings{}, &models.APIKey{}, &models.ExchangeRate{}, &models.Tag{})
+	})
 	if err != nil {
 		return err
 	}
@@ -64,9 +92,9 @@ func runMigrations(db *gorm.DB) error {
 		}
 	}
 
-	// Try to auto-migrate subscriptions after the category migration
-	// This might fail on existing databases but that's okay
-	db.AutoMigrate(&models.Subscription{})
+	if err := autoMigrateSubscriptions(db); err != nil {
+		return err
+	}
 
 	if err := migrateUncategorizedSubscriptions(db); err != nil {
 		return err
@@ -87,6 +115,183 @@ func runMigrations(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// autoMigrateSubscriptions runs after the migrations above have added every column
+// the application needs, so an existing database works without it: GORM cannot
+// parse the DDL of some older tables, and those have always carried on unchanged.
+// A failure therefore rolls back and logs instead of stopping startup. A new
+// database has no table yet, and needs this step to succeed.
+func autoMigrateSubscriptions(db *gorm.DB) error {
+	err := preservingSchemaMetadata(db, func(tx *gorm.DB) error {
+		return tx.AutoMigrate(&models.Subscription{})
+	})
+	if err == nil {
+		return nil
+	}
+	if !db.Migrator().HasTable(&models.Subscription{}) {
+		return fmt.Errorf("create subscriptions table: %w", err)
+	}
+	log.Printf("Note: subscriptions schema sync rolled back, database left as it was: %v", err)
+	return nil
+}
+
+// schemaMetadata is what a table rebuild can lose without reporting an error.
+type schemaMetadata struct {
+	objects   []schemaObject
+	sequences []tableSequence
+	contents  []tableContents
+}
+
+// schemaObject is an index or trigger with its original DDL.
+type schemaObject struct {
+	Type string
+	Name string
+	SQL  string
+}
+
+// tableSequence is an AUTOINCREMENT high-water mark, which outlives deleted IDs.
+type tableSequence struct {
+	Name          string
+	Seq           int64
+	AutoIncrement bool
+}
+
+// tableContents holds a table's row and per-column non-null counts, and the query
+// that produced them.
+type tableContents struct {
+	table  string
+	query  string
+	counts string
+}
+
+// preservingSchemaMetadata runs change, which may rebuild tables, in a transaction
+// that also puts back what a rebuild loses: GORM's rebuild and DROP TABLE discard a
+// table's indexes, triggers and sqlite_sequence row. Any failure, including one
+// while restoring, rolls everything back. The caller has foreign keys off.
+func preservingSchemaMetadata(db *gorm.DB, change func(tx *gorm.DB) error) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		before, err := captureSchemaMetadata(tx)
+		if err != nil {
+			return fmt.Errorf("capture schema metadata: %w", err)
+		}
+		if err := change(tx); err != nil {
+			return err
+		}
+		if err := before.restore(tx); err != nil {
+			return fmt.Errorf("restore schema metadata: %w", err)
+		}
+		return nil
+	})
+}
+
+func captureSchemaMetadata(tx *gorm.DB) (*schemaMetadata, error) {
+	var metadata schemaMetadata
+	// Original creation order, which is what decides the firing order of triggers.
+	if err := tx.Raw("SELECT type, name, sql FROM sqlite_master WHERE type IN ('index', 'trigger') AND sql IS NOT NULL ORDER BY rowid").Scan(&metadata.objects).Error; err != nil {
+		return nil, err
+	}
+
+	var hasSequences int64
+	if err := tx.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'").Scan(&hasSequences).Error; err != nil {
+		return nil, err
+	}
+	if hasSequences > 0 {
+		if err := tx.Raw("SELECT s.name, MAX(s.seq) AS seq, COALESCE(INSTR(UPPER(m.sql), 'AUTOINCREMENT') > 0, 0) AS auto_increment FROM sqlite_sequence s LEFT JOIN sqlite_master m ON m.type = 'table' AND m.name = s.name GROUP BY s.name").Scan(&metadata.sequences).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	var tables []string
+	// A virtual table's module may not be compiled in, and a rebuild never touches one.
+	if err := tx.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND sql NOT LIKE 'CREATE VIRTUAL%'").Scan(&tables).Error; err != nil {
+		return nil, err
+	}
+	for _, table := range tables {
+		var columns []string
+		if err := tx.Raw("SELECT name FROM pragma_table_info(?)", table).Scan(&columns).Error; err != nil {
+			return nil, err
+		}
+		contents := tableContents{table: table, query: "SELECT COUNT(*)"}
+		for _, column := range columns {
+			// Backticks: SQLite reads a double-quoted unknown name as a string.
+			contents.query += " || ',' || COUNT(" + quoteIdentifier(column) + ")"
+		}
+		contents.query += " FROM " + quoteIdentifier(table)
+		if err := tx.Raw(contents.query).Scan(&contents.counts).Error; err != nil {
+			return nil, err
+		}
+		metadata.contents = append(metadata.contents, contents)
+	}
+	return &metadata, nil
+}
+
+func (m *schemaMetadata) restore(tx *gorm.DB) error {
+	for _, object := range m.objects {
+		var exists int64
+		if err := tx.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type = ? AND name = ?", object.Type, object.Name).Scan(&exists).Error; err != nil {
+			return err
+		}
+		if exists > 0 {
+			continue
+		}
+		if err := tx.Exec(object.SQL).Error; err != nil {
+			return fmt.Errorf("recreate %s %s: %w", object.Type, object.Name, err)
+		}
+	}
+
+	for _, sequence := range m.sequences {
+		if err := restoreSequence(tx, sequence); err != nil {
+			return fmt.Errorf("sequence for %s: %w", sequence.Name, err)
+		}
+	}
+
+	// GORM builds its copy statement from a regular expression, and leaves out any
+	// column it does not match: the rebuild succeeds and the values are gone.
+	for _, contents := range m.contents {
+		var counts string
+		if err := tx.Raw(contents.query).Scan(&counts).Error; err != nil {
+			return fmt.Errorf("verify %s: %w", contents.table, err)
+		}
+		if counts != contents.counts {
+			return fmt.Errorf("verify %s: row and column counts changed from %s to %s", contents.table, contents.counts, counts)
+		}
+	}
+	return nil
+}
+
+func restoreSequence(tx *gorm.DB, sequence tableSequence) error {
+	// Manually edited databases can contain stale sequence entries for tables
+	// that never used AUTOINCREMENT. Only enforce what existed before migration.
+	if !sequence.AutoIncrement {
+		return nil
+	}
+	var tableSQL string
+	if err := tx.Raw("SELECT COALESCE(MAX(sql), '') FROM sqlite_master WHERE type = 'table' AND name = ?", sequence.Name).Scan(&tableSQL).Error; err != nil {
+		return err
+	}
+	if tableSQL == "" {
+		return nil // The row outlived its table before this migration began.
+	}
+	if !strings.Contains(strings.ToUpper(tableSQL), "AUTOINCREMENT") {
+		return errors.New("table lost AUTOINCREMENT")
+	}
+	// An emptied table has no row left to update, so the row is replaced.
+	var current int64
+	if err := tx.Raw("SELECT COALESCE(MAX(seq), -1) FROM sqlite_sequence WHERE name = ?", sequence.Name).Scan(&current).Error; err != nil {
+		return err
+	}
+	if current >= sequence.Seq {
+		return nil
+	}
+	if err := tx.Exec("DELETE FROM sqlite_sequence WHERE name = ?", sequence.Name).Error; err != nil {
+		return err
+	}
+	return tx.Exec("INSERT INTO sqlite_sequence (name, seq) VALUES (?, ?)", sequence.Name, sequence.Seq).Error
+}
+
+func quoteIdentifier(name string) string {
+	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
 // migrateCategoriesToDynamic handles the v0.3.0 migration from string categories to category IDs
@@ -195,17 +400,10 @@ var (
 // than using Migrator.AlterColumn, whose parser does not find the unquoted column
 // names in tables that pre-date GORM's quoting. The caller has foreign keys off.
 func dropCategoryNotNull(db *gorm.DB) error {
-	return db.Transaction(func(tx *gorm.DB) error {
+	return preservingSchemaMetadata(db, func(tx *gorm.DB) error {
 		var tableSQL string
 		if err := tx.Raw("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'subscriptions'").Scan(&tableSQL).Error; err != nil {
 			return err
-		}
-		// Preserve AUTOINCREMENT's high-water mark, including deleted IDs.
-		var sequence int64
-		if strings.Contains(strings.ToUpper(tableSQL), "AUTOINCREMENT") {
-			if err := tx.Raw("SELECT COALESCE(MAX(seq), 0) FROM sqlite_sequence WHERE name = 'subscriptions'").Scan(&sequence).Error; err != nil {
-				return err
-			}
 		}
 		rebuilt := categoryNotNullPattern.ReplaceAllString(tableSQL, "$1")
 		rebuilt = subscriptionsDDLName.ReplaceAllString(rebuilt, "CREATE TABLE subscriptions__rebuild")
@@ -213,25 +411,13 @@ func dropCategoryNotNull(db *gorm.DB) error {
 			return fmt.Errorf("unexpected table definition: %s", tableSQL)
 		}
 
-		// Indexes and triggers go with the old table.
-		var dependents []string
-		if err := tx.Raw("SELECT sql FROM sqlite_master WHERE tbl_name = 'subscriptions' AND type IN ('index', 'trigger') AND sql IS NOT NULL").Scan(&dependents).Error; err != nil {
-			return err
-		}
-
-		statements := []string{
+		for _, statement := range []string{
 			rebuilt,
 			"INSERT INTO subscriptions__rebuild SELECT * FROM subscriptions",
 			"DROP TABLE subscriptions",
 			"ALTER TABLE subscriptions__rebuild RENAME TO subscriptions",
-		}
-		for _, statement := range append(statements, dependents...) {
+		} {
 			if err := tx.Exec(statement).Error; err != nil {
-				return err
-			}
-		}
-		if sequence > 0 {
-			if err := tx.Exec("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'subscriptions'", sequence).Error; err != nil {
 				return err
 			}
 		}

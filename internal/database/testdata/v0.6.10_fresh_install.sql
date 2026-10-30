@@ -1,0 +1,12 @@
+-- Captured by running the v0.6.10 release (db26a58) against a new database.
+CREATE TABLE `categories` (`id` integer PRIMARY KEY AUTOINCREMENT,`name` text NOT NULL,`created_at` datetime,`updated_at` datetime);
+CREATE UNIQUE INDEX `idx_categories_name` ON `categories`(`name`);
+CREATE TABLE `settings` (`id` integer PRIMARY KEY AUTOINCREMENT,`key` text NOT NULL,`value` text,`created_at` datetime,`updated_at` datetime);
+CREATE UNIQUE INDEX `idx_settings_key` ON `settings`(`key`);
+CREATE TABLE `api_keys` (`id` integer PRIMARY KEY AUTOINCREMENT,`name` text NOT NULL,`key` text NOT NULL,`last_used` datetime,`usage_count` integer DEFAULT 0,`created_at` datetime,`updated_at` datetime);
+CREATE UNIQUE INDEX `idx_api_keys_key` ON `api_keys`(`key`);
+CREATE TABLE `exchange_rates` (`id` integer PRIMARY KEY AUTOINCREMENT,`base_currency` text NOT NULL,`currency` text NOT NULL,`rate` real NOT NULL,`date` datetime NOT NULL,`created_at` datetime,`updated_at` datetime);
+CREATE TABLE `tags` (`id` integer PRIMARY KEY AUTOINCREMENT,`name` text NOT NULL,`created_at` datetime,`updated_at` datetime);
+CREATE UNIQUE INDEX `idx_tags_name` ON `tags`(`name`);
+CREATE TABLE `subscriptions` (`id` integer PRIMARY KEY AUTOINCREMENT,`name` text NOT NULL,`label` text,`cost` real NOT NULL,`original_currency` text DEFAULT "USD",`schedule` text NOT NULL,`status` text NOT NULL,`category_id` integer,`payment_method` text,`autopay` numeric,`account` text,`start_date` datetime,`renewal_date` datetime,`cancellation_date` datetime,`url` text,`icon_url` text,`notes` text,`usage` text,`schedule_interval` integer DEFAULT 1,`share_count` integer DEFAULT 1,`cancellation_notice_days` integer DEFAULT 0,`reminder_enabled` numeric DEFAULT true,`date_calculation_version` integer DEFAULT 1,`last_reminder_sent` datetime,`last_reminder_renewal_date` datetime,`last_reminder_window` integer DEFAULT -1,`last_cancellation_reminder_sent` datetime,`last_cancellation_reminder_date` datetime,`last_cancellation_reminder_window` integer DEFAULT -1,`created_at` datetime,`updated_at` datetime,CONSTRAINT `fk_subscriptions_category` FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`));
+CREATE TABLE `subscription_tags` (`subscription_id` integer,`tag_id` integer,PRIMARY KEY (`subscription_id`,`tag_id`),CONSTRAINT `fk_subscription_tags_subscription` FOREIGN KEY (`subscription_id`) REFERENCES `subscriptions`(`id`),CONSTRAINT `fk_subscription_tags_tag` FOREIGN KEY (`tag_id`) REFERENCES `tags`(`id`));

@@ -329,6 +329,16 @@ volumes:
   - subtrackr-data:/app/data  # Named volume
 ```
 
+## Upgrading and backing up existing installations
+
+Before upgrading to v0.7.0, stop every SubTrackr process that uses the database, including the web server and MCP server. Make a backup of the entire data directory while they are stopped, and keep the previous image/version and configuration with that backup. Start only one process for the first upgrade so migrations can finish before other clients open the database.
+
+v0.7.0 uses SQLite WAL mode. The database can have `-wal` and `-shm` companion files beside it; copying only the `.db` file while the app is running can omit recent writes. Use a stopped backup of the complete directory, or a SQLite-aware online backup tool. Copying individual live files separately is not a consistent backup. Store the database on local storage; SQLite WAL is not suitable for NFS/SMB network filesystems.
+
+After upgrading, verify subscriptions, categories/tags, settings, reminders and exports before resuming normal use. To roll back, stop all processes and restore the pre-upgrade data directory with the previous application version. Do not point an older version at the upgraded database: its migrations can rebuild tables, reuse deleted IDs and discard custom indexes. A rollback from backup also discards changes made after that backup.
+
+Committed upgrade tests cover a captured v0.6.10 fresh-install schema, a v0.3.0 schema upgraded through v0.6.10, and two older schema shapes with synthetic data, including repeated migrations and failure recovery. Direct upgrades from v0.1.0/v0.2.0 are not validated for application use; those schemas have a pre-existing missing-category-column issue. Custom single-column UNIQUE indexes can make GORM rebuild the affected table on each startup; the migration preserves their data and metadata, but this increases startup work. These tests do not guarantee compatibility with every customized or long-lived database, so retain and verify your backup.
+
 ## 🔐 Security Recommendations
 
 1. **Reverse Proxy**: Use Nginx/Traefik for HTTPS

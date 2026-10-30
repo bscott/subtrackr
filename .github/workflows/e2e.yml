@@ -3,9 +3,9 @@ name: E2E
 # Browser end-to-end suite (Playwright) plus the Go MCP stdio integration test.
 # Each browser project runs in its own job so a failure in one engine does not
 # hide the others, and every job uploads its report, traces, screenshots and
-# videos whether it passed or failed. There are no retries-as-success tricks:
-# `npx playwright test` exits non-zero on any unexpected failure, and the job
-# fails with it.
+# videos whether it passed or failed. CI permits two retries; a retry that passes
+# is reported as flaky, so inspect flaky counts as well as the job status.
+# Tests that still fail after retries make the job fail.
 
 on:
   pull_request:
