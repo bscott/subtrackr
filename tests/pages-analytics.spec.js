@@ -45,6 +45,44 @@ test('analytics renders totals, status counts and upcoming renewals that match t
   }
 });
 
+// Regression: a Trial or Paused subscription in another currency must not make the oracle expect
+// per-currency lines. The app only totals Active and Cancelled subscriptions, so their currencies
+// are the only ones that can block the single converted total. Such rows are left behind by
+// other specs (the subscription form creates a EUR Trial), which made the totals checks order-dependent.
+test('analytics totals ignore the currency of paused and trial subscriptions', async ({ page, request }) => {
+  const data = fixtures(request);
+  try {
+    const category = await data.category(uniqueName('Analytics inactive currency'));
+    const cat = String(category.id);
+    await data.subscription({ name: uniqueName('Analytics usd active'), category_id: cat, cost: '7' });
+    await data.subscription({ name: uniqueName('Analytics eur trial'), category_id: cat, cost: '12.34', status: 'Trial', original_currency: 'EUR' });
+    await data.subscription({ name: uniqueName('Analytics eur paused'), category_id: cat, cost: '5', status: 'Paused', original_currency: 'EUR' });
+
+    await withStableSnapshot(request, async () => {
+      const response = await page.goto('/analytics');
+      expect(response?.status()).toBe(200);
+      const overview = page.locator('main .grid').first().locator(':scope > div');
+      await expect(overview).toHaveCount(3);
+      const stats = await (await request.get('/api/stats')).json();
+      return {
+        monthly: (await overview.nth(0).locator('p.text-2xl').allTextContents()).map(t => t.trim()),
+        statsCurrencies: Object.keys(stats.totals_by_currency).sort(),
+      };
+    }, (subscriptions, shown) => {
+      const totals = totalsByCurrency(subscriptions);
+      // The oracle and the app agree on which currencies take part in the totals.
+      expect(Object.keys(totals).sort(), 'currencies with totals').toEqual(shown.statsCurrencies);
+      const counted = subscriptions.filter(s => s.status === 'Active' || s.status === 'Cancelled');
+      if (!counted.some(s => s.original_currency === 'EUR')) {
+        expect(totals, 'EUR total from inactive rows only').not.toHaveProperty('EUR');
+      }
+      expectSpendCard(shown.monthly, totals, 'monthly', 'active', 'monthly spend');
+    });
+  } finally {
+    await data.cleanup();
+  }
+});
+
 test('analytics category breakdown shows monthly spend per category for active subscriptions only', async ({ page, request }) => {
   const data = fixtures(request);
   try {

@@ -104,18 +104,21 @@ async function withStableSnapshot(request, observe, check) {
   }).toPass({ timeout: 60_000, intervals: [250, 500, 1000] });
 }
 
-// Totals per original currency, computed from raw subscriptions.
+// Totals per original currency, computed from raw subscriptions. Only Active and Cancelled
+// subscriptions take part in the app's totals, so a currency used solely by Paused or Trial
+// rows gets no entry: it is not shown and does not stop the app converting into a single total.
 function totalsByCurrency(subscriptions) {
   const totals = {};
+  const totalsFor = currency =>
+    (totals[currency] ??= { monthly: 0, annual: 0, active: 0, cancelled: 0, saved: 0, monthlySaved: 0 });
   for (const sub of subscriptions) {
-    const currency = sub.original_currency;
-    totals[currency] ??= { monthly: 0, annual: 0, active: 0, cancelled: 0, saved: 0, monthlySaved: 0 };
-    const t = totals[currency];
     if (sub.status === 'Active') {
+      const t = totalsFor(sub.original_currency);
       t.monthly += monthlyCost(sub);
       t.annual += annualCost(sub);
       t.active++;
     } else if (sub.status === 'Cancelled') {
+      const t = totalsFor(sub.original_currency);
       t.saved += annualCost(sub);
       t.monthlySaved += monthlyCost(sub);
       t.cancelled++;
@@ -153,7 +156,8 @@ function expectSpendCard(lines, totals, field, countField, label) {
     return;
   }
   expect(lines, `${label}: expected a single converted total`).toHaveLength(1);
-  // Without exchange rates the app only shows one converted total when all data shares a currency.
+  // Without exchange rates the app only shows one converted total when every Active and Cancelled
+  // subscription shares a currency (Paused and Trial rows are not totalled, so theirs do not count).
   expect(Object.keys(totals).length, `${label}: single total with mixed currencies`).toBeLessThanOrEqual(1);
   const expected = Object.values(totals).reduce((sum, t) => sum + t[field], 0);
   expectAmount(lines[0], expected, label);
