@@ -6,6 +6,8 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"html"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,22 +23,32 @@ type OIDCAuthenticator interface {
 	ExchangeAndVerify(ctx context.Context, redirectURI, code, codeVerifier, expectedNonce string) (*service.OIDCIdentity, error)
 }
 
+// emailSender is the part of service.EmailService the auth handler needs.
+type emailSender interface {
+	SendEmail(subject, body string) error
+}
+
 type AuthHandler struct {
 	settingsService *service.SettingsService
 	sessionService  *service.SessionService
-	emailService    *service.EmailService
+	emailService    emailSender
 	i18nCatalog     *i18n.Catalog
 	oidcService     OIDCAuthenticator
 }
 
 func NewAuthHandler(settingsService *service.SettingsService, sessionService *service.SessionService, emailService *service.EmailService, i18nCatalog *i18n.Catalog) *AuthHandler {
-	return &AuthHandler{
+	handler := &AuthHandler{
 		settingsService: settingsService,
 		sessionService:  sessionService,
-		emailService:    emailService,
 		i18nCatalog:     i18nCatalog,
 		oidcService:     service.NewOIDCService(settingsService, nil),
 	}
+	// Assign only a non-nil pointer so a nil *EmailService never becomes a
+	// non-nil interface value.
+	if emailService != nil {
+		handler.emailService = emailService
+	}
+	return handler
 }
 
 // activeLang resolves the user-preferred language code, defaulting to "en" when unset
@@ -252,6 +264,15 @@ func (h *AuthHandler) ShowForgotPasswordPage(c *gin.Context) {
 
 // ForgotPassword handles forgot password request
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	// Check if SMTP is configured before issuing a token, so requests that
+	// cannot send an email do not replace an outstanding reset token.
+	if _, err := h.settingsService.GetSMTPConfig(); err != nil || h.emailService == nil {
+		c.HTML(http.StatusInternalServerError, "forgot-password-error.html", gin.H{
+			"Error": "Email is not configured. Please contact administrator.",
+		})
+		return
+	}
+
 	// Generate reset token
 	token, err := h.settingsService.GenerateResetToken()
 	if err != nil {
@@ -261,33 +282,18 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Check if SMTP is configured
-	_, err = h.settingsService.GetSMTPConfig()
-	if err != nil {
-		c.HTML(http.StatusInternalServerError, "forgot-password-error.html", gin.H{
-			"Error": "Email is not configured. Please contact administrator.",
-		})
-		return
-	}
-
-	// Build reset URL
-	resetURL := buildBaseURL(c, h.settingsService.GetBaseURL()) + "/reset-password?token=" + url.QueryEscape(token)
-
-	// Send reset email
+	// Send reset email. The link is built only from the administrator-configured
+	// Base URL, never from request headers (see passwordResetEmailBody).
 	subject := "SubTrackr Password Reset"
-	body := fmt.Sprintf(`
-		<h2>Password Reset Request</h2>
-		<p>You have requested to reset your SubTrackr password.</p>
-		<p>Click the link below to reset your password:</p>
-		<p><a href="%s">Reset Password</a></p>
-		<p>This link will expire in 1 hour.</p>
-		<p>If you did not request this reset, please ignore this email.</p>
-	`, resetURL)
+	body := passwordResetEmailBody(h.settingsService.GetBaseURL(), token)
 
 	err = h.emailService.SendEmail(subject, body)
 	if err != nil {
+		// This endpoint is unauthenticated: log SMTP details instead of showing
+		// them, since they can reveal internal hosts and server responses.
+		log.Printf("password reset email failed: %v", err)
 		c.HTML(http.StatusInternalServerError, "forgot-password-error.html", gin.H{
-			"Error": "Failed to send reset email: " + err.Error(),
+			"Error": "Failed to send reset email. Check the server logs for details.",
 		})
 		return
 	}
@@ -295,6 +301,44 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	c.HTML(http.StatusOK, "forgot-password-success.html", gin.H{
 		"Message": "Password reset link has been sent to your email",
 	})
+}
+
+// passwordResetEmailBody renders the password reset email.
+//
+// The reset link must never be derived from the incoming request: the Host and
+// X-Forwarded-Host headers of an unauthenticated forgot-password request are
+// attacker-controlled, and using them would let anyone point the emailed link,
+// and its token, at a server they control. When a Base URL is configured the
+// email carries an absolute link built from it. Otherwise it carries only the
+// site-relative path, which the administrator opens on their own SubTrackr
+// address.
+func passwordResetEmailBody(configuredBaseURL, token string) string {
+	resetPath := "/reset-password?token=" + url.QueryEscape(token)
+	baseURL := strings.TrimRight(strings.TrimSpace(configuredBaseURL), "/")
+
+	if baseURL != "" {
+		return fmt.Sprintf(`
+		<h2>Password Reset Request</h2>
+		<p>You have requested to reset your SubTrackr password.</p>
+		<p>Click the link below to reset your password:</p>
+		<p><a href="%s">Reset Password</a></p>
+		<p>This link will expire in 1 hour.</p>
+		<p>If you did not request this reset, please ignore this email.</p>
+	`, html.EscapeString(baseURL+resetPath))
+	}
+
+	return fmt.Sprintf(`
+		<h2>Password Reset Request</h2>
+		<p>You have requested to reset your SubTrackr password.</p>
+		<p>SubTrackr has no Base URL configured, so this email cannot include a clickable link.
+		To reset your password, open your SubTrackr site in your browser and append this path to its address:</p>
+		<p><code>%s</code></p>
+		<p>For example, if you normally open SubTrackr at <code>http://192.168.1.10:8080</code>,
+		enter that address followed by the path above.</p>
+		<p>This reset token will expire in 1 hour.</p>
+		<p>If you did not request this reset, please ignore this email.</p>
+		<p>Tip: set the Base URL in Settings so future reset emails include a direct link.</p>
+	`, html.EscapeString(resetPath))
 }
 
 // ShowResetPasswordPage displays the reset password page
