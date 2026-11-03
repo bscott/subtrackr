@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"html/template"
+	"mime"
 	"net/smtp"
+	"strings"
 	"subtrackr/internal/models"
 )
 
@@ -97,18 +99,7 @@ func (e *EmailService) SendEmail(subject, body string) error {
 			return fmt.Errorf("failed to get data writer: %w", err)
 		}
 
-		fromName := config.FromName
-		if fromName == "" {
-			fromName = "SubTrackr"
-		}
-
-		message := fmt.Sprintf("From: %s <%s>\r\n", fromName, config.From)
-		message += fmt.Sprintf("To: %s\r\n", config.To)
-		message += fmt.Sprintf("Subject: %s\r\n", subject)
-		message += "MIME-Version: 1.0\r\n"
-		message += "Content-Type: text/html; charset=UTF-8\r\n"
-		message += "\r\n"
-		message += body
+		message := buildEmailMessage(config, subject, body)
 
 		_, err = writer.Write([]byte(message))
 		if err != nil {
@@ -154,18 +145,7 @@ func (e *EmailService) SendEmail(subject, body string) error {
 			return fmt.Errorf("failed to get data writer: %w", err)
 		}
 
-		fromName := config.FromName
-		if fromName == "" {
-			fromName = "SubTrackr"
-		}
-
-		message := fmt.Sprintf("From: %s <%s>\r\n", fromName, config.From)
-		message += fmt.Sprintf("To: %s\r\n", config.To)
-		message += fmt.Sprintf("Subject: %s\r\n", subject)
-		message += "MIME-Version: 1.0\r\n"
-		message += "Content-Type: text/html; charset=UTF-8\r\n"
-		message += "\r\n"
-		message += body
+		message := buildEmailMessage(config, subject, body)
 
 		_, err = writer.Write([]byte(message))
 		if err != nil {
@@ -535,4 +515,38 @@ func (e *EmailService) Name() string { return "email" }
 func (e *EmailService) IsConfigured() bool {
 	config, err := e.settingsService.GetSMTPConfig()
 	return err == nil && config.Host != "" && config.To != ""
+}
+
+// headerLineBreaks matches characters that would end an email header line.
+var headerLineBreaks = strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ")
+
+// sanitizeHeaderValue removes line breaks so a value cannot end its header
+// and inject new headers or a replacement body.
+func sanitizeHeaderValue(value string) string {
+	return headerLineBreaks.Replace(value)
+}
+
+// encodeHeaderText sanitizes free text for a header and RFC 2047 encodes it
+// when it contains non-ASCII characters.
+func encodeHeaderText(value string) string {
+	return mime.QEncoding.Encode("utf-8", sanitizeHeaderValue(value))
+}
+
+// buildEmailMessage renders the SMTP message. Subjects often contain
+// subscription names, which any API key holder can set, so every header value
+// is stripped of line breaks before it is written.
+func buildEmailMessage(config *models.SMTPConfig, subject, body string) string {
+	fromName := config.FromName
+	if fromName == "" {
+		fromName = "SubTrackr"
+	}
+
+	message := fmt.Sprintf("From: %s <%s>\r\n", encodeHeaderText(fromName), sanitizeHeaderValue(config.From))
+	message += fmt.Sprintf("To: %s\r\n", sanitizeHeaderValue(config.To))
+	message += fmt.Sprintf("Subject: %s\r\n", encodeHeaderText(subject))
+	message += "MIME-Version: 1.0\r\n"
+	message += "Content-Type: text/html; charset=UTF-8\r\n"
+	message += "\r\n"
+	message += body
+	return message
 }
