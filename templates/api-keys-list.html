@@ -1,3 +1,8 @@
+{{if .Error}}
+<div role="alert" class="p-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
+    {{.Error}}
+</div>
+{{end}}
 {{if .Keys}}
     {{range .Keys}}
     <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">

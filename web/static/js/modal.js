@@ -10,6 +10,10 @@
 
 (function () {
     var opener = null;
+    // True when the form arrived while the dialog was still hidden. The mobile
+    // menu opens the dialog a couple of frames after its click, so a fast
+    // response can settle first; openModal then focuses that form itself.
+    var contentReady = false;
 
     function modalElement() {
         return document.getElementById('modal');
@@ -52,6 +56,11 @@
         if (!modal) return;
         opener = isVisible(from) ? from : (document.activeElement !== document.body ? document.activeElement : null);
         modal.classList.remove('hidden');
+        if (contentReady) {
+            contentReady = false;
+            focusContent(modal);
+            return;
+        }
         // Focus the dialog itself for now. The fields of the form that is on
         // its way are focused once it has arrived (see the settle listener below).
         // The stale form from an earlier open must not get focus: htmx keeps
@@ -65,6 +74,7 @@
         var modal = modalElement();
         if (!modal || !isOpen(modal)) return;
         modal.classList.add('hidden');
+        contentReady = false;
         var target = opener;
         opener = null;
         if (!isVisible(target)) target = document.getElementById('mobile-menu-button');
@@ -86,6 +96,10 @@
         // Move focus out of old inputs before HTMX morphs them: focused input
         // values are intentionally preserved by HTMX. Focus the new form only
         // after the entire swap has settled, never during intermediate mutations.
+        document.addEventListener('htmx:before:request', function (event) {
+            var target = event.detail && event.detail.ctx && event.detail.ctx.target;
+            if (target && target.id === 'modal-content') contentReady = false;
+        });
         document.addEventListener('htmx:before:swap', function (event) {
             var target = event.detail && event.detail.ctx && event.detail.ctx.target;
             if (target && target.id === 'modal-content' && isOpen(modal)) {
@@ -94,7 +108,9 @@
         });
         document.addEventListener('htmx:after:settle', function (event) {
             var target = event.detail && event.detail.task && event.detail.task.target;
-            if (target && target.id === 'modal-content' && isOpen(modal)) focusContent(modal);
+            if (!target || target.id !== 'modal-content') return;
+            if (isOpen(modal)) focusContent(modal);
+            else contentReady = true;
         });
 
         // Keep Tab inside the open dialog: wrap at the ends of the control list.

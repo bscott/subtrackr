@@ -240,3 +240,27 @@ test('opening the menu moves keyboard focus into it, Tab stays inside, and closi
   await expect(menu(page)).toBeHidden();
   await expect(hamburger(page)).toBeFocused();
 });
+
+// The menu opens the dialog two animation frames after the tap, so the form can
+// arrive before or after the dialog is shown. Either way the Name field gets focus.
+for (const order of ['form arrives first', 'dialog opens first']) {
+  test(`Add Subscription from the menu focuses the Name field when the ${order}`, async ({ page }) => {
+    if (order === 'form arrives first') {
+      // Hold animation frames back so the form settles while the dialog is still hidden.
+      await page.addInitScript(() => {
+        window.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 150);
+      });
+    } else {
+      await page.route('**/form/subscription', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await route.continue();
+      });
+    }
+    await page.goto('/subscriptions');
+    await openMenu(page);
+    await menu(page).getByRole('button', { name: 'Add Subscription' }).click();
+
+    await expect(page.locator('#modal')).toBeVisible();
+    await expect(page.locator('#modal-content input[name="name"]')).toBeFocused();
+  });
+}
