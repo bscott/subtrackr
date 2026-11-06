@@ -37,7 +37,9 @@ jobs:
 
   playwright:
     name: Playwright (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    # Playwright 1.56 cannot install browser dependencies on Ubuntu 26.04, which
+    # ubuntu-latest now resolves to. Move off this pin when Playwright is upgraded.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
