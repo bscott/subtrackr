@@ -330,10 +330,7 @@ func (h *SettingsHandler) GetSMTPConfig(c *gin.Context) {
 func (h *SettingsHandler) ListAPIKeys(c *gin.Context) {
 	keys, err := h.service.GetAllAPIKeys()
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "api-keys-list.html", gin.H{
-			"Error": err.Error(),
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -351,24 +348,37 @@ func (h *SettingsHandler) ListAPIKeys(c *gin.Context) {
 	})
 }
 
+// renderAPIKeyListError answers a failed API key request. HTMX 4 swaps error
+// responses into #api-keys-list as well, so the message is shown above the
+// current keys rather than replacing them with an empty list.
+func (h *SettingsHandler) renderAPIKeyListError(c *gin.Context, status int, message string) {
+	keys, err := h.service.GetAllAPIKeys()
+	if err != nil {
+		keys = nil
+	}
+	for i := range keys {
+		keys[i].Key = ""
+	}
+	c.HTML(status, "api-keys-list.html", gin.H{
+		"Keys":         keys,
+		"Error":        message,
+		"GoDateFormat": h.service.GetGoDateFormat(),
+		"Lang":         h.activeLang(),
+	})
+}
+
 // CreateAPIKey generates a new API key
 func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
-	name := c.PostForm("name")
+	name := strings.TrimSpace(c.PostForm("name"))
 	if name == "" {
-		c.HTML(http.StatusBadRequest, "api-keys-list.html", gin.H{
-			"Error": "API key name is required",
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusBadRequest, "API key name is required")
 		return
 	}
 
 	// Generate a secure random API key
 	keyBytes := make([]byte, 32)
 	if _, err := rand.Read(keyBytes); err != nil {
-		c.HTML(http.StatusInternalServerError, "api-keys-list.html", gin.H{
-			"Error": "Failed to generate API key",
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusInternalServerError, "Failed to generate API key")
 		return
 	}
 
@@ -377,20 +387,14 @@ func (h *SettingsHandler) CreateAPIKey(c *gin.Context) {
 	// Save the API key
 	newKey, err := h.service.CreateAPIKey(name, apiKey)
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "api-keys-list.html", gin.H{
-			"Error": err.Error(),
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Get all keys including the new one
 	keys, err := h.service.GetAllAPIKeys()
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "api-keys-list.html", gin.H{
-			"Error": err.Error(),
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -416,19 +420,13 @@ func (h *SettingsHandler) DeleteAPIKey(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		c.HTML(http.StatusBadRequest, "api-keys-list.html", gin.H{
-			"Error": "Invalid API key ID",
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusBadRequest, "Invalid API key ID")
 		return
 	}
 
 	err = h.service.DeleteAPIKey(uint(id))
 	if err != nil {
-		c.HTML(http.StatusInternalServerError, "api-keys-list.html", gin.H{
-			"Error": err.Error(),
-			"Lang":  h.activeLang(),
-		})
+		h.renderAPIKeyListError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -654,6 +652,7 @@ func (h *SettingsHandler) GetTheme(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"theme": theme,
+		"saved": err == nil,
 	})
 }
 
@@ -664,6 +663,12 @@ func (h *SettingsHandler) SavePushoverSettings(c *gin.Context) {
 	// Parse form data
 	config.UserKey = c.PostForm("pushover_user_key")
 	config.AppToken = c.PostForm("pushover_app_token")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.AppToken == "" {
+		if existing, err := h.service.GetPushoverConfig(); err == nil && existing != nil {
+			config.AppToken = existing.AppToken
+		}
+	}
 
 	// Validate required fields
 	if config.UserKey == "" || config.AppToken == "" {
@@ -697,6 +702,12 @@ func (h *SettingsHandler) TestPushoverConnection(c *gin.Context) {
 	// Parse form data
 	config.UserKey = c.PostForm("pushover_user_key")
 	config.AppToken = c.PostForm("pushover_app_token")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.AppToken == "" {
+		if existing, err := h.service.GetPushoverConfig(); err == nil && existing != nil {
+			config.AppToken = existing.AppToken
+		}
+	}
 
 	// Validate required fields
 	if config.UserKey == "" || config.AppToken == "" {
@@ -909,6 +920,12 @@ func (h *SettingsHandler) SaveTelegramSettings(c *gin.Context) {
 	// Parse form data
 	config.BotToken = c.PostForm("telegram_bot_token")
 	config.ChatID = c.PostForm("telegram_chat_id")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.BotToken == "" {
+		if existing, err := h.service.GetTelegramConfig(); err == nil && existing != nil {
+			config.BotToken = existing.BotToken
+		}
+	}
 
 	// Validate required fields
 	if config.BotToken == "" || config.ChatID == "" {
@@ -942,6 +959,12 @@ func (h *SettingsHandler) TestTelegramConnection(c *gin.Context) {
 	// Parse form data
 	config.BotToken = c.PostForm("telegram_bot_token")
 	config.ChatID = c.PostForm("telegram_chat_id")
+	// The saved token is never rendered back into the form, so a blank field keeps it.
+	if config.BotToken == "" {
+		if existing, err := h.service.GetTelegramConfig(); err == nil && existing != nil {
+			config.BotToken = existing.BotToken
+		}
+	}
 
 	// Validate required fields
 	if config.BotToken == "" || config.ChatID == "" {
@@ -1143,11 +1166,12 @@ func (h *SettingsHandler) SetTheme(c *gin.Context) {
 
 	// Validate theme name
 	validThemes := map[string]bool{
-		"default":   true,
-		"dark":      true,
-		"christmas": true,
-		"midnight":  true,
-		"ocean":     true,
+		"default":      true,
+		"dark":         true,
+		"dark-classic": true,
+		"christmas":    true,
+		"midnight":     true,
+		"ocean":        true,
 	}
 
 	if !validThemes[req.Theme] {

@@ -43,26 +43,3 @@ func (r *ExchangeRateRepository) GetRate(baseCurrency, targetCurrency string) (*
 func (r *ExchangeRateRepository) SaveRates(rates []models.ExchangeRate) error {
 	return r.db.Create(&rates).Error
 }
-
-// GetLatestRates retrieves the latest exchange rates for a base currency
-func (r *ExchangeRateRepository) GetLatestRates(baseCurrency string) ([]models.ExchangeRate, error) {
-	var rates []models.ExchangeRate
-
-	// Get the latest rate for each target currency
-	subQuery := r.db.Model(&models.ExchangeRate{}).
-		Select("currency, MAX(date) as latest_date").
-		Where("base_currency = ?", baseCurrency).
-		Group("currency")
-
-	err := r.db.Joins("JOIN (?) as latest ON exchange_rates.currency = latest.currency AND exchange_rates.date = latest.latest_date", subQuery).
-		Where("base_currency = ?", baseCurrency).
-		Find(&rates).Error
-
-	return rates, err
-}
-
-// DeleteStaleRates removes exchange rates older than the specified duration
-func (r *ExchangeRateRepository) DeleteStaleRates(olderThan time.Duration) error {
-	cutoff := time.Now().Add(-olderThan)
-	return r.db.Where("date < ?", cutoff).Delete(&models.ExchangeRate{}).Error
-}

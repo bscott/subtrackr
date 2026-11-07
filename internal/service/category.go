@@ -23,16 +23,8 @@ func (s *CategoryService) GetAll() ([]models.Category, error) {
 	return s.repo.GetAll()
 }
 
-func (s *CategoryService) GetByID(id uint) (*models.Category, error) {
-	return s.repo.GetByID(id)
-}
-
 func (s *CategoryService) Update(id uint, category *models.Category) (*models.Category, error) {
 	return s.repo.Update(id, category)
-}
-
-func (s *CategoryService) GetByName(name string) (*models.Category, error) {
-	return s.repo.GetByName(name)
 }
 
 func (s *CategoryService) Delete(id uint) error {

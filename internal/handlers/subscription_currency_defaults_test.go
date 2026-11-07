@@ -30,7 +30,7 @@ func TestSubscriptionCurrencyDefaultsAndUnknownEdit(t *testing.T) {
 	require.NoError(t, settings.SetCurrency("SEK"))
 	categories := service.NewCategoryService(repository.NewCategoryRepository(db))
 	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(db), categories)
-	handler := NewSubscriptionHandler(subscriptions, settings, service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo), nil, nil, nil, nil, nil, categories, nil, nil)
+	handler := NewSubscriptionHandler(subscriptions, settings, service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo), nil, nil, categories, nil, nil)
 	router := gin.New()
 	router.SetHTMLTemplate(template.Must(template.New("subscription-form.html").Funcs(template.FuncMap{"t": func(_ interface{}, key string) string { return key }}).ParseFiles("../../templates/subscription-form.html")))
 	router.POST("/api/subscriptions", handler.CreateSubscription)

@@ -348,12 +348,27 @@
 }
 
 .theme-option {
+    /* A <button>: undo the user-agent button look so the card renders as before. */
+    display: block;
+    width: 100%;
+    margin: 0;
+    font: inherit;
+    line-height: inherit;
+    color: inherit;
+    text-align: left;
+    appearance: none;
+    -webkit-appearance: none;
     padding: 1rem;
     border: 2px solid var(--theme-border);
     border-radius: 0.5rem;
     cursor: pointer;
     transition: all 0.2s ease;
     background: var(--theme-surface);
+}
+
+.theme-option:focus-visible {
+    outline: 2px solid var(--theme-primary);
+    outline-offset: 2px;
 }
 
 .theme-option:hover {

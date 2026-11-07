@@ -1,6 +1,10 @@
 package service
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"subtrackr/internal/models"
 	"subtrackr/internal/repository"
@@ -8,21 +12,34 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-// Pushover Test Credentials Usage:
-//
-// For unit tests (default): Tests use mock credentials and will fail API calls (expected behavior)
-//
-// For integration tests: Set environment variables before running tests:
-//   export PUSHOVER_USER_KEY="your_user_key_here"
-//   export PUSHOVER_APP_TOKEN="your_app_token_here"
-//
-// Integration tests will automatically skip if credentials are not provided.
-// Example:
-//   PUSHOVER_USER_KEY="u1234567890abcdef" PUSHOVER_APP_TOKEN="a1b2c3d4e5f6g7h8" go test ./internal/service -run Integration
+// Unit tests send only to a local HTTP sink. Live integration tests require
+// PUSHOVER_LIVE_TEST=1 as well as explicit credentials.
+func capturePushover(t *testing.T, service *PushoverService) <-chan url.Values {
+	t.Helper()
+	requests := make(chan url.Values, 10)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+			w.WriteHeader(400)
+			return
+		}
+		requests <- r.PostForm
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"status":1,"request":"local-test"}`)
+	}))
+	t.Cleanup(server.Close)
+	service.apiURL = server.URL
+	return requests
+}
 
 func setupPushoverTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -188,6 +205,7 @@ func TestPushoverService_SendHighCostAlert_MessageFormat(t *testing.T) {
 	settingsRepo := repository.NewSettingsRepository(db)
 	settingsService := NewSettingsService(settingsRepo)
 	pushoverService := NewPushoverService(settingsService)
+	requests := capturePushover(t, pushoverService)
 
 	// Configure Pushover with invalid credentials (we're testing message format, not actual sending)
 	config := &models.PushoverConfig{
@@ -208,12 +226,13 @@ func TestPushoverService_SendHighCostAlert_MessageFormat(t *testing.T) {
 		URL:         "https://netflix.com",
 	}
 
-	// This will fail because we don't have real Pushover credentials, but it should attempt to send
-	err := pushoverService.SendHighCostAlert(subscription)
-	// We expect an error because we can't actually connect to Pushover API, but the function should attempt to send
-	assert.Error(t, err, "Should return error when Pushover API call fails (expected in test)")
-	// The error should be about API call, not about being disabled
-	assert.NotContains(t, err.Error(), "disabled", "Error should not be about being disabled")
+	require.NoError(t, pushoverService.SendHighCostAlert(subscription))
+	payload := <-requests
+	assert.Equal(t, "test-user-key", payload.Get("user"))
+	assert.Equal(t, "test-app-token", payload.Get("token"))
+	assert.Equal(t, "1", payload.Get("priority"))
+	assert.Contains(t, payload.Get("message"), "Netflix")
+	assert.Contains(t, payload.Get("message"), "15.99")
 }
 
 func TestPushoverService_SendRenewalReminder_MessageFormat(t *testing.T) {
@@ -221,6 +240,7 @@ func TestPushoverService_SendRenewalReminder_MessageFormat(t *testing.T) {
 	settingsRepo := repository.NewSettingsRepository(db)
 	settingsService := NewSettingsService(settingsRepo)
 	pushoverService := NewPushoverService(settingsService)
+	requests := capturePushover(t, pushoverService)
 
 	// Configure Pushover with invalid credentials (we're testing message format, not actual sending)
 	config := &models.PushoverConfig{
@@ -241,12 +261,13 @@ func TestPushoverService_SendRenewalReminder_MessageFormat(t *testing.T) {
 		URL:         "https://netflix.com",
 	}
 
-	// This will fail because we don't have real Pushover credentials, but it should attempt to send
-	err := pushoverService.SendRenewalReminder(subscription, 3)
-	// We expect an error because we can't actually connect to Pushover API, but the function should attempt to send
-	assert.Error(t, err, "Should return error when Pushover API call fails (expected in test)")
-	// The error should be about API call, not about being disabled
-	assert.NotContains(t, err.Error(), "disabled", "Error should not be about being disabled")
+	require.NoError(t, pushoverService.SendRenewalReminder(subscription, 3))
+	payload := <-requests
+	assert.Equal(t, "test-user-key", payload.Get("user"))
+	assert.Equal(t, "test-app-token", payload.Get("token"))
+	assert.Equal(t, "0", payload.Get("priority"))
+	assert.Contains(t, payload.Get("message"), "Netflix")
+	assert.Contains(t, payload.Get("message"), "15.99")
 }
 
 func TestPushoverService_SendRenewalReminder_DaysText(t *testing.T) {
@@ -254,6 +275,7 @@ func TestPushoverService_SendRenewalReminder_DaysText(t *testing.T) {
 	settingsRepo := repository.NewSettingsRepository(db)
 	settingsService := NewSettingsService(settingsRepo)
 	pushoverService := NewPushoverService(settingsService)
+	requests := capturePushover(t, pushoverService)
 
 	// Configure Pushover
 	config := &models.PushoverConfig{
@@ -292,11 +314,9 @@ func TestPushoverService_SendRenewalReminder_DaysText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// This will fail because we don't have real Pushover credentials
-			err := pushoverService.SendRenewalReminder(subscription, tt.daysUntil)
-			assert.Error(t, err, "Should return error when Pushover API call fails (expected in test)")
-			// Verify the function attempted to send (not disabled)
-			assert.NotContains(t, err.Error(), "disabled", "Error should not be about being disabled")
+			require.NoError(t, pushoverService.SendRenewalReminder(subscription, tt.daysUntil))
+			payload := <-requests
+			assert.Contains(t, payload.Get("message"), fmt.Sprintf("%d %s", tt.daysUntil, tt.expectedDaysText))
 		})
 	}
 }
@@ -304,6 +324,9 @@ func TestPushoverService_SendRenewalReminder_DaysText(t *testing.T) {
 // getPushoverTestCredentials retrieves Pushover credentials from environment variables for integration testing
 // Returns empty strings if not set (for unit tests)
 func getPushoverTestCredentials() (userKey, appToken string) {
+	if os.Getenv("PUSHOVER_LIVE_TEST") != "1" {
+		return "", ""
+	}
 	userKey = os.Getenv("PUSHOVER_USER_KEY")
 	appToken = os.Getenv("PUSHOVER_APP_TOKEN")
 	return userKey, appToken

@@ -1,9 +1,9 @@
 <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 id="modal-title" class="text-lg font-semibold text-gray-900 dark:text-white">
             {{if .IsEdit}}{{t .Lang "form.edit_title"}}{{else}}{{t .Lang "form.add_title"}}{{end}}
         </h3>
-        <button onclick="document.getElementById('modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors duration-150">
+        <button type="button" onclick="closeModal()" aria-label="{{t .Lang "common.close"}}" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors duration-150">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
@@ -14,8 +14,7 @@
 
     <form {{if .IsEdit}}hx-put="/api/subscriptions/{{.Subscription.ID}}"{{else}}hx-post="/api/subscriptions"{{end}} 
           hx-target="#form-errors"
-          hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.successful) { if(event.detail.xhr.status === 201 || event.detail.xhr.status === 200) { window.location.reload(); } }">
+          hx-swap="innerHTML">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Name -->
             <div class="md:col-span-2">
@@ -51,12 +50,13 @@
 
             <!-- Category -->
             <div>
-                <label for="category_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{t .Lang "form.category"}} *</label>
+                <label for="category_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{t .Lang "form.category"}}</label>
                 <div class="flex gap-2">
                     <div class="flex-1" id="category-select-container">
-                        <select id="category_id" name="category_id" required
+                        <select id="category_id" name="category_id"
                                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
-                            <option value="">{{t .Lang "form.category"}}…</option>
+                            {{/* value 0 means uncategorized: sent explicitly so editing can clear a category (the update handler ignores an empty value). */}}
+                            <option value="0" {{if .Subscription}}{{if eq .Subscription.CategoryID 0}}selected{{end}}{{else}}selected{{end}}>{{t .Lang "common.uncategorized"}}</option>
                             {{range .Categories}}
                                 <option value="{{.ID}}" {{if $.Subscription}}{{if eq $.Subscription.CategoryID .ID}}selected{{end}}{{end}}>{{.Name}}</option>
                             {{end}}
@@ -74,7 +74,7 @@
                 <div id="new-category-container" class="hidden mt-2">
                     <div class="flex gap-2">
                         <input type="text" id="new-category-name" placeholder="{{t .Lang "form.new_category_placeholder"}}"
-                               class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
+                               class="min-w-0 flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
                         <button type="button" onclick="createNewCategory()"
                                 class="px-3 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors duration-150">
                             {{t .Lang "form.add"}}
@@ -157,7 +157,7 @@
                 <select id="status" name="status" required
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
                     <option value="">{{t .Lang "form.status"}}…</option>
-                    <option value="Active" {{if .Subscription}}{{if eq .Subscription.Status "Active"}}selected{{end}}{{end}}>{{t .Lang "form.status_active"}}</option>
+                    <option value="Active" {{if .Subscription}}{{if eq .Subscription.Status "Active"}}selected{{end}}{{else}}selected{{end}}>{{t .Lang "form.status_active"}}</option>
                     <option value="Cancelled" {{if .Subscription}}{{if eq .Subscription.Status "Cancelled"}}selected{{end}}{{end}}>{{t .Lang "form.status_cancelled"}}</option>
                     <option value="Paused" {{if .Subscription}}{{if eq .Subscription.Status "Paused"}}selected{{end}}{{end}}>{{t .Lang "form.status_paused"}}</option>
                     <option value="Trial" {{if .Subscription}}{{if eq .Subscription.Status "Trial"}}selected{{end}}{{end}}>{{t .Lang "form.status_trial"}}</option>
@@ -291,10 +291,60 @@
                 </label>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-7">{{t .Lang "form.reminder_enabled_help"}}</p>
             </div>
+
+            <!-- Plan to cancel: a reminder of its own, independent of the toggle above -->
+            {{$df := or .GoDateFormat "2006-01-02"}}
+            {{$isCancelled := false}}{{if .Subscription}}{{if eq .Subscription.Status "Cancelled"}}{{$isCancelled = true}}{{end}}{{end}}
+            <div id="to-cancel-section" class="md:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="hidden" name="to_cancel" value="false">
+                    <input type="checkbox" id="to_cancel" name="to_cancel" value="true"
+                           {{if .Subscription}}{{if .Subscription.ToCancel}}checked{{end}}{{end}}
+                           {{if $isCancelled}}disabled{{end}}
+                           aria-describedby="to-cancel-help"
+                           class="w-4 h-4 text-primary bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-primary focus:ring-2 transition-colors duration-150 disabled:opacity-50">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{t .Lang "form.to_cancel"}}</span>
+                </label>
+                <p id="to-cancel-help" class="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-7">{{t .Lang "form.to_cancel_help"}}</p>
+                <p id="to-cancel-cancelled-note" class="mt-2 text-xs text-gray-500 dark:text-gray-400 ml-7 {{if not $isCancelled}}hidden{{end}}">{{t .Lang "form.to_cancel_cancelled"}}</p>
+
+                <div id="to-cancel-options" class="ml-7 mt-3 space-y-3 {{if .Subscription}}{{if not .Subscription.ToCancel}}hidden{{end}}{{else}}hidden{{end}}">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label for="to_cancel_reminder_days" class="text-sm text-gray-700 dark:text-gray-300">{{t .Lang "form.to_cancel_remind"}}</label>
+                        <select id="to_cancel_reminder_days" name="to_cancel_reminder_days"
+                                class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-150">
+                            {{$days := 3}}{{if .Subscription}}{{$days = .Subscription.ToCancelReminderDays}}{{end}}
+                            <option value="3" {{if eq $days 3}}selected{{end}}>{{printf (t .Lang "form.to_cancel_days_before") 3}}</option>
+                            <option value="5" {{if eq $days 5}}selected{{end}}>{{printf (t .Lang "form.to_cancel_days_before") 5}}</option>
+                            <option value="14" {{if eq $days 14}}selected{{end}}>{{printf (t .Lang "form.to_cancel_days_before") 14}}</option>
+                        </select>
+                    </div>
+                    {{if .IsEdit}}
+                    {{with .Subscription.ToCancelDeadline}}
+                    <div data-to-cancel-deadline class="text-xs text-gray-600 dark:text-gray-400">
+                        <span class="font-medium text-gray-800 dark:text-gray-200">{{t $.Lang "subscriptions.cancel_by"}} {{.Format $df}}.</span>
+                        {{if $.Subscription.CancelByDate}}
+                        {{printf (t $.Lang "form.to_cancel_deadline_notice") $.Subscription.CancellationNoticeDays ($.Subscription.RenewalDate.Format $df)}}
+                        {{else}}
+                        {{t $.Lang "form.to_cancel_deadline_renewal"}}
+                        {{end}}
+                    </div>
+                    {{else}}
+                    <p data-to-cancel-no-deadline class="text-xs text-amber-700 dark:text-amber-300">{{t $.Lang "form.to_cancel_no_deadline"}}</p>
+                    {{end}}
+                    {{if .Subscription.ToCancelDeadlineMissed}}
+                    <p data-to-cancel-missed role="status" class="text-xs text-red-700 dark:text-red-300">{{t .Lang "form.to_cancel_missed"}}</p>
+                    {{end}}
+                    {{if and .Subscription.ToCancel (eq .Subscription.Status "Paused")}}
+                    <p data-to-cancel-paused class="text-xs text-amber-700 dark:text-amber-300">{{t .Lang "form.to_cancel_paused"}}</p>
+                    {{end}}
+                    {{end}}
+                </div>
+            </div>
         </div>
 
         <div class="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <button type="button" onclick="document.getElementById('modal').classList.add('hidden')"
+            <button type="button" onclick="closeModal()"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors duration-150">
                 {{t .Lang "common.cancel"}}
             </button>
@@ -307,6 +357,29 @@
 </div>
 
 <script>
+(function() {
+    const toCancel = document.getElementById('to_cancel');
+    const options = document.getElementById('to-cancel-options');
+    const cancelledNote = document.getElementById('to-cancel-cancelled-note');
+    const status = document.getElementById('status');
+    if (!toCancel || !options || !status) return;
+
+    function syncToCancel() {
+        const cancelled = status.value === 'Cancelled';
+        if (cancelled) {
+            toCancel.checked = false;
+            toCancel.disabled = true;
+        } else {
+            toCancel.disabled = false;
+        }
+        cancelledNote.classList.toggle('hidden', !cancelled);
+        options.classList.toggle('hidden', !toCancel.checked);
+    }
+
+    toCancel.addEventListener('change', syncToCancel);
+    status.addEventListener('change', syncToCancel);
+})();
+
 // Inline category creation functions
 function showNewCategoryInput() {
     document.getElementById('new-category-container').classList.remove('hidden');
@@ -314,14 +387,17 @@ function showNewCategoryInput() {
     document.getElementById('new-category-name').focus();
 }
 
-function hideNewCategoryInput() {
+function hideNewCategoryInput(created) {
     document.getElementById('new-category-container').classList.add('hidden');
     document.getElementById('add-category-btn').classList.remove('hidden');
     document.getElementById('new-category-name').value = '';
     document.getElementById('new-category-error').classList.add('hidden');
+    document.getElementById(created ? 'category_id' : 'add-category-btn').focus({ preventScroll: true });
 }
 
-let isCreatingCategory = false;
+// This script runs again every time the form is loaded into the modal, in the
+// page's global scope, so top-level bindings must tolerate redeclaration.
+var isCreatingCategory = false;
 
 async function createNewCategory() {
     // Prevent double-submission
@@ -371,7 +447,7 @@ async function createNewCategory() {
         select.appendChild(option);
 
         // Hide the input and reset
-        hideNewCategoryInput();
+        hideNewCategoryInput(true);
     } catch (error) {
         errorDiv.textContent = error.message;
         errorDiv.classList.remove('hidden');
@@ -395,13 +471,16 @@ async function createNewCategory() {
     }, { once: true });
 })();
 
-// Allow Enter key to submit new category
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && document.activeElement.id === 'new-category-name') {
-        e.preventDefault();
-        createNewCategory();
-    }
-});
+// Allow Enter key to submit new category (registered once per page)
+if (!window.subtrackrNewCategoryEnterBound) {
+    window.subtrackrNewCategoryEnterBound = true;
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && document.activeElement && document.activeElement.id === 'new-category-name') {
+            e.preventDefault();
+            createNewCategory();
+        }
+    });
+}
 
 function updateScheduleFields() {
     const combo = document.getElementById('schedule_combo');

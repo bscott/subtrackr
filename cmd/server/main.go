@@ -60,9 +60,14 @@ func main() {
 	tagService := service.NewTagService(tagRepo)
 	settingsService := service.NewSettingsService(settingsRepo)
 	emailService := service.NewEmailService(settingsService)
-	pushoverService := service.NewPushoverService(settingsService)
-	webhookService := service.NewWebhookService(settingsService)
-	telegramService := service.NewTelegramService(settingsService)
+	notifier := service.NewNotificationDispatcher(settingsService,
+		emailService,
+		service.NewPushoverService(settingsService),
+		service.NewWebhookService(settingsService),
+		service.NewTelegramService(settingsService),
+		service.NewNtfyService(settingsService),
+		service.NewGotifyService(settingsService),
+	)
 	logoService := service.NewLogoService()
 
 	// Handle CLI commands (run before starting HTTP server)
@@ -92,7 +97,7 @@ func main() {
 	}
 
 	// Initialize handlers
-	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, emailService, pushoverService, webhookService, telegramService, logoService, categoryService, tagService, i18nCatalog)
+	subscriptionHandler := handlers.NewSubscriptionHandler(subscriptionService, settingsService, currencyService, notifier, logoService, categoryService, tagService, i18nCatalog)
 	settingsHandler := handlers.NewSettingsHandler(settingsService, i18nCatalog)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 	authHandler := handlers.NewAuthHandler(settingsService, sessionService, emailService, i18nCatalog)
@@ -201,10 +206,7 @@ func main() {
 	// }
 
 	// Start renewal reminder scheduler
-	go startRenewalReminderScheduler(subscriptionService, emailService, pushoverService, webhookService, telegramService, settingsService)
-
-	// Start cancellation reminder scheduler
-	go startCancellationReminderScheduler(subscriptionService, emailService, pushoverService, webhookService, telegramService, settingsService)
+	startReminderScheduler(subscriptionService, notifier)
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -444,6 +446,12 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		api.POST("/settings/telegram", settingsHandler.SaveTelegramSettings)
 		api.POST("/settings/telegram/test", settingsHandler.TestTelegramConnection)
 		api.GET("/settings/telegram", settingsHandler.GetTelegramConfig)
+		api.POST("/settings/ntfy", settingsHandler.SaveNtfySettings)
+		api.POST("/settings/ntfy/test", settingsHandler.TestNtfyConnection)
+		api.GET("/settings/ntfy", settingsHandler.GetNtfyConfig)
+		api.POST("/settings/gotify", settingsHandler.SaveGotifySettings)
+		api.POST("/settings/gotify/test", settingsHandler.TestGotifyConnection)
+		api.GET("/settings/gotify", settingsHandler.GetGotifyConfig)
 		api.POST("/settings/notifications/:setting", settingsHandler.UpdateNotificationSetting)
 		api.GET("/settings/notifications", settingsHandler.GetNotificationSettings)
 		api.GET("/settings/smtp", settingsHandler.GetSMTPConfig)
@@ -518,234 +526,42 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 	}
 }
 
-// startRenewalReminderScheduler starts a background goroutine that checks for
-// upcoming renewals and sends reminder emails and Pushover notifications daily
-func startRenewalReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, telegramService *service.TelegramService, settingsService *service.SettingsService) {
-	// Run immediately on startup (after a short delay to let server initialize)
-	go func() {
-		time.Sleep(30 * time.Second) // Wait 30 seconds for server to fully start
-		checkAndSendRenewalReminders(subscriptionService, emailService, pushoverService, webhookService, telegramService, settingsService)
-	}()
+// startReminderScheduler runs reminder passes sequentially so they cannot
+// overwrite each other's delivery state for the same subscription.
+func startReminderScheduler(subscriptionService *service.SubscriptionService, notifier *service.NotificationDispatcher) {
+	runDailyReminderCheck(func() { runReminderPasses(subscriptionService, notifier) })
+}
 
-	// Then run daily at midnight
-	// Note: Ticker is intentionally not stopped as this is a long-running server process.
-	// The ticker will run for the lifetime of the application, which is the desired behavior.
-	ticker := time.NewTicker(24 * time.Hour)
+// runReminderPasses runs every reminder pass in turn. A panic ends only its own
+// pass, so a misbehaving channel cannot cost the passes after it.
+func runReminderPasses(subscriptionService *service.SubscriptionService, notifier *service.NotificationDispatcher) {
+	runReminderCheck("renewal", func() { notifier.RunRenewalReminders(subscriptionService) })
+	runReminderCheck("cancellation", func() { notifier.RunCancellationReminders(subscriptionService) })
+	runReminderCheck("to-cancel", func() { notifier.RunToCancelReminders(subscriptionService) })
+}
+
+// runReminderCheck protects both startup and daily passes from a channel panic.
+func runReminderCheck(kind string, check func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in %s reminder check: %v", kind, r)
+		}
+	}()
+	check()
+}
+
+// runDailyReminderCheck runs once after startup and then every 24 hours, with
+// only one pass in flight even when a provider responds slowly.
+func runDailyReminderCheck(check func()) {
 	go func() {
-		defer ticker.Stop() // Clean up ticker if goroutine exits (defensive programming)
+		time.Sleep(30 * time.Second)
+		check()
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
 		for range ticker.C {
-			// Recover from any panics in the reminder check to keep the scheduler running
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Printf("Panic in renewal reminder check: %v", r)
-					}
-				}()
-				checkAndSendRenewalReminders(subscriptionService, emailService, pushoverService, webhookService, telegramService, settingsService)
-			}()
+			check()
 		}
 	}()
-}
-
-// checkAndSendRenewalReminders checks for subscriptions needing reminders and sends emails and Pushover notifications
-func checkAndSendRenewalReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, telegramService *service.TelegramService, settingsService *service.SettingsService) {
-	// Check if renewal reminders are enabled
-	enabled, err := settingsService.GetBoolSetting("renewal_reminders", false)
-	if err != nil || !enabled {
-		return // Silently skip if disabled or error
-	}
-
-	// Resolve reminder windows: multi-value CSV takes precedence; fall back to single-int setting.
-	windowsCSV := settingsService.GetStringSettingWithDefault("reminder_days_list", "")
-	fallback := settingsService.GetIntSettingWithDefault("reminder_days", 7)
-	windows := service.ParseReminderWindows(windowsCSV, fallback)
-	if len(windows) == 0 {
-		return // No reminders configured
-	}
-
-	// Get subscriptions needing reminders
-	subscriptions, err := subscriptionService.GetSubscriptionsNeedingReminders(windows)
-	if err != nil {
-		log.Printf("Error getting subscriptions for renewal reminders: %v", err)
-		return
-	}
-
-	if len(subscriptions) == 0 {
-		log.Printf("No subscriptions need renewal reminders today")
-		return
-	}
-
-	log.Printf("Checking %d subscription(s) for renewal reminders", len(subscriptions))
-
-	// Send reminder for each subscription (both email and Pushover)
-	sentCount := 0
-	failedCount := 0
-	for sub, daysUntil := range subscriptions {
-		emailErr := emailService.SendRenewalReminder(sub, daysUntil)
-		pushoverErr := pushoverService.SendRenewalReminder(sub, daysUntil)
-		webhookErr := webhookService.SendRenewalReminder(sub, daysUntil)
-		telegramErr := telegramService.SendRenewalReminder(sub, daysUntil)
-
-		// If all fail, count as failed; otherwise consider it sent
-		if emailErr != nil && pushoverErr != nil && webhookErr != nil && telegramErr != nil {
-			log.Printf("Error sending renewal reminder for subscription %s (ID: %d): email=%v, pushover=%v, webhook=%v, telegram=%v", sub.Name, sub.ID, emailErr, pushoverErr, webhookErr, telegramErr)
-			failedCount++
-		} else {
-			// Mark reminder as sent for this renewal date and remember the window we just fired.
-			// Renewal-date changes are handled by the sameRenewal check in
-			// GetSubscriptionsNeedingReminders, so no explicit reset is needed here.
-			now := time.Now()
-			sub.LastReminderSent = &now
-			if sub.RenewalDate != nil {
-				renewalDateCopy := *sub.RenewalDate
-				sub.LastReminderRenewalDate = &renewalDateCopy
-			}
-			sub.LastReminderWindow = daysUntil
-
-			// Update the subscription in the database
-			_, updateErr := subscriptionService.Update(sub.ID, sub)
-			if updateErr != nil {
-				log.Printf("Warning: Failed to update last reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
-			}
-
-			var failed []string
-			if emailErr != nil {
-				failed = append(failed, fmt.Sprintf("email=%v", emailErr))
-			}
-			if pushoverErr != nil {
-				failed = append(failed, fmt.Sprintf("pushover=%v", pushoverErr))
-			}
-			if webhookErr != nil {
-				failed = append(failed, fmt.Sprintf("webhook=%v", webhookErr))
-			}
-			if telegramErr != nil {
-				failed = append(failed, fmt.Sprintf("telegram=%v", telegramErr))
-			}
-			if len(failed) > 0 {
-				log.Printf("Sent renewal reminder for subscription %s (renews in %d days) - some channels failed: %s", sub.Name, daysUntil, strings.Join(failed, ", "))
-			} else {
-				log.Printf("Sent renewal reminders for subscription %s (renews in %d days)", sub.Name, daysUntil)
-			}
-			sentCount++
-		}
-	}
-
-	log.Printf("Renewal reminder check complete: %d sent, %d failed", sentCount, failedCount)
-}
-
-// startCancellationReminderScheduler starts a background goroutine that checks for
-// upcoming cancellations and sends reminder emails and Pushover notifications daily
-func startCancellationReminderScheduler(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, telegramService *service.TelegramService, settingsService *service.SettingsService) {
-	// Run immediately on startup (after a short delay to let server initialize)
-	go func() {
-		time.Sleep(30 * time.Second) // Wait 30 seconds for server to fully start
-		checkAndSendCancellationReminders(subscriptionService, emailService, pushoverService, webhookService, telegramService, settingsService)
-	}()
-
-	// Then run daily at midnight
-	// Note: Ticker is intentionally not stopped as this is a long-running server process.
-	// The ticker will run for the lifetime of the application, which is the desired behavior.
-	ticker := time.NewTicker(24 * time.Hour)
-	go func() {
-		defer ticker.Stop() // Clean up ticker if goroutine exits (defensive programming)
-		for range ticker.C {
-			// Recover from any panics in the reminder check to keep the scheduler running
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Printf("Panic in cancellation reminder check: %v", r)
-					}
-				}()
-				checkAndSendCancellationReminders(subscriptionService, emailService, pushoverService, webhookService, telegramService, settingsService)
-			}()
-		}
-	}()
-}
-
-// checkAndSendCancellationReminders checks for subscriptions needing cancellation reminders and sends emails and Pushover notifications
-func checkAndSendCancellationReminders(subscriptionService *service.SubscriptionService, emailService *service.EmailService, pushoverService *service.PushoverService, webhookService *service.WebhookService, telegramService *service.TelegramService, settingsService *service.SettingsService) {
-	// Check if cancellation reminders are enabled
-	enabled, err := settingsService.GetBoolSetting("cancellation_reminders", false)
-	if err != nil || !enabled {
-		return // Silently skip if disabled or error
-	}
-
-	// Resolve cancellation reminder windows: multi-value CSV takes precedence; fall back to single-int setting.
-	windowsCSV := settingsService.GetStringSettingWithDefault("cancellation_reminder_days_list", "")
-	fallback := settingsService.GetIntSettingWithDefault("cancellation_reminder_days", 7)
-	windows := service.ParseReminderWindows(windowsCSV, fallback)
-	if len(windows) == 0 {
-		return // No reminders configured
-	}
-
-	// Get subscriptions needing cancellation reminders
-	subscriptions, err := subscriptionService.GetSubscriptionsNeedingCancellationReminders(windows)
-	if err != nil {
-		log.Printf("Error getting subscriptions for cancellation reminders: %v", err)
-		return
-	}
-
-	if len(subscriptions) == 0 {
-		log.Printf("No subscriptions need cancellation reminders today")
-		return
-	}
-
-	log.Printf("Checking %d subscription(s) for cancellation reminders", len(subscriptions))
-
-	// Send reminder for each subscription (both email and Pushover)
-	sentCount := 0
-	failedCount := 0
-	for sub, daysUntil := range subscriptions {
-		emailErr := emailService.SendCancellationReminder(sub, daysUntil)
-		pushoverErr := pushoverService.SendCancellationReminder(sub, daysUntil)
-		webhookErr := webhookService.SendCancellationReminder(sub, daysUntil)
-		telegramErr := telegramService.SendCancellationReminder(sub, daysUntil)
-
-		// If all fail, count as failed; otherwise consider it sent
-		if emailErr != nil && pushoverErr != nil && webhookErr != nil && telegramErr != nil {
-			log.Printf("Error sending cancellation reminder for subscription %s (ID: %d): email=%v, pushover=%v, webhook=%v, telegram=%v", sub.Name, sub.ID, emailErr, pushoverErr, webhookErr, telegramErr)
-			failedCount++
-		} else {
-			// Mark reminder as sent for this cancellation date and remember the window we just fired.
-			// Cancellation-date changes are handled by the sameDate check in
-			// GetSubscriptionsNeedingCancellationReminders, so no explicit reset is needed here.
-			now := time.Now()
-			sub.LastCancellationReminderSent = &now
-			if sub.CancellationDate != nil {
-				cancellationDateCopy := *sub.CancellationDate
-				sub.LastCancellationReminderDate = &cancellationDateCopy
-			}
-			sub.LastCancellationReminderWindow = daysUntil
-
-			// Update the subscription in the database
-			_, updateErr := subscriptionService.Update(sub.ID, sub)
-			if updateErr != nil {
-				log.Printf("Warning: Failed to update last cancellation reminder sent for subscription %s (ID: %d): %v", sub.Name, sub.ID, updateErr)
-			}
-
-			var failed []string
-			if emailErr != nil {
-				failed = append(failed, fmt.Sprintf("email=%v", emailErr))
-			}
-			if pushoverErr != nil {
-				failed = append(failed, fmt.Sprintf("pushover=%v", pushoverErr))
-			}
-			if webhookErr != nil {
-				failed = append(failed, fmt.Sprintf("webhook=%v", webhookErr))
-			}
-			if telegramErr != nil {
-				failed = append(failed, fmt.Sprintf("telegram=%v", telegramErr))
-			}
-			if len(failed) > 0 {
-				log.Printf("Sent cancellation reminder for subscription %s (ends in %d days) - some channels failed: %s", sub.Name, daysUntil, strings.Join(failed, ", "))
-			} else {
-				log.Printf("Sent cancellation reminders for subscription %s (ends in %d days)", sub.Name, daysUntil)
-			}
-			sentCount++
-		}
-	}
-
-	log.Printf("Cancellation reminder check complete: %d sent, %d failed", sentCount, failedCount)
 }
 
 // handleResetPassword handles the --reset-password CLI command

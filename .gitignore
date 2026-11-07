@@ -6,7 +6,7 @@
 *.dylib
 *.test
 main
-server
+/server
 subtrackr
 
 # Go coverage / profile output
@@ -88,6 +88,10 @@ docker-data/
 .beads/daemon.pid
 .beads/daemon.lock
 .beads/export-state/
+.beads/dolt-monitor.pid
+.beads/dolt-server.port
+.beads/dolt-server.activity
+.beads/backup/
 
 # Project-specific
 # - plans/ : local planning docs only
@@ -104,3 +108,7 @@ CleanShot*.png
 
 # Dolt database files (added by bd init)
 .dolt/
+
+# Playwright E2E server database (see playwright.config.js)
+test-data/
+test-data-isolated/

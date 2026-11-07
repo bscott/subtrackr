@@ -29,7 +29,7 @@ func (s *SettingsService) SaveSMTPConfig(config *models.SMTPConfig) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return s.repo.Set("smtp_config", string(data))
 }
 
@@ -39,13 +39,13 @@ func (s *SettingsService) GetSMTPConfig() (*models.SMTPConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var config models.SMTPConfig
 	err = json.Unmarshal([]byte(data), &config)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &config, nil
 }
 
@@ -83,7 +83,7 @@ func (s *SettingsService) GetBoolSetting(key string, defaultValue bool) (bool, e
 	if err != nil {
 		return defaultValue, err
 	}
-	
+
 	return value == "true", nil
 }
 
@@ -107,12 +107,12 @@ func (s *SettingsService) GetIntSetting(key string, defaultValue int) (int, erro
 	if err != nil {
 		return defaultValue, err
 	}
-	
+
 	intValue, err := strconv.Atoi(value)
 	if err != nil {
 		return defaultValue, err
 	}
-	
+
 	return intValue, nil
 }
 
@@ -207,13 +207,13 @@ func (s *SettingsService) ValidateAPIKey(key string) (*models.APIKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update usage stats
 	err = s.repo.UpdateAPIKeyUsage(apiKey.ID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return apiKey, nil
 }
 
@@ -248,7 +248,7 @@ func (s *SettingsService) GetCurrencySymbol() string {
 // SetDateFormat saves the date format preference
 func (s *SettingsService) SetDateFormat(format string) error {
 	switch format {
-	case "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD":
+	case "MM/DD/YYYY", "DD/MM/YYYY", "DD.MM.YYYY", "YYYY-MM-DD":
 		return s.repo.Set("date_format", format)
 	default:
 		return fmt.Errorf("invalid date format: %s", format)
@@ -279,6 +279,8 @@ func DateFormatToGo(format string) string {
 	switch format {
 	case "DD/MM/YYYY":
 		return "02/01/2006"
+	case "DD.MM.YYYY":
+		return "02.01.2006"
 	case "YYYY-MM-DD":
 		return "2006-01-02"
 	default:
@@ -289,7 +291,7 @@ func DateFormatToGo(format string) string {
 // DateFormatToGoLong converts a date format key to a long Go time format string
 func DateFormatToGoLong(format string) string {
 	switch format {
-	case "DD/MM/YYYY":
+	case "DD/MM/YYYY", "DD.MM.YYYY":
 		return "2 January 2006"
 	case "YYYY-MM-DD":
 		return "2006-01-02"
@@ -551,7 +553,7 @@ func (s *SettingsService) SavePushoverConfig(config *models.PushoverConfig) erro
 	if err != nil {
 		return err
 	}
-	
+
 	return s.repo.Set("pushover_config", string(data))
 }
 
@@ -612,6 +614,50 @@ func (s *SettingsService) GetTelegramConfig() (*models.TelegramConfig, error) {
 	var config models.TelegramConfig
 	err = json.Unmarshal([]byte(data), &config)
 	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// SaveNtfyConfig saves ntfy configuration
+func (s *SettingsService) SaveNtfyConfig(config *models.NtfyConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("ntfy_config", string(data))
+}
+
+// GetNtfyConfig retrieves ntfy configuration
+func (s *SettingsService) GetNtfyConfig() (*models.NtfyConfig, error) {
+	data, err := s.repo.Get("ntfy_config")
+	if err != nil {
+		return nil, err
+	}
+	var config models.NtfyConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// SaveGotifyConfig saves Gotify configuration
+func (s *SettingsService) SaveGotifyConfig(config *models.GotifyConfig) error {
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	return s.repo.Set("gotify_config", string(data))
+}
+
+// GetGotifyConfig retrieves Gotify configuration
+func (s *SettingsService) GetGotifyConfig() (*models.GotifyConfig, error) {
+	data, err := s.repo.Get("gotify_config")
+	if err != nil {
+		return nil, err
+	}
+	var config models.GotifyConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
 		return nil, err
 	}
 	return &config, nil

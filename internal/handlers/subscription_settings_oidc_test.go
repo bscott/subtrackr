@@ -33,7 +33,7 @@ func TestSettings_PassesOIDCConfigWithoutClientSecret(t *testing.T) {
 	}))
 	catalog := i18n.NewCatalog()
 	require.NoError(t, catalog.LoadDir(filepath.Join(repoRoot(t), "web", "locales")))
-	handler := NewSubscriptionHandler(nil, settings, nil, nil, nil, nil, nil, nil, nil, nil, catalog)
+	handler := NewSubscriptionHandler(nil, settings, nil, nil, nil, nil, nil, catalog)
 
 	router := gin.New()
 	router.SetHTMLTemplate(template.Must(template.New("settings.html").Parse(

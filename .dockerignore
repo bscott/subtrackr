@@ -58,16 +58,9 @@ tmp/
 # CI/CD
 .github/
 
-# Legacy files (no longer used)
+# Node / Playwright tooling (E2E tests only)
 node_modules/
-src/
-public/
 package*.json
-tsconfig.json
-tailwind.config*
-postcss.config*
-rebuild.sh
-remove-configs.sh
 
 # Media files
 *.png

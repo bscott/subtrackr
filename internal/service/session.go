@@ -177,31 +177,3 @@ func (s *SessionService) DestroySession(w http.ResponseWriter, r *http.Request) 
 
 	return session.Save(r, w)
 }
-
-// RefreshSession extends the session expiration.
-func (s *SessionService) RefreshSession(w http.ResponseWriter, r *http.Request) error {
-	session, err := s.store.Get(r, SessionName)
-	if err != nil {
-		return err
-	}
-
-	if auth, ok := session.Values[SessionUserKey].(bool); ok && auth {
-		currentMaxAge := session.Options.MaxAge
-		if currentMaxAge > 0 {
-			session.Options.MaxAge = currentMaxAge
-		}
-		return session.Save(r, w)
-	}
-
-	return nil
-}
-
-// UpdateSessionExpiry updates the session secret (useful when secret changes).
-func (s *SessionService) UpdateSessionExpiry(maxAge int) {
-	s.store.Options.MaxAge = maxAge
-}
-
-// GetSession retrieves the current session.
-func (s *SessionService) GetSession(r *http.Request) (*sessions.Session, error) {
-	return s.store.Get(r, SessionName)
-}

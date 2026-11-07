@@ -113,3 +113,20 @@ func TestGetAllSortedCategoryAndName(t *testing.T) {
 		t.Fatalf("subscription order = %v, want %v", got, want)
 	}
 }
+
+func TestCreateStoresReminderEnabledAsGiven(t *testing.T) {
+	repo := setupSubscriptionTestDB(t)
+	off := models.Subscription{Name: "Off", Cost: 5, Schedule: "Monthly", Status: "Active", ReminderEnabled: false}
+	on := models.Subscription{Name: "On", Cost: 5, Schedule: "Monthly", Status: "Active", ReminderEnabled: true}
+	createTestSubscriptions(t, repo, off, on)
+
+	for name, want := range map[string]bool{"Off": false, "On": true} {
+		var stored bool
+		if err := repo.db.Raw("SELECT reminder_enabled FROM subscriptions WHERE name = ?", name).Scan(&stored).Error; err != nil {
+			t.Fatalf("failed to read %q: %v", name, err)
+		}
+		if stored != want {
+			t.Errorf("%q: stored reminder_enabled = %v, want %v", name, stored, want)
+		}
+	}
+}

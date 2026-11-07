@@ -32,6 +32,7 @@ func TestSetDateFormat_Valid(t *testing.T) {
 	}{
 		{"US format", "MM/DD/YYYY"},
 		{"European format", "DD/MM/YYYY"},
+		{"European dotted format", "DD.MM.YYYY"},
 		{"ISO format", "YYYY-MM-DD"},
 	}
 
@@ -82,6 +83,7 @@ func TestDateFormatToGo(t *testing.T) {
 	}{
 		{"MM/DD/YYYY", "01/02/2006"},
 		{"DD/MM/YYYY", "02/01/2006"},
+		{"DD.MM.YYYY", "02.01.2006"},
 		{"YYYY-MM-DD", "2006-01-02"},
 		{"unknown", "01/02/2006"}, // defaults to US
 		{"", "01/02/2006"},        // defaults to US
@@ -101,6 +103,7 @@ func TestDateFormatToGoLong(t *testing.T) {
 	}{
 		{"MM/DD/YYYY", "January 2, 2006"},
 		{"DD/MM/YYYY", "2 January 2006"},
+		{"DD.MM.YYYY", "2 January 2006"},
 		{"YYYY-MM-DD", "2006-01-02"},
 		{"unknown", "January 2, 2006"}, // defaults to US
 		{"", "January 2, 2006"},        // defaults to US

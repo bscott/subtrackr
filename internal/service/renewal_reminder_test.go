@@ -189,6 +189,7 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders(t *testing.T) {
 
 			// Create test subscriptions
 			for _, sub := range tt.subscriptions {
+				sub.ReminderEnabled = true
 				err := db.Create(&sub).Error
 				assert.NoError(t, err, "Failed to create test subscription")
 			}
@@ -303,11 +304,12 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_DaysCalculation(t 
 	// Create subscription renewing in exactly 5 days
 	renewalDate := now.AddDate(0, 0, 5)
 	sub := &models.Subscription{
-		Name:        "Test Subscription",
-		Cost:        10.00,
-		Schedule:    "Monthly",
-		Status:      "Active",
-		RenewalDate: &renewalDate,
+		Name:            "Test Subscription",
+		Cost:            10.00,
+		Schedule:        "Monthly",
+		Status:          "Active",
+		RenewalDate:     &renewalDate,
+		ReminderEnabled: true,
 	}
 	err := db.Create(sub).Error
 	assert.NoError(t, err)
@@ -377,11 +379,12 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_BoundaryCases(t *t
 			db.Exec("DELETE FROM subscriptions")
 
 			sub := &models.Subscription{
-				Name:        "Test Subscription",
-				Cost:        10.00,
-				Schedule:    "Monthly",
-				Status:      "Active",
-				RenewalDate: &tt.renewalDate,
+				Name:            "Test Subscription",
+				Cost:            10.00,
+				Schedule:        "Monthly",
+				Status:          "Active",
+				RenewalDate:     &tt.renewalDate,
+				ReminderEnabled: true,
 			}
 			err := db.Create(sub).Error
 			assert.NoError(t, err)
@@ -418,6 +421,7 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_DuplicatePreventio
 		RenewalDate:             &renewalDate,
 		LastReminderSent:        &lastReminderDate,
 		LastReminderRenewalDate: &renewalDate, // Same as current renewal date
+		ReminderEnabled:         true,
 	}
 	err := db.Create(sub).Error
 	assert.NoError(t, err)
@@ -467,12 +471,10 @@ func TestSubscriptionService_GetSubscriptionsNeedingReminders_ReminderDisabled(t
 		Schedule:        "Monthly",
 		Status:          "Active",
 		RenewalDate:     &renewalDate,
-		ReminderEnabled: true,
+		ReminderEnabled: false,
 	}
 	err := db.Create(sub).Error
 	assert.NoError(t, err)
-	// Explicitly disable after create (GORM skips false for default:true fields)
-	db.Model(sub).Update("reminder_enabled", false)
 
 	// Should not be included in reminders
 	result, err := subscriptionService.GetSubscriptionsNeedingReminders([]int{7})

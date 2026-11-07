@@ -52,6 +52,21 @@ type TelegramConfig struct {
 	ChatID   string `json:"telegram_chat_id"`   // Target chat ID (user, group, or channel)
 }
 
+// NtfyConfig represents ntfy push notification configuration.
+type NtfyConfig struct {
+	ServerURL   string `json:"ntfy_server_url"`   // ntfy server root, e.g. https://ntfy.sh
+	Topic       string `json:"ntfy_topic"`        // Topic to publish to
+	AccessToken string `json:"ntfy_access_token"` // Optional access token, sent as a Bearer token
+	Priority    int    `json:"ntfy_priority"`     // 1 (min) to 5 (max); 3 is ntfy's default
+}
+
+// GotifyConfig represents Gotify push notification configuration.
+type GotifyConfig struct {
+	ServerURL string `json:"gotify_server_url"` // Gotify server root, e.g. https://gotify.example.com
+	AppToken  string `json:"gotify_app_token"`  // Application token, sent in the X-Gotify-Key header
+	Priority  int    `json:"gotify_priority"`   // 0 to 10
+}
+
 // NotificationSettings represents notification preferences
 type NotificationSettings struct {
 	RenewalReminders         bool    `json:"renewal_reminders"`

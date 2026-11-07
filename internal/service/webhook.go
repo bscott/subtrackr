@@ -3,8 +3,10 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"subtrackr/internal/models"
 	"time"
 )
@@ -45,6 +47,8 @@ type WebhookSubscription struct {
 	CancellationDate       string  `json:"cancellation_date,omitempty"`
 	CancellationNoticeDays int     `json:"cancellation_notice_days,omitempty"`
 	CancelByDate           string  `json:"cancel_by_date,omitempty"`
+	ToCancel               bool    `json:"to_cancel,omitempty"`
+	ToCancelReminderDays   int     `json:"to_cancel_reminder_days,omitempty"`
 }
 
 func subscriptionToWebhook(sub *models.Subscription, settings *SettingsService) *WebhookSubscription {
@@ -105,6 +109,12 @@ func (w *WebhookService) SendWebhook(payload *WebhookPayload) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		// Webhook URLs often embed a secret and transport errors (*url.Error)
+		// include the full URL, so report only the underlying cause.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
 		return fmt.Errorf("failed to send webhook: %w", err)
 	}
 	defer resp.Body.Close()
@@ -178,4 +188,32 @@ func (w *WebhookService) SendCancellationReminder(subscription *models.Subscript
 	}
 
 	return w.SendWebhook(payload)
+}
+
+// SendToCancelReminder sends a webhook reminder to cancel a subscription. The
+// deadline is subscription.cancel_by_date when present, otherwise renewal_date.
+func (w *WebhookService) SendToCancelReminder(subscription *models.Subscription, daysLeft int) error {
+	content := buildToCancelReminderContent(subscription, daysLeft, w.settingsService)
+	details := subscriptionToWebhook(subscription, w.settingsService)
+	details.URL = content.URL
+	details.ToCancel = subscription.ToCancel
+	details.ToCancelReminderDays = subscription.ToCancelReminderDays
+	payload := &WebhookPayload{
+		Event:        "to_cancel_reminder",
+		Title:        content.Title,
+		Message:      content.Lead,
+		Subscription: details,
+		Timestamp:    time.Now().UTC().Format(time.RFC3339),
+	}
+
+	return w.SendWebhook(payload)
+}
+
+// Name identifies the channel in delivery reports and logs.
+func (w *WebhookService) Name() string { return "webhook" }
+
+// IsConfigured reports whether a webhook URL has been saved.
+func (w *WebhookService) IsConfigured() bool {
+	config, err := w.settingsService.GetWebhookConfig()
+	return err == nil && config.URL != ""
 }
