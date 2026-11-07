@@ -310,7 +310,7 @@
   "settings.export_data_description": "Laden Sie Ihre Abonnementdaten in verschiedenen Formaten herunter",
   "settings.export_csv": "Als CSV exportieren",
   "settings.export_json": "Als JSON exportieren",
-  "settings.base_url_description": "Legt die externe URL für Ihre SubTrackr-Instanz fest. Wird für iCal-Abonnementlinks und Passwort-Zurücksetzen-E-Mails verwendet. Leer lassen, um automatisch aus den Request-Headern zu erkennen.",
+  "settings.base_url_description": "Legt die externe URL für Ihre SubTrackr-Instanz fest. Wird für iCal-Abonnementlinks und Passwort-Zurücksetzen-E-Mails verwendet. Ohne Angabe werden iCal-Links aus der Anfrage ermittelt, und Zurücksetzen-E-Mails enthalten nur einen Pfad, den Sie unter Ihrer SubTrackr-Adresse öffnen.",
   "settings.base_url_placeholder": "https://subtrackr.example.com",
   "settings.calendar_subscription_description": "Aktiviert eine abonnierbare iCal-URL, die Kalender-Apps für Live-Updates abrufen können",
   "settings.calendar_subscription_label": "iCal-Abonnement",

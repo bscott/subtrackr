@@ -310,7 +310,7 @@
   "settings.export_data_description": "Download your subscription data in various formats",
   "settings.export_csv": "Export as CSV",
   "settings.export_json": "Export as JSON",
-  "settings.base_url_description": "Set the external URL for your SubTrackr instance. Used for iCal subscription links and password reset emails. Leave blank to auto-detect from request headers.",
+  "settings.base_url_description": "Set the external URL for your SubTrackr instance. Used for iCal subscription links and password reset emails. If left blank, iCal links are detected from the request, and reset emails contain only a path to open on your SubTrackr address.",
   "settings.base_url_placeholder": "https://subtrackr.example.com",
   "settings.calendar_subscription_description": "Enable a subscribable iCal URL that calendar apps can poll for live updates",
   "settings.calendar_subscription_label": "iCal Subscription",
