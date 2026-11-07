@@ -6,7 +6,28 @@ A self-hosted subscription management application built with Go and HTMX. Track 
 
 ![SubTrackr Calendar View](calendar-screenshot.png)
 
-![SubTrackr Mobile View](mobile-screenshot.png)
+<img src="mobile-screenshot.png" alt="SubTrackr Mobile View" width="320"/>
+
+## ✨ What's New
+
+### v0.7.0
+- **To Cancel reminders**: mark a subscription you plan to cancel and get a reminder 3, 5 or 14 days before the last day you can cancel. See [To Cancel reminders](#to-cancel-reminders).
+- **ntfy and Gotify notifications**: send reminders and alerts to ntfy.sh or your own ntfy or Gotify server. See [ntfy and Gotify Notifications](#ntfy-and-gotify-notifications).
+- **European date format**: `DD.MM.YYYY` joins the existing date preferences.
+- **HTMX 4**: the interface runs on HTMX 4, served from SubTrackr itself rather than a CDN. Errors show beside the form that caused them, an expired session sends you to the login page, and the add/edit form works fully from the keyboard.
+- **Safer database**: SQLite now runs in WAL mode, which fixes "database is locked" errors. Back up before upgrading; see [Upgrading and backing up existing installations](#upgrading-and-backing-up-existing-installations).
+- Saved notification tokens are no longer shown in Settings.
+
+![Subscriptions marked To cancel, with cancel-by deadlines](screenshots/v0.7.0-to-cancel.png)
+
+### v0.6.11
+- Security fixes for password reset links and email headers. Password reset emails now build their link only from **Settings → Base URL**, so set it if SubTrackr runs behind a reverse proxy.
+
+### v0.6.10
+- High-cost alert thresholds above 10,000 are now accepted.
+- Security hardening for the calendar and settings pages, and a [security policy](SECURITY.md) for reporting vulnerabilities.
+
+See the [releases page](https://github.com/bscott/subtrackr/releases) for full notes.
 
 ## 🎨 Themes
 
@@ -41,7 +62,7 @@ Personalize your SubTrackr experience with 5 beautiful themes:
 Themes persist across all pages and are saved per user. Change themes anytime from Settings → Appearance.
 
 ![Version](https://img.shields.io/github/v/release/bscott/subtrackr?logo=github&label=version)
-![Go Version](https://img.shields.io/badge/go-%3E%3D1.21-00ADD8)
+![Go Version](https://img.shields.io/badge/go-%3E%3D1.24-00ADD8)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
 
 ## 🚀 Features
@@ -53,19 +74,22 @@ Themes persist across all pages and are saved per user. Change themes anytime fr
 - 🔔 **Email Notifications**: Get reminders before subscriptions renew
 - 📱 **Pushover Notifications**: Receive push notifications on your mobile device
 - 🔔 **ntfy and Gotify Notifications**: Push to ntfy.sh or your own ntfy or Gotify server, including over HTTP on your LAN
+- ⏰ **To Cancel Reminders**: Get reminded before the last day you can cancel a subscription you no longer want
 - 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
 - 🎨 **Beautiful Themes**: 5 stunning themes including a festive Christmas theme with snowfall animation
-- 🌍 **Multi-Currency Support**: Support for USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT, and CNY (with optional real-time conversion)
+- 🌍 **Multi-Currency Support**: 37 built-in currencies, including USD, EUR, GBP, JPY, INR, BRL and VND (with optional real-time conversion)
 - 🤖 **MCP Server**: AI integration via Model Context Protocol for Claude and other AI assistants
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
 - 📱 **Mobile Responsive**: Optimized mobile experience with hamburger menu navigation
+- ⌨️ **Keyboard Friendly**: The add/edit form and mobile menu keep keyboard focus inside, close with Escape and return focus where you left off
+- 📆 **Date Formats**: `MM/DD/YYYY`, `DD/MM/YYYY`, `YYYY-MM-DD` or `DD.MM.YYYY`
 
 ## 🏗️ Tech Stack
 
 - **Backend**: Go with Gin framework
 - **Database**: SQLite (no external database needed!)
-- **Frontend**: HTMX + Tailwind CSS
+- **Frontend**: HTMX 4 (served by SubTrackr) + Tailwind CSS
 - **Deployment**: Docker & Docker Compose
 
 ## 🚀 Quick Start
@@ -254,7 +278,7 @@ SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
 
 **Note:** The free Fixer.io plan only allows EUR as the base currency. SubTrackr automatically handles cross-rate calculations (e.g., USD→INR goes through EUR) so all currency conversions work correctly regardless of this limitation.
 
-**Supported currencies:** USD, EUR, GBP, JPY, RUB, SEK, PLN, INR, CHF, BRL, COP, BDT, CNY
+**Supported currencies:** USD, EUR, GBP, AUD, CAD, NZD, JPY, CHF, CNY, SEK, NOK, DKK, INR, RUB, BRL, PLN, KRW, SGD, HKD, MXN, ZAR, TRY, THB, COP, BDT, IDR, PHP, TWD, MYR, AED, SAR, ILS, CZK, HUF, RON, UAH, VND
 
 ### Email Notifications (SMTP)
 
@@ -290,6 +314,8 @@ Receive push notifications on your mobile device via Pushover:
 **Note**: Pushover notifications work alongside email notifications. Both will be sent when enabled, giving you multiple ways to stay informed about your subscriptions.
 
 ### ntfy and Gotify Notifications
+
+<img src="screenshots/v0.7.0-ntfy-gotify.png" alt="ntfy and Gotify settings" width="700"/>
 
 Send the same renewal, cancellation and high-cost notifications to a self-hostable push server. Both work over HTTPS and over plain HTTP on your LAN.
 
@@ -344,7 +370,10 @@ Committed upgrade tests cover a captured v0.6.10 fresh-install schema, a v0.3.0 
 1. **Reverse Proxy**: Use Nginx/Traefik for HTTPS
 2. **Authentication**: Add basic auth or OAuth2 proxy
 3. **Network**: Don't expose port 8080 directly to internet
-4. **Backups**: Regular backups of the data directory
+4. **Backups**: Regular backups of the data directory (see [Upgrading and backing up existing installations](#upgrading-and-backing-up-existing-installations))
+5. **Base URL**: Behind a reverse proxy, set **Settings → Base URL** to your public address. Password reset emails and iCal subscription links use it.
+
+To report a vulnerability, follow the [security policy](SECURITY.md) rather than opening a public issue.
 
 ### Nginx Reverse Proxy Example
 

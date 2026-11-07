@@ -300,7 +300,7 @@
   "settings.export_data_description": "以多种格式下载你的订阅数据",
   "settings.export_csv": "导出为 CSV",
   "settings.export_json": "导出为 JSON",
-  "settings.base_url_description": "设置 SubTrackr 实例的外部 URL。用于 iCal 订阅链接和密码重置邮件。留空则自动从请求头检测。",
+  "settings.base_url_description": "设置 SubTrackr 实例的外部 URL。用于 iCal 订阅链接和密码重置邮件。留空时，iCal 链接将根据请求自动检测，密码重置邮件只包含一个路径，需要在你的 SubTrackr 地址上打开。",
   "settings.base_url_placeholder": "https://subtrackr.example.com",
   "settings.calendar_subscription_description": "启用可订阅的 iCal URL，日历应用可以定期获取更新",
   "settings.calendar_subscription_label": "iCal 订阅",

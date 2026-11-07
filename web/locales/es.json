@@ -310,7 +310,7 @@
   "settings.export_data_description": "Descarga tus datos de suscripción en varios formatos",
   "settings.export_csv": "Exportar como CSV",
   "settings.export_json": "Exportar como JSON",
-  "settings.base_url_description": "Establece la URL externa de tu instancia de SubTrackr. Se usa para enlaces de suscripción iCal y correos de restablecimiento de contraseña. Deja vacío para autodetectar desde los encabezados de la solicitud.",
+  "settings.base_url_description": "Establece la URL externa de tu instancia de SubTrackr. Se usa para enlaces de suscripción iCal y correos de restablecimiento de contraseña. Si se deja vacía, los enlaces iCal se detectan a partir de la solicitud y los correos de restablecimiento solo incluyen una ruta que debes abrir en tu dirección de SubTrackr.",
   "settings.base_url_placeholder": "https://subtrackr.example.com",
   "settings.calendar_subscription_description": "Habilita una URL iCal a la que las aplicaciones de calendario pueden suscribirse para recibir actualizaciones en vivo",
   "settings.calendar_subscription_label": "Suscripción iCal",

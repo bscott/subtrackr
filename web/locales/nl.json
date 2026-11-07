@@ -310,7 +310,7 @@
   "settings.export_data_description": "Download je abonnementsgegevens in verschillende formaten",
   "settings.export_csv": "Exporteren als CSV",
   "settings.export_json": "Exporteren als JSON",
-  "settings.base_url_description": "Stel de externe URL voor je SubTrackr-installatie in. Gebruikt voor iCal-abonnementslinks en e-mails voor wachtwoordherstel. Laat leeg om automatisch te detecteren via verzoek-headers.",
+  "settings.base_url_description": "Stel de externe URL voor je SubTrackr-installatie in. Gebruikt voor iCal-abonnementslinks en e-mails voor wachtwoordherstel. Laat je dit leeg, dan worden iCal-links uit het verzoek afgeleid en bevatten herstel-e-mails alleen een pad dat je op je SubTrackr-adres opent.",
   "settings.base_url_placeholder": "https://subtrackr.example.com",
   "settings.calendar_subscription_description": "Schakelt een abonneerbare iCal-URL in die agenda-apps kunnen pollen voor live-updates",
   "settings.calendar_subscription_label": "iCal-abonnement",
