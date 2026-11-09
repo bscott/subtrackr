@@ -513,9 +513,9 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 	{
 		// Subscription endpoints
 		v1.GET("/subscriptions", handler.GetSubscriptionsAPI)
-		v1.POST("/subscriptions", handler.CreateSubscription)
+		v1.POST("/subscriptions", middleware.JSONBodyAsForm(), handler.CreateSubscription)
 		v1.GET("/subscriptions/:id", handler.GetSubscription)
-		v1.PUT("/subscriptions/:id", handler.UpdateSubscription)
+		v1.PUT("/subscriptions/:id", middleware.JSONBodyAsForm(), handler.UpdateSubscription)
 		v1.DELETE("/subscriptions/:id", handler.DeleteSubscription)
 		v1.POST("/subscriptions/:id/duplicate", handler.DuplicateSubscription)
 
