@@ -40,3 +40,19 @@ func TestJSONBodyAsFormRejectsInvalidJSON(t *testing.T) {
 		t.Errorf("got status %d", recorder.Code)
 	}
 }
+
+func TestJSONBodyAsFormRejectsOversizedBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/", JSONBodyAsForm(), func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	body := `{"notes":"` + strings.Repeat("a", maxJSONBodyBytes) + `"}`
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("got status %d", recorder.Code)
+	}
+}
