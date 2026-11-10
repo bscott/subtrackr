@@ -2,65 +2,6 @@
 
 A self-hosted subscription management application built with Go and HTMX. Track your subscriptions, visualize spending, and get renewal reminders.
 
-![SubTrackr Dashboard](dashboard-screenshot.png)
-
-![SubTrackr Calendar View](calendar-screenshot.png)
-
-<img src="mobile-screenshot.png" alt="SubTrackr Mobile View" width="320"/>
-
-## ✨ What's New
-
-### v0.7.0
-- **To Cancel reminders**: mark a subscription you plan to cancel and get a reminder 3, 5 or 14 days before the last day you can cancel. See [To Cancel reminders](#to-cancel-reminders).
-- **ntfy and Gotify notifications**: send reminders and alerts to ntfy.sh or your own ntfy or Gotify server. See [ntfy and Gotify Notifications](#ntfy-and-gotify-notifications).
-- **European date format**: `DD.MM.YYYY` joins the existing date preferences.
-- **HTMX 4**: the interface runs on HTMX 4, served from SubTrackr itself rather than a CDN. Errors show beside the form that caused them, an expired session sends you to the login page, and the add/edit form works fully from the keyboard.
-- **Safer database**: SQLite now runs in WAL mode, which fixes "database is locked" errors. Back up before upgrading; see [Upgrading and backing up existing installations](#upgrading-and-backing-up-existing-installations).
-- Saved notification tokens are no longer shown in Settings.
-
-![Subscriptions marked To cancel, with cancel-by deadlines](screenshots/v0.7.0-to-cancel.png)
-
-### v0.6.11
-- Security fixes for password reset links and email headers. Password reset emails now build their link only from **Settings → Base URL**, so set it if SubTrackr runs behind a reverse proxy.
-
-### v0.6.10
-- High-cost alert thresholds above 10,000 are now accepted.
-- Security hardening for the calendar and settings pages, and a [security policy](SECURITY.md) for reporting vulnerabilities.
-
-See the [releases page](https://github.com/bscott/subtrackr/releases) for full notes.
-
-## 🎨 Themes
-
-Personalize your SubTrackr experience with 5 beautiful themes:
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="screenshots/christmas.png" alt="Christmas Theme" width="600"/><br/>
-      <b>Christmas 🎄</b><br/>
-      Festive and jolly! (with snowfall animation)
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="screenshots/ocean.png" alt="Ocean Theme" width="600"/><br/>
-      <b>Ocean</b><br/>
-      Cool and refreshing
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="screenshots/login.png" alt="Login Page" width="600"/><br/>
-      <b>Optional Authentication</b><br/>
-      Secure your data with optional login support
-    </td>
-  </tr>
-</table>
-
-**Available themes:** Default (Light), Dark, Christmas 🎄, Midnight (Purple), Ocean (Cyan)
-
-Themes persist across all pages and are saved per user. Change themes anytime from Settings → Appearance.
-
 ![Version](https://img.shields.io/github/v/release/bscott/subtrackr?logo=github&label=version)
 ![Go Version](https://img.shields.io/badge/go-%3E%3D1.24-00ADD8)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
@@ -78,19 +19,13 @@ Themes persist across all pages and are saved per user. Change themes anytime fr
 - 📤 **Data Export**: Export your data as CSV, JSON, or iCal format
 - 🎨 **Beautiful Themes**: 5 stunning themes including a festive Christmas theme with snowfall animation
 - 🌍 **Multi-Currency Support**: 37 built-in currencies, including USD, EUR, GBP, JPY, INR, BRL and VND (with optional real-time conversion)
+- 🔌 **REST API**: API keys and a public OpenAPI spec at `/api/v1/openapi.json` for scripts and AI agents
 - 🤖 **MCP Server**: AI integration via Model Context Protocol for Claude and other AI assistants
 - 🐳 **Docker Ready**: Easy deployment with Docker
 - 🔒 **Self-Hosted**: Your data stays on your server
 - 📱 **Mobile Responsive**: Optimized mobile experience with hamburger menu navigation
 - ⌨️ **Keyboard Friendly**: The add/edit form and mobile menu keep keyboard focus inside, close with Escape and return focus where you left off
 - 📆 **Date Formats**: `MM/DD/YYYY`, `DD/MM/YYYY`, `YYYY-MM-DD` or `DD.MM.YYYY`
-
-## 🏗️ Tech Stack
-
-- **Backend**: Go with Gin framework
-- **Database**: SQLite (no external database needed!)
-- **Frontend**: HTMX 4 (served by SubTrackr) + Tailwind CSS
-- **Deployment**: Docker & Docker Compose
 
 ## 🚀 Quick Start
 
@@ -161,6 +96,67 @@ cd subtrackr
 ```bash
 docker-compose up -d --build
 ```
+
+## 📸 Screenshots
+
+![SubTrackr Dashboard](dashboard-screenshot.png)
+
+![SubTrackr Calendar View](calendar-screenshot.png)
+
+<img src="mobile-screenshot.png" alt="SubTrackr Mobile View" width="320"/>
+
+## 🎨 Themes
+
+Personalize your SubTrackr experience with 5 beautiful themes:
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="screenshots/christmas.png" alt="Christmas Theme" width="600"/><br/>
+      <b>Christmas 🎄</b><br/>
+      Festive and jolly! (with snowfall animation)
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/ocean.png" alt="Ocean Theme" width="600"/><br/>
+      <b>Ocean</b><br/>
+      Cool and refreshing
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="screenshots/login.png" alt="Login Page" width="600"/><br/>
+      <b>Optional Authentication</b><br/>
+      Secure your data with optional login support
+    </td>
+  </tr>
+</table>
+
+**Available themes:** Default (Light), Dark, Christmas 🎄, Midnight (Purple), Ocean (Cyan)
+
+Themes persist across all pages and are saved per user. Change themes anytime from Settings → Appearance.
+
+## ✨ What's New
+
+### v0.7.0
+- **To Cancel reminders**: mark a subscription you plan to cancel and get a reminder 3, 5 or 14 days before the last day you can cancel. See [To Cancel reminders](#to-cancel-reminders).
+- **ntfy and Gotify notifications**: send reminders and alerts to ntfy.sh or your own ntfy or Gotify server. See [ntfy and Gotify Notifications](#ntfy-and-gotify-notifications).
+- **European date format**: `DD.MM.YYYY` joins the existing date preferences.
+- **HTMX 4**: the interface runs on HTMX 4, served from SubTrackr itself rather than a CDN. Errors show beside the form that caused them, an expired session sends you to the login page, and the add/edit form works fully from the keyboard.
+- **Safer database**: SQLite now runs in WAL mode, which fixes "database is locked" errors. Back up before upgrading; see [Upgrading and backing up existing installations](#upgrading-and-backing-up-existing-installations).
+- Saved notification tokens are no longer shown in Settings.
+
+![Subscriptions marked To cancel, with cancel-by deadlines](screenshots/v0.7.0-to-cancel.png)
+
+### v0.6.11
+- Security fixes for password reset links and email headers. Password reset emails now build their link only from **Settings → Base URL**, so set it if SubTrackr runs behind a reverse proxy.
+
+### v0.6.10
+- High-cost alert thresholds above 10,000 are now accepted.
+- Security hardening for the calendar and settings pages, and a [security policy](SECURITY.md) for reporting vulnerabilities.
+
+See the [releases page](https://github.com/bscott/subtrackr/releases) for full notes.
 
 ## 🐳 Deployment Guides
 
@@ -568,6 +564,13 @@ The MCP binary is included in the Docker image. Configure your MCP client to exe
 ```
 
 The MCP server shares the same SQLite database as the web server, so changes made through either interface are immediately visible in the other.
+
+## 🏗️ Tech Stack
+
+- **Backend**: Go with Gin framework
+- **Database**: SQLite (no external database needed!)
+- **Frontend**: HTMX 4 (served by SubTrackr) + Tailwind CSS
+- **Deployment**: Docker & Docker Compose
 
 ## 🛠️ Development
 
