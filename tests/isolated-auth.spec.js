@@ -109,6 +109,12 @@ test('enabling login from settings protects every page', async ({ page, browser,
   // API calls without a session get 401 instead of a redirect.
   const api = await anonymous.request.get('/api/subscriptions', { headers: { Accept: 'application/json' } });
   expect(api.status()).toBe(401);
+
+  // The API description stays readable, so a script or agent can discover the API first.
+  const spec = await anonymous.request.get('/api/v1/openapi.json');
+  expect(spec.status()).toBe(200);
+  expect((await spec.json()).paths['/api/v1/subscriptions']).toBeTruthy();
+  expect((await anonymous.request.get('/api/v1/subscriptions')).status()).toBe(401);
   await anonymous.close();
 });
 

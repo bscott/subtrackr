@@ -402,6 +402,7 @@
   "settings.clear_data": "Daten löschen",
   "settings.loading_api_keys": "API-Schlüssel werden geladen...",
   "api_docs.title": "API-Dokumentation",
+  "api_docs.openapi_intro": "Eine maschinenlesbare OpenAPI-Beschreibung dieser API ist ohne Anmeldung verfügbar:",
   "api_docs.authentication": "Authentifizierung",
   "api_docs.auth_intro": "Alle API-Anfragen erfordern eine Authentifizierung mit einem API-Schlüssel. Fügen Sie Ihren API-Schlüssel in die Anfrage-Header ein:",
   "api_docs.endpoints": "API-Endpunkte",

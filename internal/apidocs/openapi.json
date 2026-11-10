@@ -1,0 +1,896 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SubTrackr API",
+    "version": "1",
+    "description": "REST API for a SubTrackr instance. Every endpoint except this document requires an API key, which a signed-in user creates under Settings > API Keys. Send it as `Authorization: Bearer <key>` or `X-API-Key: <key>`. Errors are JSON objects of the form `{\"error\": \"message\"}` unless noted.",
+    "license": {
+      "name": "AGPL-3.0",
+      "url": "https://www.gnu.org/licenses/agpl-3.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "This SubTrackr instance"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "apiKeyHeader": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Subscriptions"
+    },
+    {
+      "name": "Statistics and export"
+    },
+    {
+      "name": "Documentation"
+    }
+  ],
+  "paths": {
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": [
+          "Documentation"
+        ],
+        "operationId": "getOpenAPISpec",
+        "summary": "This document",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3 description of the API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions": {
+      "get": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "operationId": "listSubscriptions",
+        "summary": "List all subscriptions",
+        "responses": {
+          "200": {
+            "description": "Every subscription.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Subscription"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "operationId": "createSubscription",
+        "summary": "Create a subscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SubscriptionInput"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "cost",
+                      "schedule",
+                      "status"
+                    ]
+                  }
+                ]
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/SubscriptionInput"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "cost",
+                      "schedule",
+                      "status"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created subscription.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON, an unknown `category_id`, or an unsupported `to_cancel_reminder_days`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "description": "JSON body larger than 1 MB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "operationId": "getSubscription",
+        "summary": "Get a subscription",
+        "responses": {
+          "200": {
+            "description": "The subscription.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`id` is not a number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No subscription with this ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "operationId": "updateSubscription",
+        "summary": "Update a subscription",
+        "description": "Changes only the fields present in the body. The response has no body; read the subscription back with a GET.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionInput"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated. No response body."
+          },
+          "400": {
+            "description": "Invalid `id`, invalid JSON, or a rejected value. A rejected update may answer with an HTML fragment instead of JSON."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "No subscription with this ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body larger than 1 MB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "operationId": "deleteSubscription",
+        "summary": "Delete a subscription",
+        "responses": {
+          "200": {
+            "description": "Deleted. No response body."
+          },
+          "400": {
+            "description": "`id` is not a number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/{id}/duplicate": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Subscriptions"
+        ],
+        "operationId": "duplicateSubscription",
+        "summary": "Duplicate a subscription",
+        "description": "Creates a copy with \" (Copy)\" appended to the name. The copy starts a new reminder history.",
+        "responses": {
+          "201": {
+            "description": "The new copy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid `id`, or the subscription could not be duplicated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "tags": [
+          "Statistics and export"
+        ],
+        "operationId": "getStats",
+        "summary": "Spending statistics",
+        "responses": {
+          "200": {
+            "description": "Totals across all subscriptions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/export/csv": {
+      "get": {
+        "tags": [
+          "Statistics and export"
+        ],
+        "operationId": "exportCSV",
+        "summary": "Export subscriptions as CSV",
+        "responses": {
+          "200": {
+            "description": "CSV file with a header row.",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/export/json": {
+      "get": {
+        "tags": [
+          "Statistics and export"
+        ],
+        "operationId": "exportJSON",
+        "summary": "Export subscriptions as JSON",
+        "responses": {
+          "200": {
+            "description": "All subscriptions with export metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Export"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "`Authorization: Bearer sk_...`"
+      },
+      "apiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid API key.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Subscription": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional sub-label that tells apart several subscriptions to the same service."
+          },
+          "cost": {
+            "type": "number",
+            "description": "Price per billing period, in `original_currency`."
+          },
+          "original_currency": {
+            "type": "string",
+            "description": "ISO 4217 currency code the cost is recorded in."
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "Monthly",
+              "Annual",
+              "Weekly",
+              "Daily",
+              "Quarterly"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Cancelled",
+              "Paused",
+              "Trial"
+            ]
+          },
+          "category_id": {
+            "type": "integer",
+            "description": "0 means uncategorized."
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "payment_method": {
+            "type": "string"
+          },
+          "autopay": {
+            "type": "boolean",
+            "description": "`true` automatic, `false` manual, `null` not recorded.",
+            "nullable": true
+          },
+          "account": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "renewal_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancellation_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "url": {
+            "type": "string"
+          },
+          "icon_url": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "string",
+            "description": "One of High, Medium, Low, None, or empty when not recorded."
+          },
+          "schedule_interval": {
+            "type": "integer",
+            "description": "Number of schedule units per billing period; 2 with `Monthly` means every two months."
+          },
+          "share_count": {
+            "type": "integer",
+            "description": "Number of people splitting the cost; 1 means not shared."
+          },
+          "cancellation_notice_days": {
+            "type": "integer",
+            "description": "Notice the provider requires before renewal, 0-365; 0 means none."
+          },
+          "reminder_enabled": {
+            "type": "boolean"
+          },
+          "date_calculation_version": {
+            "type": "integer"
+          },
+          "last_reminder_sent": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_reminder_renewal_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_reminder_window": {
+            "type": "integer"
+          },
+          "last_cancellation_reminder_sent": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_cancellation_reminder_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_cancellation_reminder_window": {
+            "type": "integer"
+          },
+          "to_cancel": {
+            "type": "boolean",
+            "description": "The user intends to cancel this subscription."
+          },
+          "to_cancel_reminder_days": {
+            "type": "integer",
+            "description": "Days before the deadline to start reminding.",
+            "enum": [
+              3,
+              5,
+              14
+            ]
+          },
+          "last_to_cancel_reminder_sent": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_to_cancel_reminder_anchor": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SubscriptionInput": {
+        "type": "object",
+        "description": "Fields accepted by create and update. Send them as a JSON object or form-encoded, with the same names. On update, only the fields present are changed. In a JSON body a `null` value is treated as absent.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "number",
+            "description": "Must be greater than 0."
+          },
+          "original_currency": {
+            "type": "string",
+            "description": "ISO 4217 code. Defaults to the instance's currency."
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "Monthly",
+              "Annual",
+              "Weekly",
+              "Daily",
+              "Quarterly"
+            ]
+          },
+          "schedule_interval": {
+            "type": "integer",
+            "description": "Defaults to 1.",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Cancelled",
+              "Paused",
+              "Trial"
+            ]
+          },
+          "category_id": {
+            "type": "integer",
+            "description": "ID of an existing category. Omit for uncategorized."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tag names, for example `streaming,family`. Replaces the existing tags; an empty string removes them all. A JSON array is not accepted."
+          },
+          "payment_method": {
+            "type": "string"
+          },
+          "autopay": {
+            "type": "boolean",
+            "description": "Whether payments are automatic."
+          },
+          "autopay_known": {
+            "type": "boolean",
+            "description": "Send `false` to ignore `autopay` and leave the payment mode unrecorded."
+          },
+          "account": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "First billing date. Format `YYYY-MM-DD`; an empty string clears it."
+          },
+          "renewal_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Next renewal. Format `YYYY-MM-DD`; an empty string clears it."
+          },
+          "cancellation_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date the subscription ends. Format `YYYY-MM-DD`; an empty string clears it."
+          },
+          "url": {
+            "type": "string",
+            "description": "Service URL. When `icon_url` is empty the server tries to fetch a logo for it."
+          },
+          "icon_url": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "High",
+              "Medium",
+              "Low",
+              "None"
+            ]
+          },
+          "share_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cancellation_notice_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 365
+          },
+          "reminder_enabled": {
+            "type": "boolean",
+            "description": "Defaults to `true` on create."
+          },
+          "to_cancel": {
+            "type": "boolean"
+          },
+          "to_cancel_reminder_days": {
+            "type": "integer",
+            "enum": [
+              3,
+              5,
+              14
+            ]
+          }
+        }
+      },
+      "CurrencyTotals": {
+        "type": "object",
+        "properties": {
+          "total_monthly_spend": {
+            "type": "number"
+          },
+          "total_annual_spend": {
+            "type": "number"
+          },
+          "total_saved": {
+            "type": "number"
+          },
+          "monthly_saved": {
+            "type": "number"
+          },
+          "active_subscriptions": {
+            "type": "integer"
+          },
+          "cancelled_subscriptions": {
+            "type": "integer"
+          }
+        }
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "total_monthly_spend": {
+            "type": "number",
+            "description": "In the instance's display currency."
+          },
+          "total_annual_spend": {
+            "type": "number"
+          },
+          "active_subscriptions": {
+            "type": "integer"
+          },
+          "cancelled_subscriptions": {
+            "type": "integer"
+          },
+          "total_saved": {
+            "type": "number"
+          },
+          "monthly_saved": {
+            "type": "number"
+          },
+          "upcoming_renewals": {
+            "type": "integer"
+          },
+          "category_spending": {
+            "type": "object",
+            "description": "Monthly spend per category name.",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "conversion_complete": {
+            "type": "boolean",
+            "description": "False when some amounts could not be converted to the display currency."
+          },
+          "conversion_rate_stale": {
+            "type": "boolean"
+          },
+          "conversion_rate_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totals_by_currency": {
+            "type": "object",
+            "description": "Totals per original currency code.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CurrencyTotals"
+            }
+          },
+          "category_spending_by_currency": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "Export": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subscription"
+            }
+          },
+          "exported_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total_count": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

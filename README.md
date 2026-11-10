@@ -433,6 +433,14 @@ The `autopay` field is nullable: `true` means payments are automatic, `false` me
 
 The `cancellation_notice_days` field holds the notice period (in days, 0-365) the provider requires before renewal; `0` means none. When set, renewal reminders count down to the cancel-by deadline (`renewal_date` minus the notice period) instead of the renewal date; once the deadline has passed, reminders fall back to the renewal date. Webhook reminders keep the `renewal_reminder` event name and carry `cancel_by_date` and `cancellation_notice_days` in the subscription payload.
 
+#### OpenAPI Specification
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/openapi.json` | OpenAPI 3 description of the API (no API key required) |
+
+The spec is served without authentication, so you can point a script, an API client or an AI agent at `https://your-domain.com/api/v1/openapi.json` to learn the endpoints and schemas. It describes the API only: every other endpoint still needs an API key, and keys can only be created by a signed-in user.
+
 Create and update accept either a JSON object (`Content-Type: application/json`) or a form-encoded body, with the same field names. Set the category with `category_id`, and send `tags` as a comma-separated string such as `"streaming,family"`. JSON bodies are limited to 1 MB.
 
 #### Statistics & Export
@@ -487,16 +495,22 @@ curl -H "Authorization: Bearer sk_your_api_key_here" \
 Response:
 ```json
 {
-  "total_count": 15,
-  "active_count": 12,
-  "total_cost": 245.67,
-  "categories": {
+  "total_monthly_spend": 164.98,
+  "total_annual_spend": 1979.76,
+  "active_subscriptions": 12,
+  "cancelled_subscriptions": 3,
+  "total_saved": 239.88,
+  "monthly_saved": 19.99,
+  "upcoming_renewals": 2,
+  "category_spending": {
     "Entertainment": 45.99,
     "Productivity": 89.00,
     "Storage": 29.99
   }
 }
 ```
+
+The response also carries currency conversion details (`conversion_complete`, `conversion_rate_stale`, `conversion_rate_date`, `totals_by_currency`, `category_spending_by_currency`); see the OpenAPI spec for the full schema.
 
 ## 🤖 MCP Server (AI Integration)
 

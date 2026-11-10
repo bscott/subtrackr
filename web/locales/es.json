@@ -402,6 +402,7 @@
   "settings.clear_data": "Borrar datos",
   "settings.loading_api_keys": "Cargando claves API...",
   "api_docs.title": "Documentación de la API",
+  "api_docs.openapi_intro": "Una descripción OpenAPI de esta API, legible por máquinas, está disponible sin iniciar sesión:",
   "api_docs.authentication": "Autenticación",
   "api_docs.auth_intro": "Todas las solicitudes de la API requieren autenticación mediante una clave API. Incluye tu clave API en las cabeceras de la solicitud:",
   "api_docs.endpoints": "Endpoints de la API",

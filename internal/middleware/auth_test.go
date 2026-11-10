@@ -49,6 +49,7 @@ func TestOIDCRoutesArePublicDuringLoginFlow(t *testing.T) {
 
 func TestPublicRoutesDoNotUseBroadPrefixMatching(t *testing.T) {
 	assert.True(t, isPublicRoute("/login"))
+	assert.True(t, isPublicRoute("/api/v1/openapi.json"))
 	assert.True(t, isPublicRoute("/static/app.js"))
 	assert.False(t, isPublicRoute("/login-anything"))
 	assert.False(t, isPublicRoute("/healthz-extra"))

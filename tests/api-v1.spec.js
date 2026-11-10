@@ -67,6 +67,22 @@ test('every /api/v1 endpoint rejects requests without a valid API key', async ({
   expect(all.subscriptions.find(s => s.name === name)).toBeUndefined();
 });
 
+test('the OpenAPI spec is served without an API key and documents every endpoint', async ({ request, page }) => {
+  const response = await request.get('/api/v1/openapi.json');
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toMatch(/^application\/json/);
+  const spec = await response.json();
+  expect(spec.openapi).toMatch(/^3\./);
+  for (const [method, path] of ENDPOINTS) {
+    const documented = path.replace('/1', '/{id}');
+    expect(spec.paths[documented]?.[method], `${method} ${documented}`).toBeTruthy();
+  }
+  expect(spec.paths['/api/v1/openapi.json'].get.security).toEqual([]);
+
+  await page.goto('/settings');
+  await expect(page.locator('#api-docs').getByRole('link', { name: '/api/v1/openapi.json' })).toHaveAttribute('href', '/api/v1/openapi.json');
+});
+
 v1('accepts the key as X-API-Key or a Bearer token, and stops accepting it once deleted', async ({ request }) => {
   const { key, id } = await createAPIKey(request);
   try {

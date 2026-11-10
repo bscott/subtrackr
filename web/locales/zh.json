@@ -384,6 +384,7 @@
   "settings.clear_data": "清除数据",
   "settings.loading_api_keys": "加载 API 密钥中...",
   "api_docs.title": "API Documentation",
+  "api_docs.openapi_intro": "A machine-readable OpenAPI description of this API is available without signing in:",
   "api_docs.authentication": "Authentication",
   "api_docs.auth_intro": "All API requests require authentication using an API key. Include your API key in the request headers:",
   "api_docs.endpoints": "API Endpoints",

@@ -1283,7 +1283,11 @@
 <div id="api-docs" class="mt-6">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm transition-colors duration-200">
         <div class="p-6">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">{{t .Lang "api_docs.title"}}</h2>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{t .Lang "api_docs.title"}}</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                {{t .Lang "api_docs.openapi_intro"}}
+                <a href="/api/v1/openapi.json" target="_blank" rel="noopener" class="font-mono text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">/api/v1/openapi.json</a>
+            </p>
             
             <div class="space-y-6">
                 <!-- Authentication -->

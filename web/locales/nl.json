@@ -402,6 +402,7 @@
   "settings.clear_data": "Gegevens wissen",
   "settings.loading_api_keys": "API-sleutels laden...",
   "api_docs.title": "API-documentatie",
+  "api_docs.openapi_intro": "Een machineleesbare OpenAPI-beschrijving van deze API is beschikbaar zonder in te loggen:",
   "api_docs.authentication": "Authenticatie",
   "api_docs.auth_intro": "Alle API-verzoeken vereisen authenticatie met een API-sleutel. Voeg je API-sleutel toe aan de verzoek-headers:",
   "api_docs.endpoints": "API-eindpunten",

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"subtrackr/internal/apidocs"
 	"subtrackr/internal/config"
 	"subtrackr/internal/database"
 	"subtrackr/internal/handlers"
@@ -506,6 +507,9 @@ func setupRoutes(router *gin.Engine, handler *handlers.SubscriptionHandler, sett
 		// Base URL setting
 		api.POST("/settings/base-url", settingsHandler.UpdateBaseURL)
 	}
+
+	// API documentation: public, so scripts and agents can read it before they hold a key.
+	router.GET(apidocs.Path, apidocs.Handler)
 
 	// Public API routes (require API key authentication)
 	v1 := router.Group("/api/v1")
