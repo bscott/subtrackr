@@ -254,6 +254,7 @@ docker-compose up -d --build
 | `DATABASE_PATH` | SQLite database file path | `./data/subtrackr.db` |
 | `GIN_MODE` | Gin framework mode (debug/release) | `debug` |
 | `FIXER_API_KEY` | Fixer.io API key for currency conversion (optional) | None |
+| `FIXER_API_URL` | Alternative exchange-rate endpoint in Fixer's `latest` format (optional) | `https://data.fixer.io/api/latest` |
 
 ### Currency Conversion (Optional)
 
@@ -277,6 +278,8 @@ SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
 4. Restart SubTrackr - currency conversion will be automatically enabled
 
 **Note:** The free Fixer.io plan only allows EUR as the base currency. SubTrackr automatically handles cross-rate calculations (e.g., USD→INR goes through EUR) so all currency conversions work correctly regardless of this limitation.
+
+**Using another rate source:** set `FIXER_API_URL` to any endpoint that answers in Fixer's `latest` format (`success`, `timestamp`, `base`, `rates`), for example a self-hosted proxy or a Fixer-compatible mirror. SubTrackr calls it with `base=EUR` and `symbols=...`, and sends `access_key` only when `FIXER_API_KEY` is also set, so conversion works with a source that needs no key. Currencies the source does not return are left unconverted.
 
 **Supported currencies:** USD, EUR, GBP, AUD, CAD, NZD, JPY, CHF, CNY, SEK, NOK, DKK, INR, RUB, BRL, PLN, KRW, SGD, HKD, MXN, ZAR, TRY, THB, COP, BDT, IDR, PHP, TWD, MYR, AED, SAR, ILS, CZK, HUF, RON, UAH, VND
 
