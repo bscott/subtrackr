@@ -253,6 +253,7 @@ This project uses versioned branches for releases. See `CLAUDE.md` for the compl
 - `DATABASE_PATH` - SQLite database path (default: ./data/subtrackr.db)
 - `GIN_MODE` - Gin mode: debug/release (default: debug)
 - `FIXER_API_KEY` - Fixer.io API key for currency conversion (optional)
+- `FIXER_API_URL` - Alternative exchange-rate endpoint in Fixer's `latest` format (optional)
 
 ### Building and Running
 

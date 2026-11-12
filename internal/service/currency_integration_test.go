@@ -680,3 +680,66 @@ func TestCurrencyService_ReturnsErrorWhenRefreshFailsWithoutCachedPair(t *testin
 	assert.Equal(t, int32(1), requestCount.Load())
 	assert.Contains(t, logs.String(), "monthly quota reached")
 }
+
+func TestCurrencyService_CustomEndpointEnablesConversionWithoutAPIKey(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		if r.URL.Query().Has("access_key") {
+			t.Errorf("access_key sent without a configured API key")
+		}
+		if r.URL.Query().Get("base") != "EUR" {
+			t.Errorf("base = %q, want EUR", r.URL.Query().Get("base"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(fixerSuccessBody(now))); err != nil {
+			t.Errorf("write Fixer response: %v", err)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("FIXER_API_KEY", "")
+	t.Setenv("FIXER_API_URL", server.URL)
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+
+	currencyService := NewCurrencyService(repo, repository.NewSettingsRepository(db))
+	assert.True(t, currencyService.IsEnabled())
+	conversion, err := currencyService.ConvertAmount(3, "USD", "SEK")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 30.0, conversion.Amount)
+	assert.False(t, conversion.Stale)
+	assert.Equal(t, int32(1), requestCount.Load())
+}
+
+func TestCurrencyService_CustomEndpointStillSendsConfiguredAPIKey(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	var requestCount atomic.Int32
+	server := newFixerTestServer(t, fixerSuccessBody(now), &requestCount)
+	defer server.Close()
+	t.Setenv("FIXER_API_KEY", "test-key")
+	t.Setenv("FIXER_API_URL", server.URL)
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+
+	conversion, err := NewCurrencyService(repo, repository.NewSettingsRepository(db)).ConvertAmount(3, "USD", "SEK")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 30.0, conversion.Amount)
+	assert.Equal(t, int32(1), requestCount.Load())
+}
+
+func TestCurrencyService_WithoutCustomEndpointOrAPIKeyMakesNoRequest(t *testing.T) {
+	t.Setenv("FIXER_API_KEY", "")
+	t.Setenv("FIXER_API_URL", "")
+	db := setupTestDB(t)
+	repo := repository.NewExchangeRateRepository(db)
+
+	currencyService := NewCurrencyService(repo, repository.NewSettingsRepository(db))
+
+	assert.False(t, currencyService.IsEnabled())
+	assert.Equal(t, fixerURL, currencyService.endpoint)
+	_, err := currencyService.ConvertAmount(3, "USD", "SEK")
+	assert.Error(t, err)
+}

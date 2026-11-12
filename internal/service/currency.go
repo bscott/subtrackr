@@ -172,7 +172,13 @@ func NewCurrencyService(repo *repository.ExchangeRateRepository, settingsRepo *r
 			},
 		},
 	}
-	return createCurrencyService(repo, settingsRepo, client, fixerURL, os.Getenv("FIXER_API_KEY"))
+	// FIXER_API_URL lets the operator point the refresh at another server that
+	// answers in Fixer's "latest" format. Unset keeps the Fixer.io endpoint.
+	endpoint := fixerURL
+	if custom := strings.TrimSpace(os.Getenv("FIXER_API_URL")); custom != "" {
+		endpoint = custom
+	}
+	return createCurrencyService(repo, settingsRepo, client, endpoint, os.Getenv("FIXER_API_KEY"))
 }
 
 func createCurrencyService(repo *repository.ExchangeRateRepository, settingsRepo *repository.SettingsRepository, client *http.Client, endpoint, apiKey string) *CurrencyService {
@@ -185,9 +191,10 @@ func createCurrencyService(repo *repository.ExchangeRateRepository, settingsRepo
 	}
 }
 
-// IsEnabled returns true if currency conversion is enabled (API key is set)
+// IsEnabled returns true if currency conversion is enabled: an API key is set,
+// or the operator configured their own endpoint, which may not need a key.
 func (s *CurrencyService) IsEnabled() bool {
-	return s.apiKey != ""
+	return s.apiKey != "" || s.endpoint != fixerURL
 }
 
 // ConvertAmount converts an amount from one currency to another
@@ -312,7 +319,9 @@ func (s *CurrencyService) fetchAndCacheRates() error {
 		return fmt.Errorf("unauthorized Fixer host: %s", parsedURL.Host)
 	}
 	query := parsedURL.Query()
-	query.Set("access_key", s.apiKey)
+	if s.apiKey != "" {
+		query.Set("access_key", s.apiKey)
+	}
 	query.Set("base", "EUR")
 	query.Set("symbols", supportedCurrencySymbols())
 	parsedURL.RawQuery = query.Encode()
