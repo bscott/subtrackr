@@ -34,6 +34,9 @@ type SubscriptionWithConversion struct {
 	ShowConversion        bool      `json:"show_conversion"`
 	ConversionRateDate    time.Time `json:"conversion_rate_date"`
 	ConversionRateStale   bool      `json:"conversion_rate_stale"`
+	// RateSourceName and RateSourceURL attribute the conversion in the UI.
+	RateSourceName string `json:"-"`
+	RateSourceURL  string `json:"-"`
 }
 
 type SubscriptionHandler struct {
@@ -110,6 +113,10 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 				enriched.ShowConversion = true
 				enriched.ConversionRateDate = conversion.RateDate
 				enriched.ConversionRateStale = conversion.Stale
+				// Attribute the rate to the source that produced it, which can
+				// differ from the configured one until a refresh succeeds.
+				enriched.RateSourceName = conversion.Source.Name
+				enriched.RateSourceURL = conversion.Source.URL
 			} else {
 				// Without a usable rate, presenting the original amount avoids labeling
 				// one currency's value with another currency's symbol.
@@ -745,8 +752,19 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		}
 	}
 
+	var conversionEnabled, sourceMisconfigured bool
+	var rateSource service.RateSource
+	if h.currencyService != nil {
+		conversionEnabled = h.currencyService.IsEnabled()
+		sourceMisconfigured = h.currencyService.SourceMisconfigured()
+		rateSource = h.currencyService.RateSource()
+	}
+
 	c.HTML(http.StatusOK, "settings.html", gin.H{
 		"Title":                        "Settings",
+		"CurrencyConversionEnabled":    conversionEnabled,
+		"CurrencySourceMisconfigured":  sourceMisconfigured,
+		"RateSource":                   rateSource,
 		"CurrentPage":                  "settings",
 		"Currency":                     h.settingsService.GetCurrency(),
 		"CurrencySymbol":               h.settingsService.GetCurrencySymbol(),

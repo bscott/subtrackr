@@ -254,20 +254,20 @@ docker-compose up -d --build
 | `DATABASE_PATH` | SQLite database file path | `./data/subtrackr.db` |
 | `GIN_MODE` | Gin framework mode (debug/release) | `debug` |
 | `FIXER_API_KEY` | Fixer.io API key for currency conversion (optional) | None |
-| `FIXER_API_URL` | Alternative exchange-rate endpoint in Fixer's `latest` format (optional) | `https://data.fixer.io/api/latest` |
+| `FIXER_API_URL` | Alternative exchange-rate endpoint in Fixer's `latest` format (optional, see [Using another rate source](#using-another-rate-source)) | `https://data.fixer.io/api/latest` |
 
 ### Currency Conversion (Optional)
 
-SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
+SubTrackr supports automatic currency conversion using Fixer.io exchange rates by default, or [another rate source](#using-another-rate-source) you configure:
 
-**Without API key:** (Fully functional)
+**Without a rate source:** (Fully functional)
 - Basic multi-currency support with display symbols
 - Manual currency selection per subscription
 - Subscriptions displayed in their original currency
 - No automatic conversion between currencies
 
-**With Fixer.io API key:**
-- Real-time exchange rates (cached for 24 hours)
+**With a Fixer.io API key or another rate source:**
+- Exchange rates cached and refreshed about once a day (after a failed refresh, one retry is allowed an hour later)
 - Automatic conversion between any supported currencies
 - Display original amount + converted amount in your preferred currency
 
@@ -279,7 +279,30 @@ SubTrackr supports automatic currency conversion using Fixer.io exchange rates:
 
 **Note:** The free Fixer.io plan only allows EUR as the base currency. SubTrackr automatically handles cross-rate calculations (e.g., USD→INR goes through EUR) so all currency conversions work correctly regardless of this limitation.
 
-**Using another rate source:** set `FIXER_API_URL` to any endpoint that answers in Fixer's `latest` format (`success`, `timestamp`, `base`, `rates`), for example a self-hosted proxy or a Fixer-compatible mirror. SubTrackr calls it with `base=EUR` and `symbols=...`, and sends `access_key` only when `FIXER_API_KEY` is also set, so conversion works with a source that needs no key. Currencies the source does not return are left unconverted.
+#### Using another rate source
+
+Fixer.io is the default, but the rate source is configurable. Set `FIXER_API_URL` to any endpoint that answers in Fixer's `latest` format (`success`, `base`, `rates`, and `timestamp` in Unix seconds or `date` as `YYYY-MM-DD`), for example a self-hosted proxy or a Fixer-compatible mirror:
+
+```bash
+# A source that needs no key: FIXER_API_URL alone enables conversion
+FIXER_API_URL=https://rates.example.com/api/latest
+
+# A source that needs a key: set both, and the key is sent as access_key
+FIXER_API_URL=https://rates.example.com/api/latest
+FIXER_API_KEY=your_key_here
+```
+
+- SubTrackr calls the URL with `base=EUR` and `symbols=...`, and adds `access_key` when `FIXER_API_KEY` is set. Any query parameters already in the URL, such as a key the source expects under its own name, are kept as they are.
+- The URL must be absolute `http` or `https`. If it is not, currency conversion stays off and the server log says why. SubTrackr does not fall back to Fixer.io, so a key meant for your own source is never sent to a third party. Use `https` whenever credentials are involved: over `http`, a key, a query string or a `user:password@` part travels unencrypted, and SubTrackr logs a warning. A URL on `data.fixer.io` is treated as Fixer.io and still needs `FIXER_API_KEY`.
+- Redirects are not followed, because they would pass the key to another address. If the source answers with a redirect, the refresh fails with its status code; set `FIXER_API_URL` to the final URL.
+- A response is rejected, and the cached rates kept, unless its `base` is `EUR`, and unless it carries a `timestamp` or `date` that is not in the future. Responses over 1 MB are rejected too, and individual rates outside a plausible range (1e-6 to 1e9 per euro) are skipped.
+- A currency the source does not return is not converted, unless a rate for it was cached earlier from the same source. Then the cached rate is used and marked as out of date once it ages.
+- Many free sources publish central-bank reference rates once per business day, so a rate is only shown as out of date after 120 hours with a custom source (24 hours with Fixer.io). This keeps Friday's rates from being flagged all weekend. SubTrackr still tries to refresh about once a day.
+- When you change the source, SubTrackr fetches from the new one on the next conversion, because each source has its own daily limit, and replaces the old source's cached rates once that succeeds. Until then, converted amounts keep using, and naming, the old source.
+- Give the web server and the MCP server (`cmd/mcp`) the same `FIXER_API_URL` and `FIXER_API_KEY` when they share a database. Otherwise each one keeps replacing the other's rates, up to once a day per source.
+- Outbound requests honour the standard `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` variables.
+
+The active source is shown under **Settings → Currency**, and the tooltip on each converted amount names it and links to it. Only the source's host is shown, never its path or query string.
 
 **Supported currencies:** USD, EUR, GBP, AUD, CAD, NZD, JPY, CHF, CNY, SEK, NOK, DKK, INR, RUB, BRL, PLN, KRW, SGD, HKD, MXN, ZAR, TRY, THB, COP, BDT, IDR, PHP, TWD, MYR, AED, SAR, ILS, CZK, HUF, RON, UAH, VND
 
