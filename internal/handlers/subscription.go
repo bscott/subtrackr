@@ -1411,15 +1411,28 @@ func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
 			}
 		}
 
+		// Tag ids in the backup belong to the instance it came from, so link
+		// tags by name after the subscription is created.
+		tagNames := make([]string, len(sub.Tags))
+		for i, tag := range sub.Tags {
+			tagNames[i] = tag.Name
+		}
+
 		sub.ID = 0
 		sub.Category = models.Category{}
+		sub.Tags = nil
 		sub.CreatedAt = time.Time{}
 		sub.UpdatedAt = time.Time{}
 
-		_, err := h.service.Create(&sub)
+		created, err := h.service.Create(&sub)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to import '%s': %v", sub.Name, err))
 			continue
+		}
+		if len(tagNames) > 0 {
+			if _, err := h.tagService.SetSubscriptionTags(created.ID, tagNames); err != nil {
+				errors = append(errors, fmt.Sprintf("Failed to restore tags of '%s': %v", sub.Name, err))
+			}
 		}
 		imported++
 	}
