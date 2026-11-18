@@ -347,7 +347,10 @@ func postedAutopay(c *gin.Context) (*bool, bool) {
 	return &value, true
 }
 
-// parseDatePtr parses a date string in "2006-01-02" format and returns a pointer to time.Time.
+// parseDatePtr parses a date as "2006-01-02", or as the RFC 3339 timestamp the
+// JSON API returns, so a subscription fetched from the API can be sent back
+// unchanged. A timestamp keeps the calendar date it was written with and
+// becomes midnight UTC, the same as the date-only form.
 // Returns nil if the string is empty or if parsing fails.
 // Logs parsing errors for debugging purposes.
 func parseDatePtr(dateStr string) *time.Time {
@@ -355,6 +358,10 @@ func parseDatePtr(dateStr string) *time.Time {
 		return nil
 	}
 	if date, err := time.Parse("2006-01-02", dateStr); err == nil {
+		return &date
+	}
+	if stamp, err := time.Parse(time.RFC3339Nano, dateStr); err == nil {
+		date := time.Date(stamp.Year(), stamp.Month(), stamp.Day(), 0, 0, 0, 0, time.UTC)
 		return &date
 	}
 	// Log parsing errors for debugging (invalid date format from form)

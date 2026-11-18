@@ -459,7 +459,7 @@ The `autopay` field is nullable: `true` means payments are automatic, `false` me
 
 The `cancellation_notice_days` field holds the notice period (in days, 0-365) the provider requires before renewal; `0` means none. When set, renewal reminders count down to the cancel-by deadline (`renewal_date` minus the notice period) instead of the renewal date; once the deadline has passed, reminders fall back to the renewal date. Webhook reminders keep the `renewal_reminder` event name and carry `cancel_by_date` and `cancellation_notice_days` in the subscription payload.
 
-Create and update accept either a JSON object (`Content-Type: application/json`) or a form-encoded body, with the same field names. Set the category with `category_id`, and send `tags` as a comma-separated string such as `"streaming,family"`. JSON bodies are limited to 1 MB.
+Create and update accept either a JSON object (`Content-Type: application/json`) or a form-encoded body, with the same field names. Set the category with `category_id`. Send `tags` as a comma-separated string such as `"streaming,family"`, or in JSON as a list of names (`["streaming", "family"]`) or the list of tag objects a GET returns. Tags are matched by name and any tag `id` is ignored. An empty value or list removes all tags, and leaving `tags` out (or `null`) keeps them. Dates take `YYYY-MM-DD` or the timestamp a GET returns. A subscription fetched with GET can therefore be sent back with PUT unchanged. JSON bodies are limited to 1 MB.
 
 #### Statistics & Export
 
