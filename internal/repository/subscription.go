@@ -124,11 +124,16 @@ func (r *SubscriptionRepository) Create(subscription *models.Subscription) (*mod
 	// Normal creation for migrated schema. An uncategorized subscription leaves
 	// category_id out so it is stored as NULL; a Category without an ID is still
 	// saved by GORM, which fills in the reference.
-	tx := r.db
+	//
+	// Tags are left out: GORM would link them by primary key, and an id from a
+	// backup or another instance can name a different tag here. Callers attach
+	// tags by name through TagService.SetSubscriptionTags after creation.
+	// Each Omit call replaces the previous list, so build it in one place.
+	omit := []string{"Tags"}
 	if subscription.CategoryID == 0 && subscription.Category.ID == 0 && subscription.Category.Name == "" {
-		tx = tx.Omit("category_id")
+		omit = append(omit, "category_id")
 	}
-	if err := tx.Create(subscription).Error; err != nil {
+	if err := r.db.Omit(omit...).Create(subscription).Error; err != nil {
 		return nil, err
 	}
 	return subscription, nil

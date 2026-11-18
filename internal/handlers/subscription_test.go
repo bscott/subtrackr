@@ -115,6 +115,31 @@ func TestParseDatePtr(t *testing.T) {
 			expected: nil,
 			valid:    false,
 		},
+		{
+			name:     "API timestamp - midnight UTC",
+			input:    "2026-12-14T00:00:00Z",
+			expected: timePtr(time.Date(2026, 12, 14, 0, 0, 0, 0, time.UTC)),
+			valid:    true,
+		},
+		{
+			// The calendar date as written, not the UTC instant (Dec 15 in UTC).
+			name:     "API timestamp - keeps date in its own offset",
+			input:    "2026-12-14T20:35:13.501098886-08:00",
+			expected: timePtr(time.Date(2026, 12, 14, 0, 0, 0, 0, time.UTC)),
+			valid:    true,
+		},
+		{
+			name:     "Invalid timestamp - impossible day",
+			input:    "2026-02-30T00:00:00Z",
+			expected: nil,
+			valid:    false,
+		},
+		{
+			name:     "Invalid timestamp - no zone",
+			input:    "2026-12-14T00:00:00",
+			expected: nil,
+			valid:    false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -130,6 +155,8 @@ func TestParseDatePtr(t *testing.T) {
 					assert.Equal(t, tt.expected.Year(), result.Year(), "Year should match")
 					assert.Equal(t, tt.expected.Month(), result.Month(), "Month should match")
 					assert.Equal(t, tt.expected.Day(), result.Day(), "Day should match")
+					assert.Equal(t, time.UTC, result.Location(), "dates are stored as midnight UTC")
+					assert.Zero(t, result.Hour()*3600+result.Minute()*60+result.Second()+result.Nanosecond(), "no time of day")
 				}
 			}
 		})

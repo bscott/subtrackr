@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
+	"strings"
 	"testing"
 	"time"
 
@@ -186,4 +188,43 @@ func TestIsHighCostWithCurrency_DoesNotCompareUnconvertedCurrencies(t *testing.T
 	assert.False(t, isHighCost)
 	assert.Contains(t, logs.String(), "Failed to convert currency for high-cost check (USD to SEK)")
 	assert.NotContains(t, logs.String(), "Using direct comparison")
+}
+
+func TestEnrichWithCurrencyConversion_AttributesRateToItsSource(t *testing.T) {
+	handler, exchangeRateRepo, settingsService := newCurrencyTestHandler(t)
+	saveEURRates(t, exchangeRateRepo, time.Now().Add(-time.Hour))
+	sub := []models.Subscription{{Cost: 3, Schedule: "Monthly", OriginalCurrency: "USD"}}
+
+	// Rates cached before sources were recorded came from Fixer.io.
+	legacy := handler.enrichWithCurrencyConversion(sub)
+	require.Len(t, legacy, 1)
+	assert.Equal(t, "Fixer.io", legacy[0].RateSourceName)
+	assert.Equal(t, "https://fixer.io", legacy[0].RateSourceURL)
+
+	// Rates cached from a custom source name it, without path or query.
+	require.NoError(t, settingsService.SetStringSetting("currency_rate_source", "https://rates.example.com/api/latest"))
+	custom := handler.enrichWithCurrencyConversion(sub)
+	require.Len(t, custom, 1)
+	assert.Equal(t, "rates.example.com", custom[0].RateSourceName)
+	assert.Equal(t, "https://rates.example.com", custom[0].RateSourceURL)
+
+	// No conversion, no attribution.
+	same := handler.enrichWithCurrencyConversion([]models.Subscription{{Cost: 3, Schedule: "Monthly", OriginalCurrency: "SEK"}})
+	assert.Empty(t, same[0].RateSourceName)
+}
+
+// The JSON API must not grow rate-source fields by accident: they are for the
+// HTML views only.
+func TestSubscriptionWithConversion_JSONOmitsRateSource(t *testing.T) {
+	handler, exchangeRateRepo, settingsService := newCurrencyTestHandler(t)
+	saveEURRates(t, exchangeRateRepo, time.Now().Add(-time.Hour))
+	require.NoError(t, settingsService.SetStringSetting("currency_rate_source", "https://rates.example.com/sha256-0011223344556677"))
+
+	enriched := handler.enrichWithCurrencyConversion([]models.Subscription{{Cost: 3, Schedule: "Monthly", OriginalCurrency: "USD"}})
+	encoded, err := json.Marshal(enriched)
+
+	require.NoError(t, err)
+	require.Equal(t, "rates.example.com", enriched[0].RateSourceName)
+	assert.NotContains(t, string(encoded), "rates.example.com")
+	assert.NotContains(t, strings.ToLower(string(encoded)), "rate_source")
 }

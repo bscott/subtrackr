@@ -87,3 +87,73 @@ func TestRestoreReplaceWithTagsAndUncategorizedEntries(t *testing.T) {
 	assert.Zero(t, byName["Restored plain"].CategoryID)
 	assert.Equal(t, "Backup category", byName["Restored filed"].Category.Name)
 }
+
+// Backup tags are matched by name, since their ids belong to the instance
+// the backup came from.
+func TestRestoreMergeLinksTagsByName(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db, err := database.Initialize(filepath.Join(t.TempDir(), "restore.db"))
+	require.NoError(t, err)
+	require.NoError(t, database.RunMigrations(db))
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { sqlDB.Close() })
+
+	categoryService := service.NewCategoryService(repository.NewCategoryRepository(db))
+	subscriptions := service.NewSubscriptionService(repository.NewSubscriptionRepository(db), categoryService)
+	settingsRepo := repository.NewSettingsRepository(db)
+	tagRepo := repository.NewTagRepository(db)
+	handler := NewSubscriptionHandler(
+		subscriptions,
+		service.NewSettingsService(settingsRepo),
+		service.NewCurrencyService(repository.NewExchangeRateRepository(db), settingsRepo),
+		nil, // notifier
+		nil, // logoService
+		categoryService,
+		service.NewTagService(tagRepo),
+		nil, // i18nCatalog
+	)
+	router := gin.New()
+	router.POST("/api/restore", handler.RestoreData)
+
+	existing, err := subscriptions.Create(&models.Subscription{Name: "Gym", Cost: 30, Schedule: "Monthly", Status: "Active"})
+	require.NoError(t, err)
+	tags, err := tagRepo.FindOrCreateByNames([]string{"personal"})
+	require.NoError(t, err)
+	require.NoError(t, tagRepo.ReplaceSubscriptionTags(existing.ID, tags))
+
+	backup, err := json.Marshal(map[string]any{
+		"version": "test",
+		"subscriptions": []map[string]any{
+			{"name": "Netflix", "cost": 15.99, "schedule": "Monthly", "status": "Active",
+				"tags": []map[string]any{{"id": tags[0].ID, "name": "work"}}},
+		},
+	})
+	require.NoError(t, err)
+
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	file, err := form.CreateFormFile("backup_file", "backup.json")
+	require.NoError(t, err)
+	_, err = file.Write(backup)
+	require.NoError(t, err)
+	require.NoError(t, form.WriteField("mode", "merge"))
+	require.NoError(t, form.Close())
+
+	request := httptest.NewRequest(http.MethodPost, "/api/restore", &body)
+	request.Header.Set("Content-Type", form.FormDataContentType())
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	all, err := subscriptions.GetAll()
+	require.NoError(t, err)
+	tagNames := map[string][]string{}
+	for _, sub := range all {
+		for _, tag := range sub.Tags {
+			tagNames[sub.Name] = append(tagNames[sub.Name], tag.Name)
+		}
+	}
+	assert.Equal(t, []string{"work"}, tagNames["Netflix"])
+	assert.Equal(t, []string{"personal"}, tagNames["Gym"])
+}

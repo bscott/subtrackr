@@ -133,10 +133,6 @@ v1('create response includes the subscription\'s category', async ({ api }) => {
 });
 
 v1('creates a subscription from the JSON body shown in the README', async ({ api }) => {
-  // BUG: README documents `Content-Type: application/json` bodies for POST/PUT /api/v1/subscriptions,
-  // but the handlers only read form fields, so a JSON body is ignored and the request fails with
-  // 400 "FOREIGN KEY constraint failed" (or updates nothing).
-  v1.fail();
   const name = uniqueName('API v1 json');
   const response = await api.post('/subscriptions', { data: { name, cost: 15.99, schedule: 'Monthly', status: 'Active', category_id: api.category.id } });
   if (response.status() === 201) api.data.track((await response.json()).id);

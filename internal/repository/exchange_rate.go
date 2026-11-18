@@ -43,3 +43,15 @@ func (r *ExchangeRateRepository) GetRate(baseCurrency, targetCurrency string) (*
 func (r *ExchangeRateRepository) SaveRates(rates []models.ExchangeRate) error {
 	return r.db.Create(&rates).Error
 }
+
+// ReplaceRates atomically replaces every cached rate for baseCurrency with
+// rates. It is used when the rate source changes, so rates cached from the old
+// source can no longer outrank or fill in for the new one.
+func (r *ExchangeRateRepository) ReplaceRates(baseCurrency string, rates []models.ExchangeRate) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("base_currency = ?", baseCurrency).Delete(&models.ExchangeRate{}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&rates).Error
+	})
+}

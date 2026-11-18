@@ -34,6 +34,9 @@ type SubscriptionWithConversion struct {
 	ShowConversion        bool      `json:"show_conversion"`
 	ConversionRateDate    time.Time `json:"conversion_rate_date"`
 	ConversionRateStale   bool      `json:"conversion_rate_stale"`
+	// RateSourceName and RateSourceURL attribute the conversion in the UI.
+	RateSourceName string `json:"-"`
+	RateSourceURL  string `json:"-"`
 }
 
 type SubscriptionHandler struct {
@@ -110,6 +113,10 @@ func (h *SubscriptionHandler) enrichWithCurrencyConversion(subscriptions []model
 				enriched.ShowConversion = true
 				enriched.ConversionRateDate = conversion.RateDate
 				enriched.ConversionRateStale = conversion.Stale
+				// Attribute the rate to the source that produced it, which can
+				// differ from the configured one until a refresh succeeds.
+				enriched.RateSourceName = conversion.Source.Name
+				enriched.RateSourceURL = conversion.Source.URL
 			} else {
 				// Without a usable rate, presenting the original amount avoids labeling
 				// one currency's value with another currency's symbol.
@@ -340,7 +347,10 @@ func postedAutopay(c *gin.Context) (*bool, bool) {
 	return &value, true
 }
 
-// parseDatePtr parses a date string in "2006-01-02" format and returns a pointer to time.Time.
+// parseDatePtr parses a date as "2006-01-02", or as the RFC 3339 timestamp the
+// JSON API returns, so a subscription fetched from the API can be sent back
+// unchanged. A timestamp keeps the calendar date it was written with and
+// becomes midnight UTC, the same as the date-only form.
 // Returns nil if the string is empty or if parsing fails.
 // Logs parsing errors for debugging purposes.
 func parseDatePtr(dateStr string) *time.Time {
@@ -348,6 +358,10 @@ func parseDatePtr(dateStr string) *time.Time {
 		return nil
 	}
 	if date, err := time.Parse("2006-01-02", dateStr); err == nil {
+		return &date
+	}
+	if stamp, err := time.Parse(time.RFC3339Nano, dateStr); err == nil {
+		date := time.Date(stamp.Year(), stamp.Month(), stamp.Day(), 0, 0, 0, 0, time.UTC)
 		return &date
 	}
 	// Log parsing errors for debugging (invalid date format from form)
@@ -745,8 +759,19 @@ func (h *SubscriptionHandler) Settings(c *gin.Context) {
 		}
 	}
 
+	var conversionEnabled, sourceMisconfigured bool
+	var rateSource service.RateSource
+	if h.currencyService != nil {
+		conversionEnabled = h.currencyService.IsEnabled()
+		sourceMisconfigured = h.currencyService.SourceMisconfigured()
+		rateSource = h.currencyService.RateSource()
+	}
+
 	c.HTML(http.StatusOK, "settings.html", gin.H{
 		"Title":                        "Settings",
+		"CurrencyConversionEnabled":    conversionEnabled,
+		"CurrencySourceMisconfigured":  sourceMisconfigured,
+		"RateSource":                   rateSource,
 		"CurrentPage":                  "settings",
 		"Currency":                     h.settingsService.GetCurrency(),
 		"CurrencySymbol":               h.settingsService.GetCurrencySymbol(),
@@ -1411,15 +1436,28 @@ func (h *SubscriptionHandler) RestoreData(c *gin.Context) {
 			}
 		}
 
+		// Tag ids in the backup belong to the instance it came from, so link
+		// tags by name after the subscription is created.
+		tagNames := make([]string, len(sub.Tags))
+		for i, tag := range sub.Tags {
+			tagNames[i] = tag.Name
+		}
+
 		sub.ID = 0
 		sub.Category = models.Category{}
+		sub.Tags = nil
 		sub.CreatedAt = time.Time{}
 		sub.UpdatedAt = time.Time{}
 
-		_, err := h.service.Create(&sub)
+		created, err := h.service.Create(&sub)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("Failed to import '%s': %v", sub.Name, err))
 			continue
+		}
+		if len(tagNames) > 0 {
+			if _, err := h.tagService.SetSubscriptionTags(created.ID, tagNames); err != nil {
+				errors = append(errors, fmt.Sprintf("Failed to restore tags of '%s': %v", sub.Name, err))
+			}
 		}
 		imported++
 	}
